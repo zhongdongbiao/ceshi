@@ -1,0 +1,335 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="utry.data.modular.ccBoard.visit.dao.VisitDefaultDao">
+    <!--添加回访违约单数据-->
+    <insert id="createVisitAudit">
+        insert into t_cc_visit_default (serviceNumber,systemState,complaintMark,checkMark,productCategory,documentNo,date,serviceType,serviceDate,
+        productType,productModel,storeNumber,storeName,storeLevel,lastNumber,defaultCode,defaultDescription,repayMark,serviceMoney,
+        defaultDetailInstruction,insurancePart,insuranceMoney,originalMoney,money,result,complaintResult,complaintContent,reviewOpinions,
+        completeNote,complaintOpinion,accountingCenter,accountingRegional,accountingArea)
+        values(#{serviceNumber},#{systemState},#{complaintMark},#{checkMark},#{productCategory}, #{documentNo},#{date},#{serviceType},#{serviceDate},
+        #{productType},#{productModel},#{storeNumber},#{storeName},#{storeLevel},#{lastNumber},#{defaultCode},#{defaultDescription},
+        #{repayMark},#{serviceMoney},#{defaultDetailInstruction},#{insurancePart},#{insuranceMoney},#{originalMoney},
+        #{money},#{result},#{complaintResult},#{complaintContent},#{reviewOpinions},#{completeNote},#{complaintOpinion},#{accountingCenter},
+        #{accountingArea}, #{accountingArea})
+    </insert>
+
+    <!--根据服务单号修改回访违约单数据-->
+    <update id="updateVisitDefault">
+        update t_cc_visit_default set systemState=#{systemState},complaintMark=#{complaintMark},checkMark=#{checkMark},productCategory=#{productCategory},
+        documentNo=#{documentNo},date=#{date},serviceType=#{serviceType},serviceDate=#{serviceDate},productType=#{productType},
+        productModel=#{productModel},storeNumber=#{storeNumber},storeName=#{storeName},storeLevel=#{storeLevel},lastNumber=#{lastNumber},
+        defaultCode=#{defaultCode},defaultDescription=#{defaultDescription},repayMark=#{repayMark},serviceMoney=#{serviceMoney},
+        defaultDetailInstruction=#{defaultDetailInstruction},insurancePart=#{insurancePart},insuranceMoney=#{insuranceMoney},originalMoney=#{originalMoney},
+        money=#{money},result=#{result},complaintResult=#{complaintResult},complaintContent=#{complaintContent},reviewOpinions=#{reviewOpinions},completeNote=#{completeNote},
+        complaintOpinion=#{complaintOpinion},accountingCenter=#{accountingCenter},accountingArea=#{accountingArea},accountingArea=#{accountingArea}
+        where serviceNumber=#{serviceNumber}
+    </update>
+
+    <!--根据服务单号查询是否有数据-->
+    <select id="getFlag" resultType="utry.data.modular.ccBoard.visit.model.VisitDefault">
+        select serviceNumber,systemState,complaintMark,checkMark,productCategory,documentNo,date,serviceType,serviceDate,
+        productType,productModel,storeNumber,storeName,storeLevel,lastNumber,defaultCode,defaultDescription,repayMark,serviceMoney,
+        defaultDetailInstruction,insurancePart,insuranceMoney,originalMoney,money,result,complaintResult,complaintContent,reviewOpinions,
+        completeNote,complaintOpinion,accountingCenter,accountingRegional,accountingArea
+        from t_cc_visit_default  where serviceNumber=#{serviceNumber}
+    </select>
+
+
+    <!--当月违约量-->
+    <select id="monthDefaultCount" resultType="java.lang.Integer">
+        select count(*) from t_cc_visit_default where accountingCenter !='住宅设备BU'
+        <if test="dateDurationQueueIdDto.endDate != null and dateDurationQueueIdDto.endDate != ''">
+            and substring(date,1,7) = substring(#{dateDurationQueueIdDto.endDate},1,7)
+        </if>
+        <if test="accountingCenter != null and accountingCenter.size >0 ">
+            and accountingCenter  in
+            <foreach collection="accountingCenter" item="model" open="(" close=")" separator=",">
+                #{model}
+            </foreach>
+        </if>
+        <if test="result != null and result == '1'.toString()">
+            and result ='违约'
+        </if>
+    </select>
+
+    <!--获取所有队列每日违约量-->
+    <select id="getEveryDayDefaultCount" resultType="java.lang.Integer">
+        select count(*) from t_cc_visit_default where accountingCenter !='住宅设备BU'
+        <if test="date != null and date != ''">
+            and substring(date,1,10) =  #{date}
+        </if>
+        <if test="accountingCenter != null and accountingCenter.size >0 ">
+            and accountingCenter  in
+            <foreach collection="accountingCenter" item="model" open="(" close=")" separator=",">
+                #{model}
+            </foreach>
+        </if>
+        <if test="result != null and result == '1'.toString()">
+            and result ='违约'
+        </if>
+    </select>
+
+    <!--查询回访违约单数量-->
+    <select id="getNoComplaint" resultType="java.lang.Integer">
+        select count(*) from t_cc_visit_default where accountingCenter !='住宅设备BU'
+        <if test="dateDurationQueueIdDto.startDate != null and dateDurationQueueIdDto.startDate != ''">
+            and substring(date,1,10) <![CDATA[ >= ]]> #{dateDurationQueueIdDto.startDate}
+        </if>
+        <if test="dateDurationQueueIdDto.endDate != null and dateDurationQueueIdDto.endDate != ''">
+            and substring(date,1,10) <![CDATA[ <= ]]> #{dateDurationQueueIdDto.endDate}
+        </if>
+        <if test="accountingCenter != null and accountingCenter.size >0 ">
+            and accountingCenter  in
+            <foreach collection="accountingCenter" item="model" open="(" close=")" separator=",">
+                #{model}
+            </foreach>
+        </if>
+        <if test="systemState != null and systemState == '1'.toString()">
+            and systemState = '待核实'
+        </if>
+        <if test="systemState != null and systemState == '0'.toString()">
+            and systemState = '待申诉'
+        </if>
+    </select>
+
+    <!--获取申诉统计-大区维度-->
+    <select id="getComplaintByRegion" resultType="utry.data.modular.ccBoard.visit.bo.Complaint">
+        select accountingArea as abscissa,
+        IFNULL(ROUND((IFNULL(sum(complaint),0))/(IFNULL(sum(total),0))*100,2),0.00) as complaintRate,
+        IFNULL(ROUND((IFNULL(sum(noComplaint),0))/(IFNULL(sum(complaint),0))*100,2),0.00) as noComplaintRate
+        from (
+        select count(*) as total, null as complaint,null as noComplaint,accountingArea  from  t_cc_visit_default where accountingCenter !='住宅设备BU'
+        <if test="dateDurationQueueIdDto.startDate != null and dateDurationQueueIdDto.startDate != ''">
+            and substring(date,1,10) <![CDATA[ >= ]]> #{dateDurationQueueIdDto.startDate}
+        </if>
+        <if test="dateDurationQueueIdDto.endDate != null and dateDurationQueueIdDto.endDate != ''">
+            and substring(date,1,10) <![CDATA[ <= ]]> #{dateDurationQueueIdDto.endDate}
+        </if>
+        <if test="accountingCenter != null and accountingCenter.size >0 ">
+            and accountingCenter  in
+            <foreach collection="accountingCenter" item="model" open="(" close=")" separator=",">
+                #{model}
+            </foreach>
+        </if>
+        GROUP BY accountingArea UNION
+        select  null as total, count(*) as complaint,null as noComplaint,accountingArea from  t_cc_visit_default
+        where accountingCenter !='住宅设备BU' and systemState='已申诉'
+        <if test="dateDurationQueueIdDto.startDate != null and dateDurationQueueIdDto.startDate != ''">
+            and substring(date,1,10) <![CDATA[ >= ]]> #{dateDurationQueueIdDto.startDate}
+        </if>
+        <if test="dateDurationQueueIdDto.endDate != null and dateDurationQueueIdDto.endDate != ''">
+            and substring(date,1,10) <![CDATA[ <= ]]> #{dateDurationQueueIdDto.endDate}
+        </if>
+        <if test="accountingCenter != null and accountingCenter.size >0 ">
+            and accountingCenter  in
+            <foreach collection="accountingCenter" item="model" open="(" close=")" separator=",">
+                #{model}
+            </foreach>
+        </if>
+        GROUP BY accountingArea UNION select null as total, null as complaint,count(*) as noComplaint,accountingArea  from  t_cc_visit_default
+        where accountingCenter !='住宅设备BU' and result='违约' and systemState='已申诉'
+        <if test="dateDurationQueueIdDto.startDate != null and dateDurationQueueIdDto.startDate != ''">
+            and substring(date,1,10) <![CDATA[ >= ]]> #{dateDurationQueueIdDto.startDate}
+        </if>
+        <if test="dateDurationQueueIdDto.endDate != null and dateDurationQueueIdDto.endDate != ''">
+            and substring(date,1,10) <![CDATA[ <= ]]> #{dateDurationQueueIdDto.endDate}
+        </if>
+        <if test="accountingCenter != null and accountingCenter.size >0 ">
+            and accountingCenter  in
+            <foreach collection="accountingCenter" item="model" open="(" close=")" separator=",">
+                #{model}
+            </foreach>
+        </if> GROUP BY accountingArea) list GROUP BY accountingArea HAVING accountingArea is not null and (complaintRate!=0.00 or noComplaintRate!=0.00)
+    </select>
+
+    <!--获取申诉统计-任务分类维度-->
+    <select id="getComplaintByTaskType" resultType="utry.data.modular.ccBoard.visit.bo.Complaint">
+        select taskType as abscissa,
+        IFNULL(ROUND((IFNULL(sum(complaint),0))/(IFNULL(sum(total),0))*100,2),0.00) as complaintRate,
+        IFNULL(ROUND((IFNULL(sum(noComplaint),0))/(IFNULL(sum(complaint),0))*100,2),0.00) as noComplaintRate
+        from (
+        select count(*) as total, null as complaint,null as noComplaint,tcva.taskType   from  t_cc_visit_default tcvd LEFT JOIN t_cc_visit_audit tcva on tcvd.serviceNumber=tcva.serviceNumber where tcvd.accountingCenter !='住宅设备BU'
+        <if test="dateDurationQueueIdDto.startDate != null and dateDurationQueueIdDto.startDate != ''">
+            and substring(tcvd.date,1,10) <![CDATA[ >= ]]> #{dateDurationQueueIdDto.startDate}
+        </if>
+        <if test="dateDurationQueueIdDto.endDate != null and dateDurationQueueIdDto.endDate != ''">
+            and substring(tcvd.date,1,10) <![CDATA[ <= ]]> #{dateDurationQueueIdDto.endDate}
+        </if>
+        <if test="accountingCenter != null and accountingCenter.size >0 ">
+            and tcvd.accountingCenter  in
+            <foreach collection="accountingCenter" item="model" open="(" close=")" separator=",">
+                #{model}
+            </foreach>
+        </if>
+        GROUP BY tcva.taskType  UNION
+        select  null as total, count(*) as complaint,null as noComplaint,tcva.taskType from  t_cc_visit_default tcvd LEFT JOIN t_cc_visit_audit tcva on tcvd.serviceNumber=tcva.serviceNumber
+        where tcvd.systemState='已申诉' and tcvd.accountingCenter !='住宅设备BU'
+        <if test="dateDurationQueueIdDto.startDate != null and dateDurationQueueIdDto.startDate != ''">
+            and substring(tcvd.date,1,10) <![CDATA[ >= ]]> #{dateDurationQueueIdDto.startDate}
+        </if>
+        <if test="dateDurationQueueIdDto.endDate != null and dateDurationQueueIdDto.endDate != ''">
+            and substring(tcvd.date,1,10) <![CDATA[ <= ]]> #{dateDurationQueueIdDto.endDate}
+        </if>
+        <if test="accountingCenter != null and accountingCenter.size >0 ">
+            and tcvd.accountingCenter  in
+            <foreach collection="accountingCenter" item="model" open="(" close=")" separator=",">
+                #{model}
+            </foreach>
+        </if>
+        GROUP BY tcva.taskType UNION select null as total, null as complaint,count(*) as noComplaint,tcva.taskType  from  t_cc_visit_default tcvd LEFT JOIN t_cc_visit_audit tcva  on tcvd.serviceNumber=tcva.serviceNumber
+        where tcvd.result='违约' and tcvd.systemState='已申诉' and tcvd.accountingCenter !='住宅设备BU'
+        <if test="dateDurationQueueIdDto.startDate != null and dateDurationQueueIdDto.startDate != ''">
+            and substring(tcvd.date,1,10) <![CDATA[ >= ]]> #{dateDurationQueueIdDto.startDate}
+        </if>
+        <if test="dateDurationQueueIdDto.endDate != null and dateDurationQueueIdDto.endDate != ''">
+            and substring(tcvd.date,1,10) <![CDATA[ <= ]]> #{dateDurationQueueIdDto.endDate}
+        </if>
+        <if test="accountingCenter != null and accountingCenter.size >0 ">
+            and tcvd.accountingCenter  in
+            <foreach collection="accountingCenter" item="model" open="(" close=")" separator=",">
+                #{model}
+            </foreach>
+        </if>GROUP BY tcva.taskType) list GROUP BY taskType HAVING taskType is not null and (complaintRate!=0.00 or noComplaintRate!=0.00)
+    </select>
+
+    <!--获取申诉统计-产品品类维度-->
+    <select id="getComplaintByProductCategory" resultType="utry.data.modular.ccBoard.visit.bo.Complaint">
+        select productCategory as abscissa,
+        IFNULL(ROUND((IFNULL(sum(complaint),0))/(IFNULL(sum(total),0))*100,2),0.00) as complaintRate,
+        IFNULL(ROUND((IFNULL(sum(noComplaint),0))/(IFNULL(sum(complaint),0))*100,2),0.00) as noComplaintRate
+        from (
+        select count(*) as total, null as complaint,null as noComplaint,productCategory  from  t_cc_visit_default where accountingCenter !='住宅设备BU'
+        <if test="dateDurationQueueIdDto.startDate != null and dateDurationQueueIdDto.startDate != ''">
+            and substring(date,1,10) <![CDATA[ >= ]]> #{dateDurationQueueIdDto.startDate}
+        </if>
+        <if test="dateDurationQueueIdDto.endDate != null and dateDurationQueueIdDto.endDate != ''">
+            and substring(date,1,10) <![CDATA[ <= ]]> #{dateDurationQueueIdDto.endDate}
+        </if>
+        <if test="accountingCenter != null and accountingCenter.size >0 ">
+            and accountingCenter  in
+            <foreach collection="accountingCenter" item="model" open="(" close=")" separator=",">
+                #{model}
+            </foreach>
+        </if>
+        GROUP BY productCategory UNION
+        select  null as total, count(*) as complaint,null as noComplaint,productCategory from  t_cc_visit_default
+        where systemState='已申诉' and accountingCenter !='住宅设备BU'
+        <if test="dateDurationQueueIdDto.startDate != null and dateDurationQueueIdDto.startDate != ''">
+            and substring(date,1,10) <![CDATA[ >= ]]> #{dateDurationQueueIdDto.startDate}
+        </if>
+        <if test="dateDurationQueueIdDto.endDate != null and dateDurationQueueIdDto.endDate != ''">
+            and substring(date,1,10) <![CDATA[ <= ]]> #{dateDurationQueueIdDto.endDate}
+        </if>
+        <if test="accountingCenter != null and accountingCenter.size >0 ">
+            and accountingCenter  in
+            <foreach collection="accountingCenter" item="model" open="(" close=")" separator=",">
+                #{model}
+            </foreach>
+        </if>
+        GROUP BY productCategory UNION select null as total, null as complaint,count(*) as noComplaint,productCategory  from  t_cc_visit_default
+        where result='违约' and systemState='已申诉' and accountingCenter !='住宅设备BU'
+        <if test="dateDurationQueueIdDto.startDate != null and dateDurationQueueIdDto.startDate != ''">
+            and substring(date,1,10) <![CDATA[ >= ]]> #{dateDurationQueueIdDto.startDate}
+        </if>
+        <if test="dateDurationQueueIdDto.endDate != null and dateDurationQueueIdDto.endDate != ''">
+            and substring(date,1,10) <![CDATA[ <= ]]> #{dateDurationQueueIdDto.endDate}
+        </if>
+        <if test="accountingCenter != null and accountingCenter.size >0 ">
+            and accountingCenter  in
+            <foreach collection="accountingCenter" item="model" open="(" close=")" separator=",">
+                #{model}
+            </foreach>
+        </if> GROUP BY productCategory) list GROUP BY productCategory HAVING productCategory is not null and (complaintRate!=0.00 or noComplaintRate!=0.00)
+    </select>
+
+    <!--获取回访违约列表-->
+    <select id="getVisitDefault" resultType="utry.data.modular.ccBoard.visit.vo.VisitDefaultVo">
+        select tcvd.systemState,tcvd.documentNo,tcvd.date,tcvd.serviceType,tcvd.serviceNumber,tcvd.defaultDescription,tcvd.serviceDate,
+        tcvd.money,tcvd.result from t_cc_visit_default tcvd LEFT JOIN t_cc_visit_audit tcva on tcvd.serviceNumber=tcva.serviceNumber
+        where  tcvd.accountingCenter !='住宅设备BU'
+        <if test="visitDefaultDto.startDate != null and visitDefaultDto.startDate != ''">
+            and substring(tcvd.date,1,10) <![CDATA[ >= ]]> #{visitDefaultDto.startDate}
+        </if>
+        <if test="visitDefaultDto.endDate != null and visitDefaultDto.endDate != ''">
+            and substring(tcvd.date,1,10) <![CDATA[ <= ]]> #{visitDefaultDto.endDate}
+        </if>
+        <if test="accountingCenter != null and accountingCenter.size >0 ">
+            and tcvd.accountingCenter  in
+            <foreach collection="accountingCenter" item="model" open="(" close=")" separator=",">
+                #{model}
+            </foreach>
+        </if>
+        <if test="visitDefaultDto.taskType != null and visitDefaultDto.taskType != ''">
+            and tcva.taskType = #{visitDefaultDto.taskType}
+        </if>
+        <if test="visitDefaultDto.productCategory != null and visitDefaultDto.productCategory != ''">
+            and tcvd.productCategory = #{visitDefaultDto.productCategory}
+        </if>
+        <if test="visitDefaultDto.accountingArea != null and visitDefaultDto.accountingArea != ''">
+            and tcvd.accountingArea = #{visitDefaultDto.accountingArea}
+        </if>
+        <if test="visitDefaultDto.result != null and visitDefaultDto.result != ''">
+            and tcvd.result = #{visitDefaultDto.result}
+        </if>
+        order by tcvd.date asc
+    </select>
+
+    <!--获取违约率Bo-->
+    <select id="getDefaultRate" resultType="utry.data.modular.ccBoard.visit.bo.DefaultRate">
+        SELECT
+        `time` as abscissa,
+        ROUND((IFNULL(sum(defaultNumber),0) / IFNULL(sum(toAudit),0)) * 100, 2) AS completeDefaultRate,
+        ROUND((IFNULL(sum(auditDefaultNumber),0) / IFNULL(sum(toAudit),0)) * 100, 2) AS auditDefaultRate
+        FROM (
+        SELECT
+        substring(visitTme,1,10) AS `time`,
+        COUNT(*) AS defaultNumber,null as toAudit,null as auditDefaultNumber,null as auditNumber
+        FROM t_cc_visit_audit_history
+        WHERE visitTme BETWEEN #{dateDurationQueueIdDto.startDate} AND CONCAT(#{dateDurationQueueIdDto.endDate}, ' 23:59:59') and systemState='待审核' and defaultCode !="" and defaultCode is not null and accountingCenter !='住宅设备BU'
+        <if test="accountingCenter != null and accountingCenter.size >0 ">
+            and accountingCenter  in
+            <foreach collection="accountingCenter" item="model" open="(" close=")" separator=",">
+                #{model}
+            </foreach>
+        </if>
+        GROUP BY substring(visitTme,1,10)
+        union
+        SELECT
+        substring(visitTme,1,10) AS `time`,
+        null AS defaultNumber, COUNT(*) AS toAudit,null as auditDefaultNumber,null as auditNumber
+        FROM t_cc_visit_audit
+        WHERE visitTme BETWEEN #{dateDurationQueueIdDto.startDate} AND CONCAT(#{dateDurationQueueIdDto.endDate}, ' 23:59:59') and accountingCenter !='住宅设备BU'
+        <if test="accountingCenter != null and accountingCenter.size >0 ">
+            and accountingCenter  in
+            <foreach collection="accountingCenter" item="model" open="(" close=")" separator=",">
+                #{model}
+            </foreach>
+        </if>
+        GROUP BY substring(visitTme,1,10)
+        union
+        SELECT
+        substring(visitTme,1,10) AS `time`,
+        null AS defaultNumber, null AS toAudit,count(*) as auditDefaultNumber,null as auditNumber
+        FROM t_cc_visit_audit
+        WHERE visitTme BETWEEN #{dateDurationQueueIdDto.startDate} AND CONCAT(#{dateDurationQueueIdDto.endDate}, ' 23:59:59') and systemState='已审核' and defaultCode !="" and defaultCode is not null and accountingCenter !='住宅设备BU'
+        <if test="accountingCenter != null and accountingCenter.size >0 ">
+            and accountingCenter  in
+            <foreach collection="accountingCenter" item="model" open="(" close=")" separator=",">
+                #{model}
+            </foreach>
+        </if>
+        GROUP BY substring(visitTme,1,10)
+        ) list GROUP BY `time` ORDER BY `time` asc
+    </select>
+
+    <!--获取回访违约记录-->
+    <select id="getVisitDefaultDetail" resultType="utry.data.modular.ccBoard.visit.model.VisitDefault">
+        select serviceNumber,systemState,complaintMark,checkMark,productCategory,documentNo,date,serviceType,serviceDate,
+            productType,productModel,storeNumber,storeName,storeLevel,lastNumber,defaultCode,defaultDescription,repayMark,serviceMoney,
+            defaultDetailInstruction,insurancePart,insuranceMoney,originalMoney,money,result,complaintResult,complaintContent,reviewOpinions,
+            completeNote,complaintOpinion,accountingCenter,accountingRegional,accountingArea from t_cc_visit_default where serviceNumber=#{serviceNumber}
+    </select>
+
+</mapper>

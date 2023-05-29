@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="utry.data.modular.baseConfig.dao.CcBaseDataDao">
+    <insert id="saveStatus" parameterType="utry.data.modular.baseConfig.model.SeatStatusReminder">
+        insert into t_cc_seat_status_reminder (`seatStatusId`, `statusName`, `creationTime`, `updateTime`)
+        values (#{seatStatusId}, #{statusName}, NOW(), NOW())
+
+    </insert>
+
+
+    <select id="getCcStatus" resultType="java.lang.String">
+        select t.operation_type
+        from dos_callcenter_dnd_stats t
+        group by t.operation_type
+    </select>
+    <select id="getIsExit" resultType="java.lang.Integer">
+        select count(1)
+        from t_cc_seat_status_reminder t
+        where t.`seatStatusId` = #{status}
+    </select>
+
+
+    <select id="isExitQueue" parameterType="utry.data.modular.baseConfig.model.CCSeatInfo"
+            resultType="java.lang.Integer">
+        select
+        count(1) from  t_cc_queue_dept t where t.`queueId` =
+        #{dto.agentFromQueue} and t.deptId = #{dto.departmentId}
+    </select>
+
+    <!-- 查询所有状态 -->
+    <select id="selectSeatStatusReminder" resultType="utry.data.modular.baseConfig.model.SeatStatusReminder">
+        select
+        `seatStatusId`,
+        `statusName`,
+        `timeout`
+        from t_cc_seat_status_reminder
+    </select>
+
+</mapper>

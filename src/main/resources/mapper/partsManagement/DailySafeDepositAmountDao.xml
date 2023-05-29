@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="utry.data.modular.partsManagement.dao.DailySafeDepositAmountDao">
+    <!-- 开启二级缓存 -->
+    <cache eviction="LRU" flushInterval="300000" readOnly="true" size="1024"></cache>
+
+    <resultMap id="dateAmountBOResultMap" type="utry.data.modular.partsManagement.bo.DateAmountBO">
+        <result property="date" column="date" jdbcType="VARCHAR"/>
+        <result property="amount" column="amount" jdbcType="DECIMAL"/>
+    </resultMap>
+
+    <!-- 插入一条安全在库金额 -->
+    <insert id="insert">
+        INSERT INTO t_daily_safe_deposit_amount (amount, `date`, create_time, update_time)
+        VALUE (#{dailySafeDepositAmount.amount}, #{dailySafeDepositAmount.date}, #{dailySafeDepositAmount.createTime}, #{dailySafeDepositAmount.updateTime})
+    </insert>
+
+    <!-- 根据日期修改一条安全在库金额 -->
+    <update id="updateByDate">
+        UPDATE t_daily_safe_deposit_amount
+        SET
+        amount = #{dailySafeDepositAmount.amount},
+        update_time = #{dailySafeDepositAmount.updateTime}
+        WHERE `date` = DATE_FORMAT(#{date}, '%Y-%m-%d')
+    </update>
+
+    <!-- 查询某天条数 -->
+    <select id="selectCountByDate" resultType="java.lang.Integer">
+        SELECT COUNT(*) FROM t_daily_safe_deposit_amount WHERE `date` = DATE_FORMAT(#{date}, '%Y-%m-%d')
+    </select>
+
+    <!-- 根据时间范围和聚合方式查询安全在库金额 -->
+    <select id="selectTotalAmountByDateAndAggregateType" resultMap="dateAmountBOResultMap">
+        SELECT
+        <if test="aggregateType != null and aggregateType != ''">
+            <if test="aggregateType=='0'.toString()">
+                `date` AS date,
+            </if>
+            <if test="aggregateType=='1'.toString()">
+                DATE_FORMAT(`date`,'%Y-%m-01') AS date,
+            </if>
+        </if>
+        SUM(amount) AS amount
+        FROM t_daily_safe_deposit_amount
+        WHERE `date` BETWEEN #{startDate} AND #{endDate}
+        <if test="aggregateType != null and aggregateType != ''">
+            <if test="aggregateType=='0'.toString()">
+                GROUP BY `date`
+            </if>
+            <if test="aggregateType=='1'.toString()">
+                GROUP BY DATE_FORMAT(`date`,'%Y-%m')
+            </if>
+        </if>
+    </select>
+</mapper>

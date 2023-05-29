@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="utry.data.modular.partsManagement.dao.UserDataDao">
+    <!-- 开启二级缓存 -->
+    <cache eviction="LRU" flushInterval="300000" readOnly="true" size="1024"></cache>
+
+    <insert id="insertUserData">
+        insert into t_user_data (id,name,account,sex,mobilePhone,phone,email,dept,description,state)
+        values (REPLACE(UUID(), _utf8'-', _utf8''),#{name},#{account},#{sex},#{mobilePhone},#{phone},#{email},#{dept},#{description},#{state});
+    </insert>
+
+    <insert id="batchUserData" parameterType="java.util.List">
+        insert into t_user_data (id,name,account,sex,mobilePhone,phone,email,dept,description,`state`)
+        values
+        <foreach collection="list" item="item" separator=",">
+            (REPLACE(UUID(), _utf8'-', _utf8''),#{item.name},#{item.account},#{item.sex},#{item.mobilePhone},
+             #{item.phone},#{item.email},#{item.dept},#{item.description},#{item.state})
+        </foreach>
+    </insert>
+
+    <select id="selectAllUser" resultType="utry.data.modular.partsManagement.model.UserData">
+        SELECT
+        id,
+        `name`,
+        account,
+        sex,
+        mobilePhone,
+        description,
+        email,
+        `state`,
+        updateTime
+        FROM
+        t_user_data
+    </select>
+
+    <delete id="batchDelete">
+        delete from t_user_data
+    </delete>
+</mapper>

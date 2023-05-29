@@ -1,0 +1,1062 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="utry.data.modular.ccBoard.visit.dao.VisitAuditDao">
+    <!--添加服务回访记录审核数据-->
+    <insert id="createVisitAudit">
+        insert into t_cc_visit_audit (serviceNumber,systemState,productCategory,taskType,serviceType,storeNumber,storeName,storeLevel,engineerId,doortTime,completeTime,
+        productType,productSeries,productModel,machineNumber,visitNote,visitTme,visitTable,visitComplete,completeCode,completeNote,
+        dialNumber,defaultCode,defaultDescription,money,visitVoc,serviceMoney,repayMark,complaintMark,productScore,serviceScore,checkMark,
+        hotlineMark,accountingCenter,accountingRegional,accountingArea,reviewSource)
+        values(#{serviceNumber},#{systemState},#{productCategory},#{taskType},#{serviceType}, #{storeNumber},#{storeName},#{storeLevel},
+        #{engineerId},#{doortTime},#{completeTime},#{productType},#{productSeries},#{productModel},#{machineNumber},#{visitNote},
+        #{visitTme},#{visitTable},#{visitComplete},#{completeCode},#{completeNote},#{dialNumber},#{defaultCode},#{defaultDescription},
+        #{money},#{visitVoc},#{serviceMoney},#{repayMark},#{complaintMark},#{productScore},#{serviceScore},#{checkMark},
+        #{hotlineMark},#{accountingCenter},#{accountingRegional},#{accountingArea},#{reviewSource})
+    </insert>
+    <insert id="createVisitAuditHistory">
+        insert into t_cc_visit_audit_history (serviceNumber,systemState,productCategory,taskType,serviceType,storeNumber,storeName,storeLevel,engineerId,doortTime,completeTime,
+                                      productType,productSeries,productModel,machineNumber,visitNote,visitTme,visitTable,visitComplete,completeCode,completeNote,
+                                      dialNumber,defaultCode,defaultDescription,money,visitVoc,serviceMoney,repayMark,complaintMark,productScore,serviceScore,checkMark,
+                                      hotlineMark,accountingCenter,accountingRegional,accountingArea,reviewSource)
+        values(#{serviceNumber},#{systemState},#{productCategory},#{taskType},#{serviceType}, #{storeNumber},#{storeName},#{storeLevel},
+               #{engineerId},#{doortTime},#{completeTime},#{productType},#{productSeries},#{productModel},#{machineNumber},#{visitNote},
+               #{visitTme},#{visitTable},#{visitComplete},#{completeCode},#{completeNote},#{dialNumber},#{defaultCode},#{defaultDescription},
+               #{money},#{visitVoc},#{serviceMoney},#{repayMark},#{complaintMark},#{productScore},#{serviceScore},#{checkMark},
+               #{hotlineMark},#{accountingCenter},#{accountingRegional},#{accountingArea},#{reviewSource})
+    </insert>
+
+    <!--根据服务单号修改服务回访记录审核数据-->
+    <update id="updateVisitAudit">
+        update t_cc_visit_audit set systemState=#{systemState},productCategory=#{productCategory},taskType=#{taskType},serviceType=#{serviceType},
+        storeNumber=#{storeNumber},storeName=#{storeName},storeLevel=#{storeLevel},engineerId=#{engineerId},doortTime=#{doortTime},
+        completeTime=#{completeTime},productType=#{productType},productSeries=#{productSeries},productModel=#{productModel},machineNumber=#{machineNumber},
+        visitNote=#{visitNote},visitTme=#{visitTme},visitTable=#{visitTable},visitComplete=#{visitComplete},completeCode=#{completeCode},
+        completeNote=#{completeNote},dialNumber=#{dialNumber},defaultCode=#{defaultCode},defaultDescription=#{defaultDescription},money=#{money},
+        visitVoc=#{visitVoc},serviceMoney=#{serviceMoney},repayMark=#{repayMark},complaintMark=#{complaintMark},productScore=#{productScore},
+        serviceScore=#{serviceScore},checkMark=#{checkMark},hotlineMark=#{hotlineMark},accountingCenter=#{accountingCenter},accountingRegional=#{accountingRegional},
+        accountingArea=#{accountingArea},reviewSource=#{reviewSource} where serviceNumber=#{serviceNumber}
+    </update>
+
+    <!--根据服务单号查询是否有数据-->
+    <select id="getFlag" resultType="utry.data.modular.ccBoard.visit.model.VisitAudit">
+        select serviceNumber,systemState,productCategory,taskType,serviceType,storeNumber,storeName,storeLevel,engineerId,doortTime,completeTime,
+        productType,productSeries,productModel,machineNumber,visitNote,visitTme,visitTable,visitComplete,completeCode,completeNote,
+        dialNumber,defaultCode,defaultDescription,money,visitVoc,serviceMoney,repayMark,complaintMark,productScore,serviceScore,checkMark,
+        hotlineMark,accountingCenter,accountingRegional,accountingArea,reviewSource from t_cc_visit_audit  where serviceNumber=#{serviceNumber}
+    </select>
+
+    <!--获取当日回访总量-->
+    <select id="getDayCompleteCount" resultType="java.lang.Integer">
+        select count(*) from t_cc_visit_audit where accountingCenter !='住宅设备BU'
+        <if test="dateDurationQueueIdDto.startDate != null and dateDurationQueueIdDto.startDate != ''">
+            and substring(visitTme,1,10) <![CDATA[ >= ]]> #{dateDurationQueueIdDto.startDate}
+        </if>
+        <if test="dateDurationQueueIdDto.endDate != null and dateDurationQueueIdDto.endDate != ''">
+            and substring(visitTme,1,10) <![CDATA[ <= ]]> #{dateDurationQueueIdDto.endDate}
+        </if>
+        <if test="accountingCenter != null and accountingCenter.size >0 ">
+            and accountingCenter  in
+            <foreach collection="accountingCenter" item="model" open="(" close=")" separator=",">
+                #{model}
+            </foreach>
+        </if>
+    </select>
+
+    <!--查询当月完成量-->
+    <select id="monthCompleteCount" resultType="java.lang.Integer">
+        select count(*) from t_cc_visit_audit where accountingCenter !='住宅设备BU'
+        <if test="dateDurationQueueIdDto.endDate != null and dateDurationQueueIdDto.endDate != ''">
+            and substring(visitTme,1,7) = substring(#{dateDurationQueueIdDto.endDate},1,7)
+        </if>
+        <if test="accountingCenter != null and accountingCenter.size >0 ">
+            and accountingCenter  in
+            <foreach collection="accountingCenter" item="model" open="(" close=")" separator=",">
+                #{model}
+            </foreach>
+        </if>
+        <if test="completeNote != null and completeNote == '1'.toString()">
+            and completeNote ='完成'
+        </if>
+    </select>
+
+    <!--获取所有队列每日单日完成量-->
+    <select id="getEveryDayCount" resultType="java.lang.Integer">
+        select count(*) from t_cc_visit_audit where accountingCenter !='住宅设备BU'
+        <if test="date != null and date != ''">
+            and substring(visitTme,1,10)  =  #{date}
+        </if>
+        <if test="accountingCenter != null and accountingCenter.size >0 ">
+            and accountingCenter  in
+            <foreach collection="accountingCenter" item="model" open="(" close=")" separator=",">
+                #{model}
+            </foreach>
+        </if>
+        <if test="completeNote != null and completeNote == '1'.toString()">
+            and completeNote ='完成'
+        </if>
+    </select>
+
+    <!--获取话务明细数据-->
+    <select id="getCallDetail" resultType="utry.data.modular.ccBoard.visit.vo.CallDetailVo">
+        select tcva.serviceNumber,tcva.visitTme as visitTime,tcva.completeNote as result,tchl.dispatchingOrder as dispatchingOrder,
+        CASE
+        WHEN tcva.productCategory = '洗衣机' THEN '洗衣机回访'
+        WHEN tcva.productCategory != '洗衣机' THEN '小家电回访'
+        END as dept,
+        tcva.productCategory,tcva.productType,tchl.recordId,tchl.recordFileName,
+        tchl.hotlineNumber,tcva.serviceType,tchl.serviceDetails as serviceDetail from t_cc_visit_audit tcva
+        left join t_region_dispatching_detail trdd on tcva.serviceNumber=trdd.serviceNumber
+        left join t_complaint_hot_line tchl on tchl.dispatchingOrder=trdd.dispatchingOrder where tcva.accountingCenter !='住宅设备BU'
+        <if test="accountCode != null and accountCode.size >0 ">
+            and tcva.serviceNumber  in
+            <foreach collection="accountCode" item="model" open="(" close=")" separator=",">
+                #{model}
+            </foreach>
+        </if>
+    </select>
+
+    <!--获取回访记录-->
+    <select id="getVisitRecord" resultType="utry.data.modular.ccBoard.visit.bo.VisitAuditBo">
+        select tcva.serviceNumber,tcva.systemState,tcva.productCategory,tcva.taskType,tcva.serviceType,tchl.provinces,tchl.city,tchl.customerNo,tchl.dispatchingOrder,tcva.storeNumber,tcva.storeName,tcva.storeLevel,tcva.engineerId,tcva.doortTime,tcva.completeTime,
+        tcva.productType,tcva.productSeries,tcva.productModel,tcva.machineNumber,tcva.visitNote,tcva.visitTme,tcva.visitTable,tcva.visitComplete,tcva.completeCode,tcva.completeNote,
+        tcva.dialNumber,tcva.defaultCode,tcva.defaultDescription,tcva.money,tcva.visitVoc,tcva.serviceMoney,tcva.repayMark,tcva.complaintMark,tcva.productScore,tcva.serviceScore,tcva.checkMark,
+        tcva.hotlineMark,tcva.accountingCenter,tcva.accountingRegional,tcva.accountingArea,tcva.reviewSource,tchl.recordFileName  from t_cc_visit_audit tcva
+        left join t_region_dispatching_detail trdd on tcva.serviceNumber=trdd.serviceNumber
+        left join t_complaint_hot_line tchl on tchl.dispatchingOrder=trdd.dispatchingOrder where tcva.serviceNumber=#{serviceNumber}
+    </select>
+
+    <!--获取回访记录审核数量-->
+    <select id="getComplete" resultType="java.lang.Integer">
+        select count(*) from t_cc_visit_audit where accountingCenter !='住宅设备BU'
+        <if test="dateDurationQueueIdDto.startDate != null and dateDurationQueueIdDto.startDate != ''">
+            and substring(visitTme,1,10) <![CDATA[ >= ]]> #{dateDurationQueueIdDto.startDate}
+        </if>
+        <if test="dateDurationQueueIdDto.endDate != null and dateDurationQueueIdDto.endDate != ''">
+            and substring(visitTme,1,10) <![CDATA[ <= ]]> #{dateDurationQueueIdDto.endDate}
+        </if>
+        <if test="accountingCenter != null and accountingCenter.size >0 ">
+            and accountingCenter  in
+            <foreach collection="accountingCenter" item="model" open="(" close=")" separator=",">
+                #{model}
+            </foreach>
+        </if>
+        <if test="systemState != null and systemState == '1'.toString()">
+            and systemState = '已审核'
+        </if>
+        <if test="systemState != null and systemState == '0'.toString()">
+            and systemState = '待审核'
+        </if>
+    </select>
+
+    <!--获取已完成回访项目-任务分类维度-->
+    <select id="getCompleteByTaskType" resultType="utry.data.modular.ccBoard.visit.bo.CompleteProject">
+        select taskType as abscissa,IFNULL(sum(complete),0) as complete,IFNULL(sum(gray),0) as gray,IFNULL(sum(defaultCount),0) as defaultCount,IFNULL(sum(complete),0)+IFNULL(sum(gray),0)+IFNULL(sum(defaultCount),0) as total,
+        ROUND((IFNULL(sum(complete),0))/(IFNULL(sum(complete),0)+IFNULL(sum(gray),0)+IFNULL(sum(defaultCount),0))*100,2) as completeRate,
+        ROUND((IFNULL(sum(gray),0))/(IFNULL(sum(complete),0)+IFNULL(sum(gray),0)+IFNULL(sum(defaultCount),0))*100,2) as grayRate,
+        ROUND((IFNULL(sum(defaultCount),0))/(IFNULL(sum(complete),0)+IFNULL(sum(gray),0)+IFNULL(sum(defaultCount),0))*100,2) as defaultCountRate
+        from (
+        select count(*) as complete,null as gray, null as defaultCount,taskType  from  t_cc_visit_audit where accountingCenter !='住宅设备BU' and systemState='已审核' and  completeNote='完成' and (defaultCode is null or defaultCode='')
+        <if test="dateDurationQueueIdDto.startDate != null and dateDurationQueueIdDto.startDate != ''">
+            and substring(visitTme,1,10) <![CDATA[ >= ]]> #{dateDurationQueueIdDto.startDate}
+        </if>
+        <if test="dateDurationQueueIdDto.endDate != null and dateDurationQueueIdDto.endDate != ''">
+            and substring(visitTme,1,10) <![CDATA[ <= ]]> #{dateDurationQueueIdDto.endDate}
+        </if>
+        <if test="accountingCenter != null and accountingCenter.size >0 ">
+            and accountingCenter  in
+            <foreach collection="accountingCenter" item="model" open="(" close=")" separator=",">
+                #{model}
+            </foreach>
+        </if>
+        GROUP BY taskType UNION
+        select null as complete,null as gray, count(*) as defaultCount,taskType from  t_cc_visit_audit where accountingCenter !='住宅设备BU' and  systemState='已审核' and  defaultCode is not null and defaultCode!=''
+        <if test="dateDurationQueueIdDto.startDate != null and dateDurationQueueIdDto.startDate != ''">
+            and substring(visitTme,1,10) <![CDATA[ >= ]]> #{dateDurationQueueIdDto.startDate}
+        </if>
+        <if test="dateDurationQueueIdDto.endDate != null and dateDurationQueueIdDto.endDate != ''">
+            and substring(visitTme,1,10) <![CDATA[ <= ]]> #{dateDurationQueueIdDto.endDate}
+        </if>
+        <if test="accountingCenter != null and accountingCenter.size >0 ">
+            and accountingCenter  in
+            <foreach collection="accountingCenter" item="model" open="(" close=")" separator=",">
+                #{model}
+            </foreach>
+        </if>
+        GROUP BY taskType UNION
+        select null as complete,count(*) as gray, null as defaultCount,taskType from t_cc_visit_audit where accountingCenter !='住宅设备BU' and systemState='已审核' and completeNote in ('不知情','未完成','无人接听','停机','拒接','传真','拒访','改号','关机')
+        <if test="dateDurationQueueIdDto.startDate != null and dateDurationQueueIdDto.startDate != ''">
+            and substring(visitTme,1,10) <![CDATA[ >= ]]> #{dateDurationQueueIdDto.startDate}
+        </if>
+        <if test="dateDurationQueueIdDto.endDate != null and dateDurationQueueIdDto.endDate != ''">
+            and substring(visitTme,1,10) <![CDATA[ <= ]]> #{dateDurationQueueIdDto.endDate}
+        </if>
+        <if test="accountingCenter != null and accountingCenter.size >0 ">
+            and accountingCenter  in
+            <foreach collection="accountingCenter" item="model" open="(" close=")" separator=",">
+                #{model}
+            </foreach>
+        </if> GROUP BY taskType) list GROUP BY taskType
+    </select>
+
+    <!--获取已完成回访项目-任务分类维度-灰色-->
+    <select id="getCompleteByTaskTypeByGray" resultType="utry.data.modular.ccBoard.visit.bo.GrayProject">
+        select taskType as abscissa,IFNULL(sum(notKnow),0) as notKnow,IFNULL(sum(noComplete),0) as noComplete,IFNULL(sum(noAnswering),0) as noAnswering,
+        IFNULL(sum(downtime),0) as downtime,IFNULL(sum(reject),0) as reject,IFNULL(sum(fax),0) as fax,IFNULL(sum(refusedVisit),0) as refusedVisit,
+        IFNULL(sum(gaiHao),0) as gaiHao,IFNULL(sum(turnOff),0) as turnOff,IFNULL(sum(notKnow),0)+IFNULL(sum(noComplete),0)+IFNULL(sum(noAnswering),0)+IFNULL(sum(downtime),0)
+        +IFNULL(sum(reject),0)+IFNULL(sum(fax),0)+IFNULL(sum(refusedVisit),0)+IFNULL(sum(gaiHao),0)+IFNULL(sum(turnOff),0) as total,
+        ROUND((IFNULL(sum(notKnow),0))/(IFNULL(sum(notKnow),0)+IFNULL(sum(noComplete),0)+IFNULL(sum(noAnswering),0)+IFNULL(sum(downtime),0)
+        +IFNULL(sum(reject),0)+IFNULL(sum(fax),0)+IFNULL(sum(refusedVisit),0)+IFNULL(sum(gaiHao),0)+IFNULL(sum(turnOff),0))*100,2) as notKnowRate,
+        ROUND((IFNULL(sum(noComplete),0))/(IFNULL(sum(notKnow),0)+IFNULL(sum(noComplete),0)+IFNULL(sum(noAnswering),0)+IFNULL(sum(downtime),0)
+        +IFNULL(sum(reject),0)+IFNULL(sum(fax),0)+IFNULL(sum(refusedVisit),0)+IFNULL(sum(gaiHao),0)+IFNULL(sum(turnOff),0))*100,2) as noCompleteRate,
+        ROUND((IFNULL(sum(noAnswering),0))/(IFNULL(sum(notKnow),0)+IFNULL(sum(noComplete),0)+IFNULL(sum(noAnswering),0)+IFNULL(sum(downtime),0)
+        +IFNULL(sum(reject),0)+IFNULL(sum(fax),0)+IFNULL(sum(refusedVisit),0)+IFNULL(sum(gaiHao),0)+IFNULL(sum(turnOff),0))*100,2) as noAnsweringRate,
+        ROUND((IFNULL(sum(downtime),0))/(IFNULL(sum(notKnow),0)+IFNULL(sum(noComplete),0)+IFNULL(sum(noAnswering),0)+IFNULL(sum(downtime),0)
+        +IFNULL(sum(reject),0)+IFNULL(sum(fax),0)+IFNULL(sum(refusedVisit),0)+IFNULL(sum(gaiHao),0)+IFNULL(sum(turnOff),0))*100,2) as downtimeRate,
+        ROUND((IFNULL(sum(reject),0) )/(IFNULL(sum(notKnow),0)+IFNULL(sum(noComplete),0)+IFNULL(sum(noAnswering),0)+IFNULL(sum(downtime),0)
+        +IFNULL(sum(reject),0)+IFNULL(sum(fax),0)+IFNULL(sum(refusedVisit),0)+IFNULL(sum(gaiHao),0)+IFNULL(sum(turnOff),0))*100,2) as rejectRate,
+        ROUND((IFNULL(sum(fax),0))/(IFNULL(sum(notKnow),0)+IFNULL(sum(noComplete),0)+IFNULL(sum(noAnswering),0)+IFNULL(sum(downtime),0)
+        +IFNULL(sum(reject),0)+IFNULL(sum(fax),0)+IFNULL(sum(refusedVisit),0)+IFNULL(sum(gaiHao),0)+IFNULL(sum(turnOff),0))*100,2) as faxRate,
+        ROUND((IFNULL(sum(refusedVisit),0))/(IFNULL(sum(notKnow),0)+IFNULL(sum(noComplete),0)+IFNULL(sum(noAnswering),0)+IFNULL(sum(downtime),0)
+        +IFNULL(sum(reject),0)+IFNULL(sum(fax),0)+IFNULL(sum(refusedVisit),0)+IFNULL(sum(gaiHao),0)+IFNULL(sum(turnOff),0))*100,2) as refusedVisitRate,
+        ROUND((IFNULL(sum(gaiHao),0))/(IFNULL(sum(notKnow),0)+IFNULL(sum(noComplete),0)+IFNULL(sum(noAnswering),0)+IFNULL(sum(downtime),0)
+        +IFNULL(sum(reject),0)+IFNULL(sum(fax),0)+IFNULL(sum(refusedVisit),0)+IFNULL(sum(gaiHao),0)+IFNULL(sum(turnOff),0))*100,2) as gaiHaoRate,
+        ROUND((IFNULL(sum(turnOff),0))/(IFNULL(sum(notKnow),0)+IFNULL(sum(noComplete),0)+IFNULL(sum(noAnswering),0)+IFNULL(sum(downtime),0)
+        +IFNULL(sum(reject),0)+IFNULL(sum(fax),0)+IFNULL(sum(refusedVisit),0)+IFNULL(sum(gaiHao),0)+IFNULL(sum(turnOff),0))*100,2) as turnOffRate
+        from (
+        select count(*) as notKnow,null as noComplete,null as noAnswering,null as downtime,null as reject,null as fax,null as refusedVisit,null as gaiHao,
+        null as turnOff,taskType from  t_cc_visit_audit where systemState='已审核' and  completeNote='不知情'
+        <if test="dateDurationQueueIdDto.startDate != null and dateDurationQueueIdDto.startDate != ''">
+            and substring(visitTme,1,10) <![CDATA[ >= ]]> #{dateDurationQueueIdDto.startDate}
+        </if>
+        <if test="dateDurationQueueIdDto.endDate != null and dateDurationQueueIdDto.endDate != ''">
+            and substring(visitTme,1,10) <![CDATA[ <= ]]> #{dateDurationQueueIdDto.endDate}
+        </if>
+        <if test="accountingCenter != null and accountingCenter.size >0 ">
+            and accountingCenter  in
+            <foreach collection="accountingCenter" item="model" open="(" close=")" separator=",">
+                #{model}
+            </foreach>
+        </if>
+        GROUP BY taskType  UNION
+        select null as notKnow,count(*) as noComplete,null as noAnswering,null as downtime,null as reject,null as fax,null as refusedVisit,null as gaiHao,
+        null as turnOff,taskType  from  t_cc_visit_audit where accountingCenter !='住宅设备BU' and systemState='已审核' and  completeNote='未完成'
+        <if test="dateDurationQueueIdDto.startDate != null and dateDurationQueueIdDto.startDate != ''">
+            and substring(visitTme,1,10) <![CDATA[ >= ]]> #{dateDurationQueueIdDto.startDate}
+        </if>
+        <if test="dateDurationQueueIdDto.endDate != null and dateDurationQueueIdDto.endDate != ''">
+            and substring(visitTme,1,10) <![CDATA[ <= ]]> #{dateDurationQueueIdDto.endDate}
+        </if>
+        <if test="accountingCenter != null and accountingCenter.size >0 ">
+            and accountingCenter  in
+            <foreach collection="accountingCenter" item="model" open="(" close=")" separator=",">
+                #{model}
+            </foreach>
+        </if>
+        GROUP BY taskType UNION select null as notKnow,null as noComplete,count(*) as noAnswering,null as downtime,null as reject,null as fax,null as refusedVisit,null as gaiHao,
+        null as turnOff,taskType from t_cc_visit_audit where accountingCenter !='住宅设备BU' and systemState='已审核' and  completeNote='无人接听'
+        <if test="dateDurationQueueIdDto.startDate != null and dateDurationQueueIdDto.startDate != ''">
+            and substring(visitTme,1,10) <![CDATA[ >= ]]> #{dateDurationQueueIdDto.startDate}
+        </if>
+        <if test="dateDurationQueueIdDto.endDate != null and dateDurationQueueIdDto.endDate != ''">
+            and substring(visitTme,1,10) <![CDATA[ <= ]]> #{dateDurationQueueIdDto.endDate}
+        </if>
+        <if test="accountingCenter != null and accountingCenter.size >0 ">
+            and accountingCenter  in
+            <foreach collection="accountingCenter" item="model" open="(" close=")" separator=",">
+                #{model}
+            </foreach>
+        </if> GROUP BY taskType UNION select null as notKnow,null as noComplete,null as noAnswering,count(*) as downtime,null as reject,null as fax,null as refusedVisit,null as gaiHao,
+        null as turnOff,taskType  from t_cc_visit_audit where accountingCenter !='住宅设备BU' and systemState='已审核' and  completeNote='停机'
+        <if test="dateDurationQueueIdDto.startDate != null and dateDurationQueueIdDto.startDate != ''">
+            and substring(visitTme,1,10) <![CDATA[ >= ]]> #{dateDurationQueueIdDto.startDate}
+        </if>
+        <if test="dateDurationQueueIdDto.endDate != null and dateDurationQueueIdDto.endDate != ''">
+            and substring(visitTme,1,10) <![CDATA[ <= ]]> #{dateDurationQueueIdDto.endDate}
+        </if>
+        <if test="accountingCenter != null and accountingCenter.size >0 ">
+            and accountingCenter  in
+            <foreach collection="accountingCenter" item="model" open="(" close=")" separator=",">
+                #{model}
+            </foreach>
+        </if> GROUP BY taskType UNION select null as notKnow,null as noComplete,null as noAnswering,null as downtime,count(*) as reject,null as fax,null as refusedVisit,null as gaiHao,
+        null as turnOff,taskType from t_cc_visit_audit where accountingCenter !='住宅设备BU' and systemState='已审核' and  completeNote='拒接'
+        <if test="dateDurationQueueIdDto.startDate != null and dateDurationQueueIdDto.startDate != ''">
+            and substring(visitTme,1,10) <![CDATA[ >= ]]> #{dateDurationQueueIdDto.startDate}
+        </if>
+        <if test="dateDurationQueueIdDto.endDate != null and dateDurationQueueIdDto.endDate != ''">
+            and substring(visitTme,1,10) <![CDATA[ <= ]]> #{dateDurationQueueIdDto.endDate}
+        </if>
+        <if test="accountingCenter != null and accountingCenter.size >0 ">
+            and accountingCenter  in
+            <foreach collection="accountingCenter" item="model" open="(" close=")" separator=",">
+                #{model}
+            </foreach>
+        </if> GROUP BY taskType UNION select null as notKnow,null as noComplete,null as noAnswering,null as downtime,null as reject,count(*) as fax,null as refusedVisit,null as gaiHao,
+        null as turnOff,taskType from t_cc_visit_audit where accountingCenter !='住宅设备BU' and systemState='已审核' and  completeNote='传真'
+        <if test="dateDurationQueueIdDto.startDate != null and dateDurationQueueIdDto.startDate != ''">
+            and substring(visitTme,1,10) <![CDATA[ >= ]]> #{dateDurationQueueIdDto.startDate}
+        </if>
+        <if test="dateDurationQueueIdDto.endDate != null and dateDurationQueueIdDto.endDate != ''">
+            and substring(visitTme,1,10) <![CDATA[ <= ]]> #{dateDurationQueueIdDto.endDate}
+        </if>
+        <if test="accountingCenter != null and accountingCenter.size >0 ">
+            and accountingCenter  in
+            <foreach collection="accountingCenter" item="model" open="(" close=")" separator=",">
+                #{model}
+            </foreach>
+        </if> GROUP BY taskType UNION select null as notKnow,null as noComplete,null as noAnswering,null as downtime,null as reject,null as fax,count(*) as refusedVisit,null as gaiHao,
+        null as turnOff,taskType from t_cc_visit_audit where accountingCenter !='住宅设备BU' and systemState='已审核' and  completeNote='拒访'
+        <if test="dateDurationQueueIdDto.startDate != null and dateDurationQueueIdDto.startDate != ''">
+            and substring(visitTme,1,10) <![CDATA[ >= ]]> #{dateDurationQueueIdDto.startDate}
+        </if>
+        <if test="dateDurationQueueIdDto.endDate != null and dateDurationQueueIdDto.endDate != ''">
+            and substring(visitTme,1,10) <![CDATA[ <= ]]> #{dateDurationQueueIdDto.endDate}
+        </if>
+        <if test="accountingCenter != null and accountingCenter.size >0 ">
+            and accountingCenter  in
+            <foreach collection="accountingCenter" item="model" open="(" close=")" separator=",">
+                #{model}
+            </foreach>
+        </if> GROUP BY taskType UNION select null as notKnow,null as noComplete,null as noAnswering,null as downtime,null as reject,null as fax,null as refusedVisit,count(*) as gaiHao,
+        null as turnOff,taskType from t_cc_visit_audit where accountingCenter !='住宅设备BU' and systemState='已审核' and  completeNote='改号'
+        <if test="dateDurationQueueIdDto.startDate != null and dateDurationQueueIdDto.startDate != ''">
+            and substring(visitTme,1,10) <![CDATA[ >= ]]> #{dateDurationQueueIdDto.startDate}
+        </if>
+        <if test="dateDurationQueueIdDto.endDate != null and dateDurationQueueIdDto.endDate != ''">
+            and substring(visitTme,1,10) <![CDATA[ <= ]]> #{dateDurationQueueIdDto.endDate}
+        </if>
+        <if test="accountingCenter != null and accountingCenter.size >0 ">
+            and accountingCenter  in
+            <foreach collection="accountingCenter" item="model" open="(" close=")" separator=",">
+                #{model}
+            </foreach>
+        </if> GROUP BY taskType UNION select null as notKnow,null as noComplete,null as noAnswering,null as downtime,null as reject,null as fax,null as refusedVisit,null as gaiHao,
+        count(*) as turnOff,taskType from t_cc_visit_audit where accountingCenter !='住宅设备BU' and systemState='已审核' and  completeNote='关机'
+        <if test="dateDurationQueueIdDto.startDate != null and dateDurationQueueIdDto.startDate != ''">
+            and substring(visitTme,1,10) <![CDATA[ >= ]]> #{dateDurationQueueIdDto.startDate}
+        </if>
+        <if test="dateDurationQueueIdDto.endDate != null and dateDurationQueueIdDto.endDate != ''">
+            and substring(visitTme,1,10) <![CDATA[ <= ]]> #{dateDurationQueueIdDto.endDate}
+        </if>
+        <if test="accountingCenter != null and accountingCenter.size >0 ">
+            and accountingCenter  in
+            <foreach collection="accountingCenter" item="model" open="(" close=")" separator=",">
+                #{model}
+            </foreach>
+        </if> GROUP BY taskType) list group by taskType
+    </select>
+
+    <!--获取已完成回访项目-大区维度-->
+    <select id="getCompleteByRegion" resultType="utry.data.modular.ccBoard.visit.bo.CompleteProject">
+        select accountingArea as abscissa,IFNULL(sum(complete),0) as complete,IFNULL(sum(gray),0) as gray,IFNULL(sum(defaultCount),0) as defaultCount,IFNULL(sum(complete),0)+IFNULL(sum(gray),0)+IFNULL(sum(defaultCount),0) as total,
+        ROUND((IFNULL(sum(complete),0))/(IFNULL(sum(complete),0)+IFNULL(sum(gray),0)+IFNULL(sum(defaultCount),0))*100,2) as completeRate,
+        ROUND((IFNULL(sum(gray),0))/(IFNULL(sum(complete),0)+IFNULL(sum(gray),0)+IFNULL(sum(defaultCount),0))*100,2) as grayRate,
+        ROUND((IFNULL(sum(defaultCount),0))/(IFNULL(sum(complete),0)+IFNULL(sum(gray),0)+IFNULL(sum(defaultCount),0))*100,2) as defaultCountRate
+        from (
+        select count(*) as complete,null as gray, null as defaultCount,accountingArea  from  t_cc_visit_audit
+        where accountingCenter !='住宅设备BU' and systemState='已审核' and  completeNote='完成' and (defaultCode is null or defaultCode='')
+        <if test="dateDurationQueueIdDto.startDate != null and dateDurationQueueIdDto.startDate != ''">
+            and substring(visitTme,1,10) <![CDATA[ >= ]]> #{dateDurationQueueIdDto.startDate}
+        </if>
+        <if test="dateDurationQueueIdDto.endDate != null and dateDurationQueueIdDto.endDate != ''">
+            and substring(visitTme,1,10) <![CDATA[ <= ]]> #{dateDurationQueueIdDto.endDate}
+        </if>
+        <if test="accountingCenter != null and accountingCenter.size >0 ">
+            and accountingCenter  in
+            <foreach collection="accountingCenter" item="model" open="(" close=")" separator=",">
+                #{model}
+            </foreach>
+        </if>
+        GROUP BY accountingArea UNION
+        select null as complete,null as gray, count(*) as defaultCount,accountingArea from  t_cc_visit_audit
+        where accountingCenter !='住宅设备BU' and systemState='已审核' and  defaultCode is not null and defaultCode!=''
+        <if test="dateDurationQueueIdDto.startDate != null and dateDurationQueueIdDto.startDate != ''">
+            and substring(visitTme,1,10) <![CDATA[ >= ]]> #{dateDurationQueueIdDto.startDate}
+        </if>
+        <if test="dateDurationQueueIdDto.endDate != null and dateDurationQueueIdDto.endDate != ''">
+            and substring(visitTme,1,10) <![CDATA[ <= ]]> #{dateDurationQueueIdDto.endDate}
+        </if>
+        <if test="accountingCenter != null and accountingCenter.size >0 ">
+            and accountingCenter  in
+            <foreach collection="accountingCenter" item="model" open="(" close=")" separator=",">
+                #{model}
+            </foreach>
+        </if>
+        GROUP BY accountingArea UNION select null as complete,count(*) as gray, null as defaultCount,accountingArea  from  t_cc_visit_audit
+        where accountingCenter !='住宅设备BU' and systemState='已审核' and completeNote in ('不知情','未完成','无人接听','停机','拒接','传真','拒访','改号','关机')
+        <if test="dateDurationQueueIdDto.startDate != null and dateDurationQueueIdDto.startDate != ''">
+            and substring(visitTme,1,10) <![CDATA[ >= ]]> #{dateDurationQueueIdDto.startDate}
+        </if>
+        <if test="dateDurationQueueIdDto.endDate != null and dateDurationQueueIdDto.endDate != ''">
+            and substring(visitTme,1,10) <![CDATA[ <= ]]> #{dateDurationQueueIdDto.endDate}
+        </if>
+        <if test="accountingCenter != null and accountingCenter.size >0 ">
+            and accountingCenter  in
+            <foreach collection="accountingCenter" item="model" open="(" close=")" separator=",">
+                #{model}
+            </foreach>
+        </if> GROUP BY accountingArea) list GROUP BY accountingArea
+    </select>
+
+    <!--获取已完成回访项目-大区维度-灰色-->
+    <select id="getCompleteByRegionByGray" resultType="utry.data.modular.ccBoard.visit.bo.GrayProject">
+        select accountingArea as abscissa,IFNULL(sum(notKnow),0) as notKnow,IFNULL(sum(noComplete),0) as noComplete,IFNULL(sum(noAnswering),0) as noAnswering,
+        IFNULL(sum(downtime),0) as downtime,IFNULL(sum(reject),0) as reject,IFNULL(sum(fax),0) as fax,IFNULL(sum(refusedVisit),0) as refusedVisit,
+        IFNULL(sum(gaiHao),0) as gaiHao,IFNULL(sum(turnOff),0) as turnOff,IFNULL(sum(notKnow),0)+IFNULL(sum(noComplete),0)+IFNULL(sum(noAnswering),0)+IFNULL(sum(downtime),0)
+        +IFNULL(sum(reject),0)+IFNULL(sum(fax),0)+IFNULL(sum(refusedVisit),0)+IFNULL(sum(gaiHao),0)+IFNULL(sum(turnOff),0) as total,
+        ROUND((IFNULL(sum(notKnow),0))/(IFNULL(sum(notKnow),0)+IFNULL(sum(noComplete),0)+IFNULL(sum(noAnswering),0)+IFNULL(sum(downtime),0)
+        +IFNULL(sum(reject),0)+IFNULL(sum(fax),0)+IFNULL(sum(refusedVisit),0)+IFNULL(sum(gaiHao),0)+IFNULL(sum(turnOff),0))*100,2) as notKnowRate,
+        ROUND((IFNULL(sum(noComplete),0))/(IFNULL(sum(notKnow),0)+IFNULL(sum(noComplete),0)+IFNULL(sum(noAnswering),0)+IFNULL(sum(downtime),0)
+        +IFNULL(sum(reject),0)+IFNULL(sum(fax),0)+IFNULL(sum(refusedVisit),0)+IFNULL(sum(gaiHao),0)+IFNULL(sum(turnOff),0))*100,2) as noCompleteRate,
+        ROUND((IFNULL(sum(noAnswering),0))/(IFNULL(sum(notKnow),0)+IFNULL(sum(noComplete),0)+IFNULL(sum(noAnswering),0)+IFNULL(sum(downtime),0)
+        +IFNULL(sum(reject),0)+IFNULL(sum(fax),0)+IFNULL(sum(refusedVisit),0)+IFNULL(sum(gaiHao),0)+IFNULL(sum(turnOff),0))*100,2) as noAnsweringRate,
+        ROUND((IFNULL(sum(downtime),0))/(IFNULL(sum(notKnow),0)+IFNULL(sum(noComplete),0)+IFNULL(sum(noAnswering),0)+IFNULL(sum(downtime),0)
+        +IFNULL(sum(reject),0)+IFNULL(sum(fax),0)+IFNULL(sum(refusedVisit),0)+IFNULL(sum(gaiHao),0)+IFNULL(sum(turnOff),0))*100,2) as downtimeRate,
+        ROUND((IFNULL(sum(reject),0) )/(IFNULL(sum(notKnow),0)+IFNULL(sum(noComplete),0)+IFNULL(sum(noAnswering),0)+IFNULL(sum(downtime),0)
+        +IFNULL(sum(reject),0)+IFNULL(sum(fax),0)+IFNULL(sum(refusedVisit),0)+IFNULL(sum(gaiHao),0)+IFNULL(sum(turnOff),0))*100,2) as rejectRate,
+        ROUND((IFNULL(sum(fax),0))/(IFNULL(sum(notKnow),0)+IFNULL(sum(noComplete),0)+IFNULL(sum(noAnswering),0)+IFNULL(sum(downtime),0)
+        +IFNULL(sum(reject),0)+IFNULL(sum(fax),0)+IFNULL(sum(refusedVisit),0)+IFNULL(sum(gaiHao),0)+IFNULL(sum(turnOff),0))*100,2) as faxRate,
+        ROUND((IFNULL(sum(refusedVisit),0))/(IFNULL(sum(notKnow),0)+IFNULL(sum(noComplete),0)+IFNULL(sum(noAnswering),0)+IFNULL(sum(downtime),0)
+        +IFNULL(sum(reject),0)+IFNULL(sum(fax),0)+IFNULL(sum(refusedVisit),0)+IFNULL(sum(gaiHao),0)+IFNULL(sum(turnOff),0))*100,2) as refusedVisitRate,
+        ROUND((IFNULL(sum(gaiHao),0))/(IFNULL(sum(notKnow),0)+IFNULL(sum(noComplete),0)+IFNULL(sum(noAnswering),0)+IFNULL(sum(downtime),0)
+        +IFNULL(sum(reject),0)+IFNULL(sum(fax),0)+IFNULL(sum(refusedVisit),0)+IFNULL(sum(gaiHao),0)+IFNULL(sum(turnOff),0))*100,2) as gaiHaoRate,
+        ROUND((IFNULL(sum(turnOff),0))/(IFNULL(sum(notKnow),0)+IFNULL(sum(noComplete),0)+IFNULL(sum(noAnswering),0)+IFNULL(sum(downtime),0)
+        +IFNULL(sum(reject),0)+IFNULL(sum(fax),0)+IFNULL(sum(refusedVisit),0)+IFNULL(sum(gaiHao),0)+IFNULL(sum(turnOff),0))*100,2) as turnOffRate
+        from (
+        select count(*) as notKnow,null as noComplete,null as noAnswering,null as downtime,null as reject,null as fax,null as refusedVisit,null as gaiHao,
+        null as turnOff,accountingArea  from  t_cc_visit_audit where accountingCenter !='住宅设备BU' and systemState='已审核' and  completeNote='不知情'
+        <if test="dateDurationQueueIdDto.startDate != null and dateDurationQueueIdDto.startDate != ''">
+            and substring(visitTme,1,10) <![CDATA[ >= ]]> #{dateDurationQueueIdDto.startDate}
+        </if>
+        <if test="dateDurationQueueIdDto.endDate != null and dateDurationQueueIdDto.endDate != ''">
+            and substring(visitTme,1,10) <![CDATA[ <= ]]> #{dateDurationQueueIdDto.endDate}
+        </if>
+        <if test="accountingCenter != null and accountingCenter.size >0 ">
+            and accountingCenter  in
+            <foreach collection="accountingCenter" item="model" open="(" close=")" separator=",">
+                #{model}
+            </foreach>
+        </if>
+        GROUP BY accountingArea UNION
+        select null as notKnow,count(*) as noComplete,null as noAnswering,null as downtime,null as reject,null as fax,null as refusedVisit,null as gaiHao,
+        null as turnOff,accountingArea  from  t_cc_visit_audit
+        where accountingCenter !='住宅设备BU' and systemState='已审核' and  completeNote='未完成'
+        <if test="dateDurationQueueIdDto.startDate != null and dateDurationQueueIdDto.startDate != ''">
+            and substring(visitTme,1,10) <![CDATA[ >= ]]> #{dateDurationQueueIdDto.startDate}
+        </if>
+        <if test="dateDurationQueueIdDto.endDate != null and dateDurationQueueIdDto.endDate != ''">
+            and substring(visitTme,1,10) <![CDATA[ <= ]]> #{dateDurationQueueIdDto.endDate}
+        </if>
+        <if test="accountingCenter != null and accountingCenter.size >0 ">
+            and accountingCenter  in
+            <foreach collection="accountingCenter" item="model" open="(" close=")" separator=",">
+                #{model}
+            </foreach>
+        </if>
+        GROUP BY accountingArea UNION select null as notKnow,null as noComplete,count(*) as noAnswering,null as downtime,null as reject,null as fax,null as refusedVisit,null as gaiHao,
+        null as turnOff,accountingArea  from  t_cc_visit_audit
+        where accountingCenter !='住宅设备BU' and systemState='已审核' and  completeNote='无人接听'
+        <if test="dateDurationQueueIdDto.startDate != null and dateDurationQueueIdDto.startDate != ''">
+            and substring(visitTme,1,10) <![CDATA[ >= ]]> #{dateDurationQueueIdDto.startDate}
+        </if>
+        <if test="dateDurationQueueIdDto.endDate != null and dateDurationQueueIdDto.endDate != ''">
+            and substring(visitTme,1,10) <![CDATA[ <= ]]> #{dateDurationQueueIdDto.endDate}
+        </if>
+        <if test="accountingCenter != null and accountingCenter.size >0 ">
+            and accountingCenter  in
+            <foreach collection="accountingCenter" item="model" open="(" close=")" separator=",">
+                #{model}
+            </foreach>
+        </if> GROUP BY accountingArea UNION select null as notKnow,null as noComplete,null as noAnswering,count(*) as downtime,null as reject,null as fax,null as refusedVisit,null as gaiHao,
+        null as turnOff,accountingArea  from  t_cc_visit_audit
+         where accountingCenter !='住宅设备BU' and systemState='已审核' and  completeNote='停机'
+        <if test="dateDurationQueueIdDto.startDate != null and dateDurationQueueIdDto.startDate != ''">
+            and substring(visitTme,1,10) <![CDATA[ >= ]]> #{dateDurationQueueIdDto.startDate}
+        </if>
+        <if test="dateDurationQueueIdDto.endDate != null and dateDurationQueueIdDto.endDate != ''">
+            and substring(visitTme,1,10) <![CDATA[ <= ]]> #{dateDurationQueueIdDto.endDate}
+        </if>
+        <if test="accountingCenter != null and accountingCenter.size >0 ">
+            and accountingCenter  in
+            <foreach collection="accountingCenter" item="model" open="(" close=")" separator=",">
+                #{model}
+            </foreach>
+        </if> GROUP BY accountingArea UNION select null as notKnow,null as noComplete,null as noAnswering,null as downtime,count(*) as reject,null as fax,null as refusedVisit,null as gaiHao,
+        null as turnOff,accountingArea  from  t_cc_visit_audit
+        where accountingCenter !='住宅设备BU' and systemState='已审核' and  completeNote='拒接'
+        <if test="dateDurationQueueIdDto.startDate != null and dateDurationQueueIdDto.startDate != ''">
+            and substring(visitTme,1,10) <![CDATA[ >= ]]> #{dateDurationQueueIdDto.startDate}
+        </if>
+        <if test="dateDurationQueueIdDto.endDate != null and dateDurationQueueIdDto.endDate != ''">
+            and substring(visitTme,1,10) <![CDATA[ <= ]]> #{dateDurationQueueIdDto.endDate}
+        </if>
+        <if test="accountingCenter != null and accountingCenter.size >0 ">
+            and accountingCenter  in
+            <foreach collection="accountingCenter" item="model" open="(" close=")" separator=",">
+                #{model}
+            </foreach>
+        </if> GROUP BY accountingArea UNION select null as notKnow,null as noComplete,null as noAnswering,null as downtime,null as reject,count(*) as fax,null as refusedVisit,null as gaiHao,
+        null as turnOff,accountingArea  from  t_cc_visit_audit
+        where accountingCenter !='住宅设备BU' and systemState='已审核' and  completeNote='传真'
+        <if test="dateDurationQueueIdDto.startDate != null and dateDurationQueueIdDto.startDate != ''">
+            and substring(visitTme,1,10) <![CDATA[ >= ]]> #{dateDurationQueueIdDto.startDate}
+        </if>
+        <if test="dateDurationQueueIdDto.endDate != null and dateDurationQueueIdDto.endDate != ''">
+            and substring(visitTme,1,10) <![CDATA[ <= ]]> #{dateDurationQueueIdDto.endDate}
+        </if>
+        <if test="accountingCenter != null and accountingCenter.size >0 ">
+            and accountingCenter  in
+            <foreach collection="accountingCenter" item="model" open="(" close=")" separator=",">
+                #{model}
+            </foreach>
+        </if>GROUP BY accountingArea UNION select null as notKnow,null as noComplete,null as noAnswering,null as downtime,null as reject,null as fax,count(*) as refusedVisit,null as gaiHao,
+        null as turnOff,accountingArea  from  t_cc_visit_audit
+        where accountingCenter !='住宅设备BU' and systemState='已审核' and  completeNote='拒访'
+        <if test="dateDurationQueueIdDto.startDate != null and dateDurationQueueIdDto.startDate != ''">
+            and substring(visitTme,1,10) <![CDATA[ >= ]]> #{dateDurationQueueIdDto.startDate}
+        </if>
+        <if test="dateDurationQueueIdDto.endDate != null and dateDurationQueueIdDto.endDate != ''">
+            and substring(visitTme,1,10) <![CDATA[ <= ]]> #{dateDurationQueueIdDto.endDate}
+        </if>
+        <if test="accountingCenter != null and accountingCenter.size >0 ">
+            and accountingCenter  in
+            <foreach collection="accountingCenter" item="model" open="(" close=")" separator=",">
+                #{model}
+            </foreach>
+        </if>GROUP BY accountingArea UNION select null as notKnow,null as noComplete,null as noAnswering,null as downtime,null as reject,null as fax,null as refusedVisit,count(*) as gaiHao,
+        null as turnOff,accountingArea  from  t_cc_visit_audit
+        where accountingCenter !='住宅设备BU' and systemState='已审核' and  completeNote='改号'
+        <if test="dateDurationQueueIdDto.startDate != null and dateDurationQueueIdDto.startDate != ''">
+            and substring(visitTme,1,10) <![CDATA[ >= ]]> #{dateDurationQueueIdDto.startDate}
+        </if>
+        <if test="dateDurationQueueIdDto.endDate != null and dateDurationQueueIdDto.endDate != ''">
+            and substring(visitTme,1,10) <![CDATA[ <= ]]> #{dateDurationQueueIdDto.endDate}
+        </if>
+        <if test="accountingCenter != null and accountingCenter.size >0 ">
+            and accountingCenter  in
+            <foreach collection="accountingCenter" item="model" open="(" close=")" separator=",">
+                #{model}
+            </foreach>
+        </if> GROUP BY accountingArea UNION select null as notKnow,null as noComplete,null as noAnswering,null as downtime,null as reject,null as fax,null as refusedVisit,null as gaiHao,
+        count(*) as turnOff,accountingArea  from  t_cc_visit_audit
+        where accountingCenter !='住宅设备BU' and systemState='已审核' and  completeNote='关机'
+        <if test="dateDurationQueueIdDto.startDate != null and dateDurationQueueIdDto.startDate != ''">
+            and substring(visitTme,1,10) <![CDATA[ >= ]]> #{dateDurationQueueIdDto.startDate}
+        </if>
+        <if test="dateDurationQueueIdDto.endDate != null and dateDurationQueueIdDto.endDate != ''">
+            and substring(visitTme,1,10) <![CDATA[ <= ]]> #{dateDurationQueueIdDto.endDate}
+        </if>
+        <if test="accountingCenter != null and accountingCenter.size >0 ">
+            and accountingCenter  in
+            <foreach collection="accountingCenter" item="model" open="(" close=")" separator=",">
+                #{model}
+            </foreach>
+        </if> GROUP BY accountingArea) list group by accountingArea
+    </select>
+
+    <!--获取已完成回访项目-产品品类维度-->
+    <select id="getCompleteByProductCategory" resultType="utry.data.modular.ccBoard.visit.bo.CompleteProject">
+        select productCategory as abscissa,IFNULL(sum(complete),0) as complete,IFNULL(sum(gray),0) as gray,IFNULL(sum(defaultCount),0) as defaultCount,IFNULL(sum(complete),0)+IFNULL(sum(gray),0)+IFNULL(sum(defaultCount),0) as total,
+        ROUND((IFNULL(sum(complete),0))/(IFNULL(sum(complete),0)+IFNULL(sum(gray),0)+IFNULL(sum(defaultCount),0))*100,2) as completeRate,
+        ROUND((IFNULL(sum(gray),0))/(IFNULL(sum(complete),0)+IFNULL(sum(gray),0)+IFNULL(sum(defaultCount),0))*100,2) as grayRate,
+        ROUND((IFNULL(sum(defaultCount),0))/(IFNULL(sum(complete),0)+IFNULL(sum(gray),0)+IFNULL(sum(defaultCount),0))*100,2) as defaultCountRate
+        from (
+        select count(*) as complete,null as gray, null as defaultCount,productCategory  from  t_cc_visit_audit where accountingCenter !='住宅设备BU' and systemState='已审核' and  completeNote='完成' and (defaultCode is null or defaultCode='')
+        <if test="dateDurationQueueIdDto.startDate != null and dateDurationQueueIdDto.startDate != ''">
+            and substring(visitTme,1,10) <![CDATA[ >= ]]> #{dateDurationQueueIdDto.startDate}
+        </if>
+        <if test="dateDurationQueueIdDto.endDate != null and dateDurationQueueIdDto.endDate != ''">
+            and substring(visitTme,1,10) <![CDATA[ <= ]]> #{dateDurationQueueIdDto.endDate}
+        </if>
+        <if test="accountingCenter != null and accountingCenter.size >0 ">
+            and accountingCenter  in
+            <foreach collection="accountingCenter" item="model" open="(" close=")" separator=",">
+                #{model}
+            </foreach>
+        </if>
+        GROUP BY productCategory UNION
+        select null as complete,null as gray, count(*) as defaultCount,productCategory  from  t_cc_visit_audit where accountingCenter !='住宅设备BU' and systemState='已审核' and  defaultCode is not null and defaultCode!=''
+        <if test="dateDurationQueueIdDto.startDate != null and dateDurationQueueIdDto.startDate != ''">
+            and substring(visitTme,1,10) <![CDATA[ >= ]]> #{dateDurationQueueIdDto.startDate}
+        </if>
+        <if test="dateDurationQueueIdDto.endDate != null and dateDurationQueueIdDto.endDate != ''">
+            and substring(visitTme,1,10) <![CDATA[ <= ]]> #{dateDurationQueueIdDto.endDate}
+        </if>
+        <if test="accountingCenter != null and accountingCenter.size >0 ">
+            and accountingCenter  in
+            <foreach collection="accountingCenter" item="model" open="(" close=")" separator=",">
+                #{model}
+            </foreach>
+        </if>
+        GROUP BY productCategory UNION select null as complete,count(*) as gray, null as productCategory,taskType from t_cc_visit_audit where accountingCenter !='住宅设备BU' and systemState='已审核' and completeNote in ('不知情','未完成','无人接听','停机','拒接','传真','拒访','改号','关机')
+        <if test="dateDurationQueueIdDto.startDate != null and dateDurationQueueIdDto.startDate != ''">
+            and substring(visitTme,1,10) <![CDATA[ >= ]]> #{dateDurationQueueIdDto.startDate}
+        </if>
+        <if test="dateDurationQueueIdDto.endDate != null and dateDurationQueueIdDto.endDate != ''">
+            and substring(visitTme,1,10) <![CDATA[ <= ]]> #{dateDurationQueueIdDto.endDate}
+        </if>
+        <if test="accountingCenter != null and accountingCenter.size >0 ">
+            and accountingCenter  in
+            <foreach collection="accountingCenter" item="model" open="(" close=")" separator=",">
+                #{model}
+            </foreach>
+        </if> GROUP BY productCategory) list GROUP BY productCategory
+    </select>
+
+    <!--获取已完成回访项目-产品品类维度-灰色-->
+    <select id="getCompleteByProductCategoryByGray"
+            resultType="utry.data.modular.ccBoard.visit.bo.GrayProject">
+        select productCategory as abscissa,IFNULL(sum(notKnow),0) as notKnow,IFNULL(sum(noComplete),0) as noComplete,IFNULL(sum(noAnswering),0) as noAnswering,
+        IFNULL(sum(downtime),0) as downtime,IFNULL(sum(reject),0) as reject,IFNULL(sum(fax),0) as fax,IFNULL(sum(refusedVisit),0) as refusedVisit,
+        IFNULL(sum(gaiHao),0) as gaiHao,IFNULL(sum(turnOff),0) as turnOff,IFNULL(sum(notKnow),0)+IFNULL(sum(noComplete),0)+IFNULL(sum(noAnswering),0)+IFNULL(sum(downtime),0)
+        +IFNULL(sum(reject),0)+IFNULL(sum(fax),0)+IFNULL(sum(refusedVisit),0)+IFNULL(sum(gaiHao),0)+IFNULL(sum(turnOff),0) as total,
+        ROUND((IFNULL(sum(notKnow),0))/(IFNULL(sum(notKnow),0)+IFNULL(sum(noComplete),0)+IFNULL(sum(noAnswering),0)+IFNULL(sum(downtime),0)
+        +IFNULL(sum(reject),0)+IFNULL(sum(fax),0)+IFNULL(sum(refusedVisit),0)+IFNULL(sum(gaiHao),0)+IFNULL(sum(turnOff),0))*100,2) as notKnowRate,
+        ROUND((IFNULL(sum(noComplete),0))/(IFNULL(sum(notKnow),0)+IFNULL(sum(noComplete),0)+IFNULL(sum(noAnswering),0)+IFNULL(sum(downtime),0)
+        +IFNULL(sum(reject),0)+IFNULL(sum(fax),0)+IFNULL(sum(refusedVisit),0)+IFNULL(sum(gaiHao),0)+IFNULL(sum(turnOff),0))*100,2) as noCompleteRate,
+        ROUND((IFNULL(sum(noAnswering),0))/(IFNULL(sum(notKnow),0)+IFNULL(sum(noComplete),0)+IFNULL(sum(noAnswering),0)+IFNULL(sum(downtime),0)
+        +IFNULL(sum(reject),0)+IFNULL(sum(fax),0)+IFNULL(sum(refusedVisit),0)+IFNULL(sum(gaiHao),0)+IFNULL(sum(turnOff),0))*100,2) as noAnsweringRate,
+        ROUND((IFNULL(sum(downtime),0))/(IFNULL(sum(notKnow),0)+IFNULL(sum(noComplete),0)+IFNULL(sum(noAnswering),0)+IFNULL(sum(downtime),0)
+        +IFNULL(sum(reject),0)+IFNULL(sum(fax),0)+IFNULL(sum(refusedVisit),0)+IFNULL(sum(gaiHao),0)+IFNULL(sum(turnOff),0))*100,2) as downtimeRate,
+        ROUND((IFNULL(sum(reject),0) )/(IFNULL(sum(notKnow),0)+IFNULL(sum(noComplete),0)+IFNULL(sum(noAnswering),0)+IFNULL(sum(downtime),0)
+        +IFNULL(sum(reject),0)+IFNULL(sum(fax),0)+IFNULL(sum(refusedVisit),0)+IFNULL(sum(gaiHao),0)+IFNULL(sum(turnOff),0))*100,2) as rejectRate,
+        ROUND((IFNULL(sum(fax),0))/(IFNULL(sum(notKnow),0)+IFNULL(sum(noComplete),0)+IFNULL(sum(noAnswering),0)+IFNULL(sum(downtime),0)
+        +IFNULL(sum(reject),0)+IFNULL(sum(fax),0)+IFNULL(sum(refusedVisit),0)+IFNULL(sum(gaiHao),0)+IFNULL(sum(turnOff),0))*100,2) as faxRate,
+        ROUND((IFNULL(sum(refusedVisit),0))/(IFNULL(sum(notKnow),0)+IFNULL(sum(noComplete),0)+IFNULL(sum(noAnswering),0)+IFNULL(sum(downtime),0)
+        +IFNULL(sum(reject),0)+IFNULL(sum(fax),0)+IFNULL(sum(refusedVisit),0)+IFNULL(sum(gaiHao),0)+IFNULL(sum(turnOff),0))*100,2) as refusedVisitRate,
+        ROUND((IFNULL(sum(gaiHao),0))/(IFNULL(sum(notKnow),0)+IFNULL(sum(noComplete),0)+IFNULL(sum(noAnswering),0)+IFNULL(sum(downtime),0)
+        +IFNULL(sum(reject),0)+IFNULL(sum(fax),0)+IFNULL(sum(refusedVisit),0)+IFNULL(sum(gaiHao),0)+IFNULL(sum(turnOff),0))*100,2) as gaiHaoRate,
+        ROUND((IFNULL(sum(turnOff),0))/(IFNULL(sum(notKnow),0)+IFNULL(sum(noComplete),0)+IFNULL(sum(noAnswering),0)+IFNULL(sum(downtime),0)
+        +IFNULL(sum(reject),0)+IFNULL(sum(fax),0)+IFNULL(sum(refusedVisit),0)+IFNULL(sum(gaiHao),0)+IFNULL(sum(turnOff),0))*100,2) as turnOffRate
+        from (
+        select count(*) as notKnow,null as noComplete,null as noAnswering,null as downtime,null as reject,null as fax,null as refusedVisit,null as gaiHao,
+        null as turnOff,productCategory  from  t_cc_visit_audit where accountingCenter !='住宅设备BU' and systemState='已审核' and  completeNote='不知情'
+        <if test="dateDurationQueueIdDto.startDate != null and dateDurationQueueIdDto.startDate != ''">
+            and substring(visitTme,1,10) <![CDATA[ >= ]]> #{dateDurationQueueIdDto.startDate}
+        </if>
+        <if test="dateDurationQueueIdDto.endDate != null and dateDurationQueueIdDto.endDate != ''">
+            and substring(visitTme,1,10) <![CDATA[ <= ]]> #{dateDurationQueueIdDto.endDate}
+        </if>
+        <if test="accountingCenter != null and accountingCenter.size >0 ">
+            and accountingCenter  in
+            <foreach collection="accountingCenter" item="model" open="(" close=")" separator=",">
+                #{model}
+            </foreach>
+        </if>
+        GROUP BY productCategory  UNION
+        select null as notKnow,count(*) as noComplete,null as noAnswering,null as downtime,null as reject,null as fax,null as refusedVisit,null as gaiHao,
+        null as turnOff,productCategory  from  t_cc_visit_audit where accountingCenter !='住宅设备BU' and systemState='已审核' and  completeNote='未完成'
+        <if test="dateDurationQueueIdDto.startDate != null and dateDurationQueueIdDto.startDate != ''">
+            and substring(visitTme,1,10) <![CDATA[ >= ]]> #{dateDurationQueueIdDto.startDate}
+        </if>
+        <if test="dateDurationQueueIdDto.endDate != null and dateDurationQueueIdDto.endDate != ''">
+            and substring(visitTme,1,10) <![CDATA[ <= ]]> #{dateDurationQueueIdDto.endDate}
+        </if>
+        <if test="accountingCenter != null and accountingCenter.size >0 ">
+            and accountingCenter  in
+            <foreach collection="accountingCenter" item="model" open="(" close=")" separator=",">
+                #{model}
+            </foreach>
+        </if>
+        GROUP BY productCategory UNION select null as notKnow,null as noComplete,count(*) as noAnswering,null as downtime,null as reject,null as fax,null as refusedVisit,null as gaiHao,
+        null as turnOff,productCategory from t_cc_visit_audit where accountingCenter !='住宅设备BU' and systemState='已审核' and  completeNote='无人接听'
+        <if test="dateDurationQueueIdDto.startDate != null and dateDurationQueueIdDto.startDate != ''">
+            and substring(visitTme,1,10) <![CDATA[ >= ]]> #{dateDurationQueueIdDto.startDate}
+        </if>
+        <if test="dateDurationQueueIdDto.endDate != null and dateDurationQueueIdDto.endDate != ''">
+            and substring(visitTme,1,10) <![CDATA[ <= ]]> #{dateDurationQueueIdDto.endDate}
+        </if>
+        <if test="accountingCenter != null and accountingCenter.size >0 ">
+            and accountingCenter  in
+            <foreach collection="accountingCenter" item="model" open="(" close=")" separator=",">
+                #{model}
+            </foreach>
+        </if> GROUP BY productCategory UNION select null as notKnow,null as noComplete,null as noAnswering,count(*) as downtime,null as reject,null as fax,null as refusedVisit,null as gaiHao,
+        null as turnOff,productCategory from t_cc_visit_audit where accountingCenter !='住宅设备BU' and systemState='已审核' and  completeNote='停机'
+        <if test="dateDurationQueueIdDto.startDate != null and dateDurationQueueIdDto.startDate != ''">
+            and substring(visitTme,1,10) <![CDATA[ >= ]]> #{dateDurationQueueIdDto.startDate}
+        </if>
+        <if test="dateDurationQueueIdDto.endDate != null and dateDurationQueueIdDto.endDate != ''">
+            and substring(visitTme,1,10) <![CDATA[ <= ]]> #{dateDurationQueueIdDto.endDate}
+        </if>
+        <if test="accountingCenter != null and accountingCenter.size >0 ">
+            and accountingCenter  in
+            <foreach collection="accountingCenter" item="model" open="(" close=")" separator=",">
+                #{model}
+            </foreach>
+        </if> GROUP BY productCategory UNION select null as notKnow,null as noComplete,null as noAnswering,null as downtime,count(*) as reject,null as fax,null as refusedVisit,null as gaiHao,
+        null as turnOff,productCategory from t_cc_visit_audit where accountingCenter !='住宅设备BU' and systemState='已审核' and  completeNote='拒接'
+        <if test="dateDurationQueueIdDto.startDate != null and dateDurationQueueIdDto.startDate != ''">
+            and substring(visitTme,1,10) <![CDATA[ >= ]]> #{dateDurationQueueIdDto.startDate}
+        </if>
+        <if test="dateDurationQueueIdDto.endDate != null and dateDurationQueueIdDto.endDate != ''">
+            and substring(visitTme,1,10) <![CDATA[ <= ]]> #{dateDurationQueueIdDto.endDate}
+        </if>
+        <if test="accountingCenter != null and accountingCenter.size >0 ">
+            and accountingCenter  in
+            <foreach collection="accountingCenter" item="model" open="(" close=")" separator=",">
+                #{model}
+            </foreach>
+        </if> GROUP BY productCategory UNION select null as notKnow,null as noComplete,null as noAnswering,null as downtime,null as reject,count(*) as fax,null as refusedVisit,null as gaiHao,
+        null as turnOff,productCategory  from t_cc_visit_audit where accountingCenter !='住宅设备BU' and systemState='已审核' and  completeNote='传真'
+        <if test="dateDurationQueueIdDto.startDate != null and dateDurationQueueIdDto.startDate != ''">
+            and substring(visitTme,1,10) <![CDATA[ >= ]]> #{dateDurationQueueIdDto.startDate}
+        </if>
+        <if test="dateDurationQueueIdDto.endDate != null and dateDurationQueueIdDto.endDate != ''">
+            and substring(visitTme,1,10) <![CDATA[ <= ]]> #{dateDurationQueueIdDto.endDate}
+        </if>
+        <if test="accountingCenter != null and accountingCenter.size >0 ">
+            and accountingCenter  in
+            <foreach collection="accountingCenter" item="model" open="(" close=")" separator=",">
+                #{model}
+            </foreach>
+        </if> GROUP BY productCategory UNION select null as notKnow,null as noComplete,null as noAnswering,null as downtime,null as reject,null as fax,count(*) as refusedVisit,null as gaiHao,
+        null as turnOff,productCategory from t_cc_visit_audit where accountingCenter !='住宅设备BU' and systemState='已审核' and  completeNote='拒访'
+        <if test="dateDurationQueueIdDto.startDate != null and dateDurationQueueIdDto.startDate != ''">
+            and substring(visitTme,1,10) <![CDATA[ >= ]]> #{dateDurationQueueIdDto.startDate}
+        </if>
+        <if test="dateDurationQueueIdDto.endDate != null and dateDurationQueueIdDto.endDate != ''">
+            and substring(visitTme,1,10) <![CDATA[ <= ]]> #{dateDurationQueueIdDto.endDate}
+        </if>
+        <if test="accountingCenter != null and accountingCenter.size >0 ">
+            and accountingCenter  in
+            <foreach collection="accountingCenter" item="model" open="(" close=")" separator=",">
+                #{model}
+            </foreach>
+        </if> GROUP BY productCategory UNION select null as notKnow,null as noComplete,null as noAnswering,null as downtime,null as reject,null as fax,null as refusedVisit,count(*) as gaiHao,
+        null as turnOff,productCategory from t_cc_visit_audit where accountingCenter !='住宅设备BU' and systemState='已审核' and  completeNote='改号'
+        <if test="dateDurationQueueIdDto.startDate != null and dateDurationQueueIdDto.startDate != ''">
+            and substring(visitTme,1,10) <![CDATA[ >= ]]> #{dateDurationQueueIdDto.startDate}
+        </if>
+        <if test="dateDurationQueueIdDto.endDate != null and dateDurationQueueIdDto.endDate != ''">
+            and substring(visitTme,1,10) <![CDATA[ <= ]]> #{dateDurationQueueIdDto.endDate}
+        </if>
+        <if test="accountingCenter != null and accountingCenter.size >0 ">
+            and accountingCenter  in
+            <foreach collection="accountingCenter" item="model" open="(" close=")" separator=",">
+                #{model}
+            </foreach>
+        </if> GROUP BY productCategory UNION select null as notKnow,null as noComplete,null as noAnswering,null as downtime,null as reject,null as fax,null as refusedVisit,null as gaiHao,
+        count(*) as turnOff,productCategory from t_cc_visit_audit where accountingCenter !='住宅设备BU' and systemState='已审核' and  completeNote='关机'
+        <if test="dateDurationQueueIdDto.startDate != null and dateDurationQueueIdDto.startDate != ''">
+            and substring(visitTme,1,10) <![CDATA[ >= ]]> #{dateDurationQueueIdDto.startDate}
+        </if>
+        <if test="dateDurationQueueIdDto.endDate != null and dateDurationQueueIdDto.endDate != ''">
+            and substring(visitTme,1,10) <![CDATA[ <= ]]> #{dateDurationQueueIdDto.endDate}
+        </if>
+        <if test="accountingCenter != null and accountingCenter.size >0 ">
+            and accountingCenter  in
+            <foreach collection="accountingCenter" item="model" open="(" close=")" separator=",">
+                #{model}
+            </foreach>
+        </if> GROUP BY productCategory) list group by productCategory
+    </select>
+
+    <!--获取已完成回访项目-坐席维度-->
+    <select id="getCompleteByTable" resultType="utry.data.modular.ccBoard.visit.bo.CompleteProject">
+        select visitTable as abscissa,IFNULL(sum(complete),0) as complete,IFNULL(sum(gray),0) as gray,IFNULL(sum(defaultCount),0) as defaultCount,IFNULL(sum(complete),0)+IFNULL(sum(gray),0)+IFNULL(sum(defaultCount),0) as total,
+        ROUND((IFNULL(sum(complete),0))/(IFNULL(sum(complete),0)+IFNULL(sum(gray),0)+IFNULL(sum(defaultCount),0))*100,2) as completeRate,
+        ROUND((IFNULL(sum(gray),0))/(IFNULL(sum(complete),0)+IFNULL(sum(gray),0)+IFNULL(sum(defaultCount),0))*100,2) as grayRate,
+        ROUND((IFNULL(sum(defaultCount),0))/(IFNULL(sum(complete),0)+IFNULL(sum(gray),0)+IFNULL(sum(defaultCount),0))*100,2) as defaultCountRate
+        from (
+        select count(*) as complete,null as gray, null as defaultCount,visitTable  from  t_cc_visit_audit where accountingCenter !='住宅设备BU' and systemState='已审核' and  completeNote='完成' and (defaultCode is null or defaultCode='')
+        <if test="dateDurationQueueIdDto.startDate != null and dateDurationQueueIdDto.startDate != ''">
+            and substring(visitTme,1,10) <![CDATA[ >= ]]> #{dateDurationQueueIdDto.startDate}
+        </if>
+        <if test="dateDurationQueueIdDto.endDate != null and dateDurationQueueIdDto.endDate != ''">
+            and substring(visitTme,1,10) <![CDATA[ <= ]]> #{dateDurationQueueIdDto.endDate}
+        </if>
+        <if test="accountingCenter != null and accountingCenter.size >0 ">
+            and accountingCenter  in
+            <foreach collection="accountingCenter" item="model" open="(" close=")" separator=",">
+                #{model}
+            </foreach>
+        </if>
+
+        GROUP BY visitTable UNION
+        select null as complete,null as gray, count(*) as defaultCount,visitTable  from  t_cc_visit_audit where accountingCenter !='住宅设备BU' and systemState='已审核' and  defaultCode is not null and defaultCode!=''
+        <if test="dateDurationQueueIdDto.startDate != null and dateDurationQueueIdDto.startDate != ''">
+            and substring(visitTme,1,10) <![CDATA[ >= ]]> #{dateDurationQueueIdDto.startDate}
+        </if>
+        <if test="dateDurationQueueIdDto.endDate != null and dateDurationQueueIdDto.endDate != ''">
+            and substring(visitTme,1,10) <![CDATA[ <= ]]> #{dateDurationQueueIdDto.endDate}
+        </if>
+        <if test="accountingCenter != null and accountingCenter.size >0 ">
+            and accountingCenter  in
+            <foreach collection="accountingCenter" item="model" open="(" close=")" separator=",">
+                #{model}
+            </foreach>
+        </if>
+
+        GROUP BY visitTable UNION select null as complete,count(*) as gray, null as defaultCount,visitTable from t_cc_visit_audit where accountingCenter !='住宅设备BU' and systemState='已审核' and completeNote in ('不知情','未完成','无人接听','停机','拒接','传真','拒访','改号','关机')
+        <if test="dateDurationQueueIdDto.startDate != null and dateDurationQueueIdDto.startDate != ''">
+            and substring(visitTme,1,10) <![CDATA[ >= ]]> #{dateDurationQueueIdDto.startDate}
+        </if>
+        <if test="dateDurationQueueIdDto.endDate != null and dateDurationQueueIdDto.endDate != ''">
+            and substring(visitTme,1,10) <![CDATA[ <= ]]> #{dateDurationQueueIdDto.endDate}
+        </if>
+        <if test="accountingCenter != null and accountingCenter.size >0 ">
+            and accountingCenter  in
+            <foreach collection="accountingCenter" item="model" open="(" close=")" separator=",">
+                #{model}
+            </foreach>
+        </if>
+        GROUP BY visitTable) list GROUP BY visitTable
+    </select>
+
+    <!--获取已完成回访项目-坐席维度-灰色-->
+    <select id="getCompleteByTableByGray" resultType="utry.data.modular.ccBoard.visit.bo.GrayProject">
+        select visitTable as abscissa,IFNULL(sum(notKnow),0) as notKnow,IFNULL(sum(noComplete),0) as noComplete,IFNULL(sum(noAnswering),0) as noAnswering,
+        IFNULL(sum(downtime),0) as downtime,IFNULL(sum(reject),0) as reject,IFNULL(sum(fax),0) as fax,IFNULL(sum(refusedVisit),0) as refusedVisit,
+        IFNULL(sum(gaiHao),0) as gaiHao,IFNULL(sum(turnOff),0) as turnOff,IFNULL(sum(notKnow),0)+IFNULL(sum(noComplete),0)+IFNULL(sum(noAnswering),0)+IFNULL(sum(downtime),0)
+        +IFNULL(sum(reject),0)+IFNULL(sum(fax),0)+IFNULL(sum(refusedVisit),0)+IFNULL(sum(gaiHao),0)+IFNULL(sum(turnOff),0) as total,
+        ROUND((IFNULL(sum(notKnow),0))/(IFNULL(sum(notKnow),0)+IFNULL(sum(noComplete),0)+IFNULL(sum(noAnswering),0)+IFNULL(sum(downtime),0)
+        +IFNULL(sum(reject),0)+IFNULL(sum(fax),0)+IFNULL(sum(refusedVisit),0)+IFNULL(sum(gaiHao),0)+IFNULL(sum(turnOff),0))*100,2) as notKnowRate,
+        ROUND((IFNULL(sum(noComplete),0))/(IFNULL(sum(notKnow),0)+IFNULL(sum(noComplete),0)+IFNULL(sum(noAnswering),0)+IFNULL(sum(downtime),0)
+        +IFNULL(sum(reject),0)+IFNULL(sum(fax),0)+IFNULL(sum(refusedVisit),0)+IFNULL(sum(gaiHao),0)+IFNULL(sum(turnOff),0))*100,2) as noCompleteRate,
+        ROUND((IFNULL(sum(noAnswering),0))/(IFNULL(sum(notKnow),0)+IFNULL(sum(noComplete),0)+IFNULL(sum(noAnswering),0)+IFNULL(sum(downtime),0)
+        +IFNULL(sum(reject),0)+IFNULL(sum(fax),0)+IFNULL(sum(refusedVisit),0)+IFNULL(sum(gaiHao),0)+IFNULL(sum(turnOff),0))*100,2) as noAnsweringRate,
+        ROUND((IFNULL(sum(downtime),0))/(IFNULL(sum(notKnow),0)+IFNULL(sum(noComplete),0)+IFNULL(sum(noAnswering),0)+IFNULL(sum(downtime),0)
+        +IFNULL(sum(reject),0)+IFNULL(sum(fax),0)+IFNULL(sum(refusedVisit),0)+IFNULL(sum(gaiHao),0)+IFNULL(sum(turnOff),0))*100,2) as downtimeRate,
+        ROUND((IFNULL(sum(reject),0) )/(IFNULL(sum(notKnow),0)+IFNULL(sum(noComplete),0)+IFNULL(sum(noAnswering),0)+IFNULL(sum(downtime),0)
+        +IFNULL(sum(reject),0)+IFNULL(sum(fax),0)+IFNULL(sum(refusedVisit),0)+IFNULL(sum(gaiHao),0)+IFNULL(sum(turnOff),0))*100,2) as rejectRate,
+        ROUND((IFNULL(sum(fax),0))/(IFNULL(sum(notKnow),0)+IFNULL(sum(noComplete),0)+IFNULL(sum(noAnswering),0)+IFNULL(sum(downtime),0)
+        +IFNULL(sum(reject),0)+IFNULL(sum(fax),0)+IFNULL(sum(refusedVisit),0)+IFNULL(sum(gaiHao),0)+IFNULL(sum(turnOff),0))*100,2) as faxRate,
+        ROUND((IFNULL(sum(refusedVisit),0))/(IFNULL(sum(notKnow),0)+IFNULL(sum(noComplete),0)+IFNULL(sum(noAnswering),0)+IFNULL(sum(downtime),0)
+        +IFNULL(sum(reject),0)+IFNULL(sum(fax),0)+IFNULL(sum(refusedVisit),0)+IFNULL(sum(gaiHao),0)+IFNULL(sum(turnOff),0))*100,2) as refusedVisitRate,
+        ROUND((IFNULL(sum(gaiHao),0))/(IFNULL(sum(notKnow),0)+IFNULL(sum(noComplete),0)+IFNULL(sum(noAnswering),0)+IFNULL(sum(downtime),0)
+        +IFNULL(sum(reject),0)+IFNULL(sum(fax),0)+IFNULL(sum(refusedVisit),0)+IFNULL(sum(gaiHao),0)+IFNULL(sum(turnOff),0))*100,2) as gaiHaoRate,
+        ROUND((IFNULL(sum(turnOff),0))/(IFNULL(sum(notKnow),0)+IFNULL(sum(noComplete),0)+IFNULL(sum(noAnswering),0)+IFNULL(sum(downtime),0)
+        +IFNULL(sum(reject),0)+IFNULL(sum(fax),0)+IFNULL(sum(refusedVisit),0)+IFNULL(sum(gaiHao),0)+IFNULL(sum(turnOff),0))*100,2) as turnOffRate
+        from (
+        select count(*) as notKnow,null as noComplete,null as noAnswering,null as downtime,null as reject,null as fax,null as refusedVisit,null as gaiHao,
+        null as turnOff,visitTable  from  t_cc_visit_audit where accountingCenter !='住宅设备BU' and systemState='已审核' and  completeNote='不知情'
+        <if test="dateDurationQueueIdDto.startDate != null and dateDurationQueueIdDto.startDate != ''">
+            and substring(visitTme,1,10) <![CDATA[ >= ]]> #{dateDurationQueueIdDto.startDate}
+        </if>
+        <if test="dateDurationQueueIdDto.endDate != null and dateDurationQueueIdDto.endDate != ''">
+            and substring(visitTme,1,10) <![CDATA[ <= ]]> #{dateDurationQueueIdDto.endDate}
+        </if>
+        <if test="accountingCenter != null and accountingCenter.size >0 ">
+            and accountingCenter  in
+            <foreach collection="accountingCenter" item="model" open="(" close=")" separator=",">
+                #{model}
+            </foreach>
+        </if>
+        GROUP BY visitTable  UNION
+        select null as notKnow,count(*) as noComplete,null as noAnswering,null as downtime,null as reject,null as fax,null as refusedVisit,null as gaiHao,
+        null as turnOff,visitTable  from  t_cc_visit_audit where accountingCenter !='住宅设备BU' and systemState='已审核' and  completeNote='未完成'
+        <if test="dateDurationQueueIdDto.startDate != null and dateDurationQueueIdDto.startDate != ''">
+            and substring(visitTme,1,10) <![CDATA[ >= ]]> #{dateDurationQueueIdDto.startDate}
+        </if>
+        <if test="dateDurationQueueIdDto.endDate != null and dateDurationQueueIdDto.endDate != ''">
+            and substring(visitTme,1,10) <![CDATA[ <= ]]> #{dateDurationQueueIdDto.endDate}
+        </if>
+        <if test="accountingCenter != null and accountingCenter.size >0 ">
+            and accountingCenter  in
+            <foreach collection="accountingCenter" item="model" open="(" close=")" separator=",">
+                #{model}
+            </foreach>
+        </if>
+        GROUP BY visitTable UNION select null as notKnow,null as noComplete,count(*) as noAnswering,null as downtime,null as reject,null as fax,null as refusedVisit,null as gaiHao,
+        null as turnOff,visitTable from t_cc_visit_audit where accountingCenter !='住宅设备BU' and systemState='已审核' and  completeNote='无人接听'
+        <if test="dateDurationQueueIdDto.startDate != null and dateDurationQueueIdDto.startDate != ''">
+            and substring(visitTme,1,10) <![CDATA[ >= ]]> #{dateDurationQueueIdDto.startDate}
+        </if>
+        <if test="dateDurationQueueIdDto.endDate != null and dateDurationQueueIdDto.endDate != ''">
+            and substring(visitTme,1,10) <![CDATA[ <= ]]> #{dateDurationQueueIdDto.endDate}
+        </if>
+        <if test="accountingCenter != null and accountingCenter.size >0 ">
+            and accountingCenter  in
+            <foreach collection="accountingCenter" item="model" open="(" close=")" separator=",">
+                #{model}
+            </foreach>
+        </if> GROUP BY visitTable UNION select null as notKnow,null as noComplete,null as noAnswering,count(*) as downtime,null as reject,null as fax,null as refusedVisit,null as gaiHao,
+        null as turnOff,visitTable from t_cc_visit_audit where accountingCenter !='住宅设备BU' and systemState='已审核' and  completeNote='停机'
+        <if test="dateDurationQueueIdDto.startDate != null and dateDurationQueueIdDto.startDate != ''">
+            and substring(visitTme,1,10) <![CDATA[ >= ]]> #{dateDurationQueueIdDto.startDate}
+        </if>
+        <if test="dateDurationQueueIdDto.endDate != null and dateDurationQueueIdDto.endDate != ''">
+            and substring(visitTme,1,10) <![CDATA[ <= ]]> #{dateDurationQueueIdDto.endDate}
+        </if>
+        <if test="accountingCenter != null and accountingCenter.size >0 ">
+            and accountingCenter  in
+            <foreach collection="accountingCenter" item="model" open="(" close=")" separator=",">
+                #{model}
+            </foreach>
+        </if> GROUP BY visitTable UNION select null as notKnow,null as noComplete,null as noAnswering,null as downtime,count(*) as reject,null as fax,null as refusedVisit,null as gaiHao,
+        null as turnOff,visitTable from t_cc_visit_audit where accountingCenter !='住宅设备BU' and systemState='已审核' and  completeNote='拒接'
+        <if test="dateDurationQueueIdDto.startDate != null and dateDurationQueueIdDto.startDate != ''">
+            and substring(visitTme,1,10) <![CDATA[ >= ]]> #{dateDurationQueueIdDto.startDate}
+        </if>
+        <if test="dateDurationQueueIdDto.endDate != null and dateDurationQueueIdDto.endDate != ''">
+            and substring(visitTme,1,10) <![CDATA[ <= ]]> #{dateDurationQueueIdDto.endDate}
+        </if>
+        <if test="accountingCenter != null and accountingCenter.size >0 ">
+            and accountingCenter  in
+            <foreach collection="accountingCenter" item="model" open="(" close=")" separator=",">
+                #{model}
+            </foreach>
+        </if> GROUP BY visitTable UNION select null as notKnow,null as noComplete,null as noAnswering,null as downtime,null as reject,count(*) as fax,null as refusedVisit,null as gaiHao,
+        null as turnOff,visitTable from t_cc_visit_audit where accountingCenter !='住宅设备BU' and systemState='已审核' and  completeNote='传真'
+        <if test="dateDurationQueueIdDto.startDate != null and dateDurationQueueIdDto.startDate != ''">
+            and substring(visitTme,1,10) <![CDATA[ >= ]]> #{dateDurationQueueIdDto.startDate}
+        </if>
+        <if test="dateDurationQueueIdDto.endDate != null and dateDurationQueueIdDto.endDate != ''">
+            and substring(visitTme,1,10) <![CDATA[ <= ]]> #{dateDurationQueueIdDto.endDate}
+        </if>
+        <if test="accountingCenter != null and accountingCenter.size >0 ">
+            and accountingCenter  in
+            <foreach collection="accountingCenter" item="model" open="(" close=")" separator=",">
+                #{model}
+            </foreach>
+        </if> GROUP BY visitTable UNION  select null as notKnow,null as noComplete,null as noAnswering,null as downtime,null as reject,null as fax,count(*) as refusedVisit,null as gaiHao,
+        null as turnOff,visitTable from t_cc_visit_audit where accountingCenter !='住宅设备BU' and systemState='已审核' and  completeNote='拒访'
+        <if test="dateDurationQueueIdDto.startDate != null and dateDurationQueueIdDto.startDate != ''">
+            and substring(visitTme,1,10) <![CDATA[ >= ]]> #{dateDurationQueueIdDto.startDate}
+        </if>
+        <if test="dateDurationQueueIdDto.endDate != null and dateDurationQueueIdDto.endDate != ''">
+            and substring(visitTme,1,10) <![CDATA[ <= ]]> #{dateDurationQueueIdDto.endDate}
+        </if>
+        <if test="accountingCenter != null and accountingCenter.size >0 ">
+            and accountingCenter  in
+            <foreach collection="accountingCenter" item="model" open="(" close=")" separator=",">
+                #{model}
+            </foreach>
+        </if> GROUP BY visitTable UNION select null as notKnow,null as noComplete,null as noAnswering,null as downtime,null as reject,null as fax,null as refusedVisit,count(*) as gaiHao,
+        null as turnOff,visitTable from t_cc_visit_audit where accountingCenter !='住宅设备BU' and systemState='已审核' and  completeNote='改号'
+        <if test="dateDurationQueueIdDto.startDate != null and dateDurationQueueIdDto.startDate != ''">
+            and substring(visitTme,1,10) <![CDATA[ >= ]]> #{dateDurationQueueIdDto.startDate}
+        </if>
+        <if test="dateDurationQueueIdDto.endDate != null and dateDurationQueueIdDto.endDate != ''">
+            and substring(visitTme,1,10) <![CDATA[ <= ]]> #{dateDurationQueueIdDto.endDate}
+        </if>
+        <if test="accountingCenter != null and accountingCenter.size >0 ">
+            and accountingCenter  in
+            <foreach collection="accountingCenter" item="model" open="(" close=")" separator=",">
+                #{model}
+            </foreach>
+        </if> GROUP BY visitTable UNION select null as notKnow,null as noComplete,null as noAnswering,null as downtime,null as reject,null as fax,null as refusedVisit,null as gaiHao,
+        count(*) as turnOff,visitTable from t_cc_visit_audit where accountingCenter !='住宅设备BU' and systemState='已审核' and  completeNote='关机'
+        <if test="dateDurationQueueIdDto.startDate != null and dateDurationQueueIdDto.startDate != ''">
+            and substring(visitTme,1,10) <![CDATA[ >= ]]> #{dateDurationQueueIdDto.startDate}
+        </if>
+        <if test="dateDurationQueueIdDto.endDate != null and dateDurationQueueIdDto.endDate != ''">
+            and substring(visitTme,1,10) <![CDATA[ <= ]]> #{dateDurationQueueIdDto.endDate}
+        </if>
+        <if test="accountingCenter != null and accountingCenter.size >0 ">
+            and accountingCenter  in
+            <foreach collection="accountingCenter" item="model" open="(" close=")" separator=",">
+                #{model}
+            </foreach>
+        </if> GROUP BY visitTable) list group by visitTable
+    </select>
+
+    <!--获取回访结果列表-->
+    <select id="getVisitResult" resultType="utry.data.modular.ccBoard.visit.vo.VisitResultVo">
+        select tcva.systemState,tcva.visitTable,tcva.accountingRegional,tcvd.documentNo,tcva.productCategory,tcvd.date,tcva.serviceType,
+        tcva.serviceNumber,tcva.visitTme,tcva.completeNote,tcvd.defaultDescription as resultType from t_cc_visit_audit tcva
+        LEFT JOIN t_cc_visit_default tcvd on tcva.serviceNumber = tcvd.serviceNumber where tcva.accountingCenter !='住宅设备BU' and tcva.systemState='已审核'
+        <if test="visitResultDto.startDate != null and visitResultDto.startDate != ''">
+            and substring(tcva.visitTme,1,10) <![CDATA[ >= ]]> #{visitResultDto.startDate}
+        </if>
+        <if test="visitResultDto.endDate != null and visitResultDto.endDate != ''">
+            and substring(tcva.visitTme,1,10) <![CDATA[ <= ]]> #{visitResultDto.endDate}
+        </if>
+        <if test="accountingCenter != null and accountingCenter.size >0 ">
+            and tcva.accountingCenter  in
+            <foreach collection="accountingCenter" item="model" open="(" close=")" separator=",">
+                #{model}
+            </foreach>
+        </if>
+        <if test="visitResultDto.taskType != null and visitResultDto.taskType != ''">
+            and tcva.taskType = #{visitResultDto.taskType}
+        </if>
+        <if test="visitResultDto.productCategory != null and visitResultDto.productCategory != ''">
+            and tcva.productCategory = #{visitResultDto.productCategory}
+        </if>
+        <if test="visitResultDto.accountingArea != null and visitResultDto.accountingArea != ''">
+            and tcva.accountingArea = #{visitResultDto.accountingArea}
+        </if>
+        <if test="visitResultDto.visitTable != null and visitResultDto.visitTable != ''">
+            and tcva.visitTable = #{visitResultDto.visitTable}
+        </if>
+        <if test="visitResultDto.completeNote != null and visitResultDto.completeNote != ''">
+            and tcva.completeNote = #{visitResultDto.completeNote}
+        </if>
+        <if test="visitResultDto.defaultCode != null and visitResultDto.defaultCode != '' and visitResultDto.defaultCode=='1'.toString()">
+            and tcva.defaultCode is not null and tcva.defaultCode!=''
+        </if>
+        <if test="visitResultDto.defaultCode != null and visitResultDto.defaultCode != '' and visitResultDto.defaultCode=='2'.toString()">
+            and (tcva.defaultCode is null or tcva.defaultCode='')
+        </if>
+        order by tcva.visitTme desc
+    </select>
+
+    <!--获取一级部门数据-->
+    <select id="getDeptList" resultType="utry.data.modular.ccBoard.visit.vo.QueueVo">
+        SELECT tcqd.deptId as queueId,tcqd.deptName as queueName,'0' as label FROM t_cc_queue_business tcqb
+        LEFT JOIN t_cc_queue_dept tcqd on tcqb.queueId=tcqd.queueId where tcqb.businessType=#{businessType} GROUP BY tcqd.deptId
+    </select>
+
+    <!--获取队列数据-->
+    <select id="getQueueList" resultType="utry.data.modular.ccBoard.visit.vo.QueueVo">
+        SELECT tcqb.queueId as queueId,tcqd.queueName as queueName,'1' as label FROM t_cc_queue_business tcqb
+        LEFT JOIN t_cc_queue_dept tcqd on tcqb.queueId=tcqd.queueId where tcqb.businessType=#{businessType}
+    </select>
+
+    <!--获取回访队列完成量-->
+    <select id="getVisitCompleteNumber" resultType="utry.data.modular.ccBoard.visit.bo.VisitCompleteNumber">
+        SELECT
+        t1.`time` as abscissa,
+        t1.complete
+        FROM (
+        SELECT
+        DATE_FORMAT(DATE_FORMAT( concat( date( visitTme ), ' ', HOUR ( visitTme ), ':',( floor(( MINUTE ( visitTme ) / 30 )) * 30 )),'%Y-%m-%d %H:%i' ),
+        '%Y-%m-%d %H:%i:%s'
+        ) AS `time`,
+        COUNT(*) AS complete
+        FROM t_cc_visit_audit
+        WHERE accountingCenter !='住宅设备BU' and  visitTme BETWEEN #{dateDurationQueueIdDto.startDate} AND CONCAT(#{dateDurationQueueIdDto.endDate}, ' 23:59:59')
+        <if test="accountingCenter != null and accountingCenter.size >0 ">
+            and accountingCenter  in
+            <foreach collection="accountingCenter" item="model" open="(" close=")" separator=",">
+                #{model}
+            </foreach>
+        </if>
+        GROUP BY `time`
+        ) t1
+    </select>
+
+
+    <!--获取每个坐席当日回访总量-->
+    <select id="getDayCompleteCountByVisitTable" resultType="java.util.Map">
+        select count(*) as dayCompleteCount,visitTable as agentName from t_cc_visit_audit where accountingCenter !='住宅设备BU'
+        <if test="dateDurationQueueIdDto.startDate != null and dateDurationQueueIdDto.startDate != ''">
+            and substring(visitTme,1,10) <![CDATA[ >= ]]> #{dateDurationQueueIdDto.startDate}
+        </if>
+        <if test="dateDurationQueueIdDto.endDate != null and dateDurationQueueIdDto.endDate != ''">
+            and substring(visitTme,1,10) <![CDATA[ <= ]]> #{dateDurationQueueIdDto.endDate}
+        </if>
+        <if test="accountingCenter != null and accountingCenter.size >0 ">
+            and accountingCenter  in
+            <foreach collection="accountingCenter" item="model" open="(" close=")" separator=",">
+                #{model}
+            </foreach>
+        </if>
+        group by visitTable
+    </select>
+
+    <!--根据队列获取部门名称-->
+    <select id="getQueueDeptList" resultType="java.lang.String">
+        select deptName from t_cc_queue_dept where 1=1
+        <if test="deptId != null and deptId.size >0 ">
+            and queueId  in
+            <foreach collection="deptId" item="model" open="(" close=")" separator=",">
+                #{model}
+            </foreach>
+        </if>
+        GROUP BY deptName
+    </select>
+</mapper>

@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="utry.data.modular.common.dao.CommonTemplateDao">
+
+    <select id="selectAccountIdByPhone" resultType="java.lang.String">
+        select AccountID from hrm_db.t_hrm_accountinfo where contactNumber = #{phoneNum} AND deleted = '0'
+    </select>
+
+
+</mapper>

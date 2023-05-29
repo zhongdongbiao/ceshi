@@ -1,0 +1,183 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//ibatis.apache.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="utry.data.modular.ccBoard.common.dao.DosCallCenterCheckStatsDao">
+
+    <resultMap id="startEndDateTimeDurationBoResultMap" type="utry.data.modular.ccBoard.hotLineAgent.bo.StartEndDateTimeDurationBo">
+        <result property="startDateTime" column="start_date_time"/>
+        <result property="endDateTime" column="end_date_time"/>
+        <result property="duration" column="duration"/>
+    </resultMap>
+
+    <resultMap id="agentQueueHistoryTableVoResultMap" type="utry.data.modular.ccBoard.hotLineAgent.vo.AgentQueueHistoryTableVo">
+        <result property="queueName" column="queue_name"/>
+        <result property="startDateTime" column="start_date_time"/>
+        <result property="endDateTime" column="end_date_time"/>
+        <result property="duration" column="duration"/>
+    </resultMap>
+
+    <select id="getWorkTime" resultType="java.lang.Integer">
+        select IFNULL(SUM(CASE WHEN duration IS NULL THEN TIMESTAMPDIFF(SECOND, start_time, NOW()) ELSE duration END),0) from dos_callcenter_check_stats where 1=1
+        <if test="dateDurationQueueIdDto.startDate != null and dateDurationQueueIdDto.startDate != ''">
+            and substring(start_time,1,10) <![CDATA[ >= ]]> #{dateDurationQueueIdDto.startDate}
+        </if>
+        <if test="dateDurationQueueIdDto.endDate != null and dateDurationQueueIdDto.endDate != ''">
+            and substring(start_time,1,10)  <![CDATA[ <= ]]> #{dateDurationQueueIdDto.endDate}
+        </if>
+        <if test="dateDurationQueueIdDto.queueId != null and dateDurationQueueIdDto.queueId.size >0 ">
+            and queue  in
+            <foreach collection="dateDurationQueueIdDto.queueId" item="model" open="(" close=")" separator=",">
+                #{model}
+            </foreach>
+        </if>
+    </select>
+
+    <!-- 登录开始结束时间、持续时长 -->
+    <select id="selectStartEndDateTimeDuration" resultMap="startEndDateTimeDurationBoResultMap">
+        SELECT
+            start_time AS start_date_time,
+            end_time AS end_date_time,
+            duration
+        FROM dos_callcenter_check_stats
+        WHERE start_time BETWEEN #{startDate} AND CONCAT(#{endDate}, ' 23:59:59')
+        AND queue IN
+        <foreach collection="queueId" open="(" close=")" item="qId" separator=",">
+            #{qId}
+        </foreach>
+        ORDER BY start_time
+    </select>
+
+    <!-- 队列历史表格 -->
+    <select id="selectAgentQueueHistoryTable" resultMap="agentQueueHistoryTableVoResultMap">
+        SELECT
+            queue AS queue_name,
+            DATE_FORMAT(start_time, '%Y-%m-%d %H:%i:%s') AS start_date_time,
+            IFNULL(end_time, '-') AS end_date_time,
+            IFNULL(duration, TIMESTAMPDIFF(SECOND, start_time, NOW())) AS duration
+        FROM dos_callcenter_check_stats
+        WHERE start_time BETWEEN #{startDate} AND CONCAT(#{endDate}, ' 23:59:59')
+        AND extension = #{agentId}
+    </select>
+
+    <!--获取回访坐席坐席状态-->
+    <select id="getVisitAgentStateTable"
+            resultType="utry.data.modular.ccBoard.visit.vo.VisitAgentStateTableVo">
+        SELECT
+        t1.agent_name as agentName,
+        t1.agent_id as agentId,
+        IFNULL(t2.breathOut, 0) AS breathOut,
+        IFNULL(ROUND((IFNULL(t4.breathNumber, 0)/ IFNULL(t2.breathOut, 0) ), 2)*100 ,0) as breathRate,
+        IFNULL(t4.breathNumber, 0) as breathNumber,
+        t5.login_duration as workTime,
+        IFNULL(ROUND(((IFNULL(t2.call_duration, 0) + IFNULL(t2.ring_time, 0) + IFNULL(t3.working_duration, 0)) / IFNULL(t5.login_duration, 0)) * 100, 2) ,0) AS manHourUtilizationRate,
+        IFNULL(ROUND((IFNULL(t2.call_duration, 0) / IFNULL(t5.login_duration, 0)) * 100, 2),0) AS callTimeUtilization,
+        IFNULL(ROUND(IFNULL(t2.breathOut, 0)/(IFNULL(t5.login_duration, 0)/3600), 2),0) completeNumber,
+        t3.current_state as currentState,
+        IFNULL(t3.current_state_stay ,'00:00:00')  as currentStateStay,
+        IFNULL(t3.leisure_cumulative_duration ,0)  as leisureCumulativeDuration,
+        IFNULL(t3.rest_cumulative_duration ,0)  as restCumulativeDuration,
+        IFNULL(t3.after_call_cumulative_duration ,0) AS afterCallCumulativeDuration,
+        IFNULL(t3.busy_cumulative_duration ,0) AS busyCumulativeDuration
+        FROM (
+        SELECT
+        extension AS agent_id,
+        real_name AS agent_name
+        FROM dos_callcenter_check_stats
+        WHERE start_time BETWEEN #{dto.startDate} AND CONCAT(#{dto.endDate}, ' 23:59:59')
+        AND queue IN
+        <foreach collection="dto.queueId" open="(" close=")" item="qId" separator=",">
+            #{qId}
+        </foreach>
+        <if test="historyFlag != null and historyFlag == 0">
+            AND end_time IS NULL
+        </if>
+        GROUP BY extension,real_name
+        ) t1
+        LEFT JOIN (
+        SELECT
+        source AS agent_id,
+        COUNT(*) AS breathOut,
+        SUM(billable_seconds) AS call_duration,
+        SUM(ring_time) AS ring_time
+        FROM dos_callcenter_callrecord
+        WHERE call_time BETWEEN #{dto.startDate} AND CONCAT(#{dto.endDate}, ' 23:59:59')
+        AND agent_from_queue IN
+        <foreach collection="dto.queueId" open="(" close=")" item="qId" separator=",">
+            #{qId}
+        </foreach>
+        AND call_type = 'out'
+        GROUP BY source
+        ) t2 ON t1.agent_id = t2.agent_id
+        LEFT JOIN (
+        SELECT
+        dcds.extension AS agent_id,
+        SUM(
+            CASE
+            WHEN dcds.operation_type IN (0,1,3,5,6) AND duration IS NULL THEN TIMESTAMPDIFF(SECOND, start_time, NOW())
+            WHEN dcds.operation_type IN (0,1,3,5,6) AND duration IS NOT NULL THEN dcds.duration
+            ELSE 0 END
+        ) AS service_duration,
+        SUM(
+            CASE
+            WHEN dcds.operation_type IN (-1,0,2,5,6) AND duration IS NULL THEN TIMESTAMPDIFF(SECOND, start_time, NOW())
+            WHEN dcds.operation_type IN (-1,0,2,5,6) AND duration IS NOT NULL THEN dcds.duration
+            ELSE 0 END
+        ) AS working_duration,
+        dcam.current_state AS current_state,
+        dcam.current_state_duration AS current_state_stay,
+        SUM(CASE
+        WHEN dcds.operation_type = -1 AND dcds.duration IS NULL THEN TIMESTAMPDIFF(SECOND, dcds.start_time, NOW())
+        WHEN dcds.operation_type = -1 AND dcds.duration IS NOT NULL THEN duration
+        ELSE 0 END) AS leisure_cumulative_duration,
+        SUM(CASE
+        WHEN dcds.operation_type IN (1,2,3,4,5) AND duration IS NULL THEN TIMESTAMPDIFF(SECOND, dcds.start_time, NOW())
+        WHEN dcds.operation_type IN (1,2,3,4,5) AND duration IS NOT NULL THEN duration
+        ELSE 0 END) AS rest_cumulative_duration,
+        SUM(CASE
+        WHEN dcds.operation_type = 0 AND dcds.duration IS NULL THEN TIMESTAMPDIFF(SECOND, dcds.start_time, NOW())
+        WHEN dcds.operation_type = 0 AND dcds.duration IS NOT NULL THEN duration
+        ELSE 0 END) AS after_call_cumulative_duration,
+        SUM(CASE
+        WHEN dcds.operation_type = 6 AND dcds.duration IS NULL THEN TIMESTAMPDIFF(SECOND, start_time, NOW())
+        WHEN dcds.operation_type = 6 AND dcds.duration IS NOT NULL THEN duration
+        ELSE 0 END) AS busy_cumulative_duration
+        FROM dos_callcenter_dnd_stats dcds LEFT JOIN dos_callcenter_agent_monitor dcam on dcds.extension=dcam.extension
+        WHERE dcds.start_time BETWEEN #{dto.startDate} AND CONCAT(#{dto.endDate}, ' 23:59:59') and  `time` = (SELECT MAX(`time`) FROM dos_callcenter_agent_monitor)
+        AND dcds.queue IN
+        <foreach collection="dto.queueId" open="(" close=")" item="qId" separator=",">
+            #{qId}
+        </foreach>
+        GROUP BY dcds.extension
+        ) t3 ON t1.agent_id = t3.agent_id
+        LEFT JOIN (
+        SELECT
+        source AS agent_id,
+        COUNT(*) AS breathNumber
+        FROM dos_callcenter_callrecord
+        WHERE call_time BETWEEN #{dto.startDate} AND CONCAT(#{dto.endDate}, ' 23:59:59')
+        AND agent_from_queue IN
+        <foreach collection="dto.queueId" open="(" close=")" item="qId" separator=",">
+            #{qId}
+        </foreach>
+        AND call_type = 'out' AND disposition ='answered'
+        GROUP BY source
+        ) t4 ON t1.agent_id = t4.agent_id
+        LEFT JOIN (
+            SELECT
+                extension AS agent_id,
+                SUM(CASE WHEN duration IS NULL THEN TIMESTAMPDIFF(SECOND, start_time, NOW()) ELSE duration END) AS login_duration
+            FROM dos_callcenter_check_stats
+            <where>
+                start_time BETWEEN #{dto.startDate} AND CONCAT(#{dto.endDate}, ' 23:59:59')
+                AND queue IN
+                <foreach collection="dto.queueId" open="(" close=")" item="qId" separator=",">
+                    #{qId}
+                </foreach>
+            </where>
+            GROUP BY extension
+        ) t5 ON t1.agent_id = t5.agent_id
+        where 1=1
+        <if test="dto.state != null and dto.state != ''">
+            AND t3.current_state like concat(#{dto.state},'%')
+        </if>
+    </select>
+</mapper>

@@ -1,0 +1,97 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="utry.data.modular.baseConfig.dao.UserComplaintDao">
+
+    <!--查询所有用户-->
+    <select id="selectUser" resultType="utry.data.modular.baseConfig.dto.HrmAccountInfoDTO">
+        SELECT
+            AccountID as accountId,
+            Account as account,
+            RealName as realName
+        FROM
+            hrm_db.t_hrm_accountinfo
+        WHERE deleted = '0'
+    </select>
+
+    <!--关联用户-->
+    <insert id="associatedUser" parameterType="utry.data.modular.baseConfig.dto.UserComplaintDTO">
+        INSERT INTO t_user_complaint (id, userId, realName, account, createTime,updateTime)
+        VALUES (REPLACE(UUID(), _utf8'-', _utf8''),#{accountId},#{realName}, #{account}, #{createTime}, NOW())
+    </insert>
+
+    <!--查询所有担当用户列表-->
+    <select id="queryAssumeUser" resultType="utry.data.modular.baseConfig.dto.UserComplaintDTO">
+        SELECT userId AS accountId,
+               realName,
+               account,
+               createTime,
+               updateTime
+        FROM t_user_complaint
+        ORDER BY createTime desc
+    </select>
+
+    <!--删除担当用户-->
+    <delete id="deleteAssumeUser" parameterType="java.lang.String">
+        delete from t_user_complaint where userId = #{accountId}
+    </delete>
+
+    <!--通过账户id查询担当用户数量-->
+    <select id="queryAssumeUserByAccountId" parameterType="java.lang.String" resultType="java.lang.Long">
+        SELECT COUNT(id) FROM t_user_complaint WHERE userId = #{accountId}
+    </select>
+
+    <!--查询部门站内信信息列表-->
+    <select id="queryStationLetter" resultType="utry.data.modular.baseConfig.dto.DepartmentStationLetterDTO">
+        SELECT status,
+               departmentNumber,
+               departmentName,
+               relationProject,
+               createTime,
+               updateTime
+        FROM t_department_station_letter
+    </select>
+
+    <!--编辑部门站内信信息-->
+    <update id="editStationLetter" parameterType="utry.data.modular.baseConfig.dto.DepartmentStationLetterDTO">
+        UPDATE t_department_station_letter
+        SET status=#{status}, relationProject=#{relationProject}, updateTime=NOW()
+        WHERE departmentNumber=#{departmentNumber}
+    </update>
+
+    <insert id="insertStationLetter" parameterType="java.util.List">
+        INSERT t_department_station_letter (status, departmentNumber, departmentName, relationProject, createTime, updateTime)
+        VALUES
+            <foreach collection="stationLetterDTOList" item="item" separator=",">
+                (#{item.status}, #{item.departmentNumber}, #{item.departmentName}, #{item.relationProject}, #{item.createTime}, #{item.updateTime})
+            </foreach>
+    </insert>
+
+    <delete id="batchDeleteDepartmentStationLetter">
+        DELETE FROM t_department_station_letter
+    </delete>
+
+    <insert id="insertDepartmentData" parameterType="java.util.List">
+        INSERT t_department (systemStatus, departmentNumber, departmentName, accountingCenterCode, accountingCenter, createTime, createUser, updateTime, updateUser)
+        VALUES
+            <foreach collection="departmentDataList" item="item" separator=",">
+                (#{item.systemStatus}, #{item.departmentNumber}, #{item.departmentName}, #{item.accountingCenterCode}, #{item.accountingCenter}, #{item.createTime}, #{item.createUser}, #{item.updateTime}, #{item.updateUser})
+            </foreach>
+    </insert>
+
+    <delete id="deleteDepartmentData">
+        DELETE FROM t_department
+    </delete>
+
+    <select id="getStationLetterByDepartmentNumber" parameterType="java.lang.String" resultType="utry.data.modular.baseConfig.dto.DepartmentStationLetterDTO">
+        SELECT status,
+               departmentNumber,
+               departmentName,
+               relationProject,
+               createTime,
+               updateTime
+        FROM t_department_station_letter
+        WHERE departmentNumber = #{departmentNumber}
+    </select>
+
+</mapper>

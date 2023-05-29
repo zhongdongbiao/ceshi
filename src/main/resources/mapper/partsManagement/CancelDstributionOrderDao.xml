@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="utry.data.modular.partsManagement.dao.CancelDstributionOrderDao">
+    <!-- 开启二级缓存 -->
+    <cache eviction="LRU" flushInterval="300000" readOnly="true" size="1024"></cache>
+
+    <insert id="insertCancelDstributionOrder">
+        <if test="detail != null and detail != '' and detail.size>0 ">
+            insert into t_cancel_dstribution_order_detail (documentNo,documentNumber,productModel,partCode,sourceLineNumber,distributionSingleNo,
+            stockoutNumber,orderType,orderTime,applyNumber,distributionNumber,outNumber,cancelDstributionOrderNumber,cancelType)
+            VALUES
+            <foreach collection="detail" item="model" separator=",">
+                (#{documentNo},#{model.documentNumber},#{model.productModel},#{model.partCode},#{model.sourceLineNumber},#{model.distributionSingleNo},#{model.stockoutNumber},
+                #{model.orderType},#{model.orderTime},#{model.applyNumber},#{model.distributionNumber},#{model.outNumber},#{model.cancelDstributionOrderNumber},#{model.cancelType})
+            </foreach>
+            ;
+        </if>
+      insert into t_cancel_dstribution_order (documentNo,documentDate,accountingCenterCode,warehouseCode,
+      warehouseName,partDrawingNo,describedDrawingNo,instructions,accountingCenter,systemState)
+        values(#{documentNo},#{documentDate},#{accountingCenterCode},#{warehouseCode},#{warehouseName},
+        #{partDrawingNo},#{describedDrawingNo},#{instructions},#{accountingCenter},#{systemState})
+    </insert>
+
+    <!--批量修改配货取消单-->
+    <update id="updateOrder">
+        <foreach collection="dstributionOrderValue" item="item" index="index" open="" close="" separator=";">
+            update t_cancel_dstribution_order set documentNumber = #{item.documentNumber}
+            where documentNo=#{item.documentNo}
+        </foreach>
+    </update>
+
+    <!--获取配货取消单关联订单号-->
+    <select id="getOrderValue" resultType="java.util.Map">
+        select documentNo,documentNumber  from t_cancel_dstribution_order_detail GROUP BY documentNo
+    </select>
+    <select id="getOrderDetailFlag" resultType="java.lang.String">
+         select documentNo  from t_cancel_dstribution_order where documentNo=#{documentNo}
+    </select>
+
+
+</mapper>

@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="utry.data.modular.partsManagement.dao.ModelPartsDao">
+    <!-- 开启二级缓存 -->
+    <cache eviction="LRU" flushInterval="300000" readOnly="true" size="1024"></cache>
+    <insert id="batchModelParts" parameterType="java.util.List">
+        insert into t_model_parts (id,systemState,productModel,partDrawingNo,partName)
+        values
+        <foreach collection="list" item="item" separator=",">
+            (REPLACE(UUID(), _utf8'-', _utf8''),#{item.systemState},#{item.productModel},#{item.partDrawingNo},#{item.partName})
+        </foreach>
+    </insert>
+
+    <delete id="batchModelPartsDelete">
+        delete from t_model_parts
+    </delete>
+</mapper>

@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="utry.data.modular.partsManagement.dao.ScanDetailDao">
+
+
+    <delete id="batchScanDetailDelete">
+        delete from t_receipt_scan_detail
+    </delete>
+
+    <insert id="batchScanDetail" parameterType="java.util.List">
+        insert into t_receipt_scan_detail (documentNumber,associatedOrderNumber,partDrawingNo,partBarcode,barCodeNumber,stateGoods,scannerPerson,
+        sweepTime)
+        values
+        <foreach collection="list" item="item" separator=",">
+            (#{item.documentNumber},#{item.associatedOrderNumber},#{item.partDrawingNo},#{item.partBarcode},#{item.barCodeNumber},
+            #{item.stateGoods},#{item.scannerPerson},#{item.sweepTime})
+        </foreach>
+    </insert>
+</mapper>

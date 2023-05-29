@@ -1,0 +1,356 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="utry.data.modular.partsManagement.dao.PurchaseOrderDao">
+    <!-- 开启二级缓存 -->
+    <cache eviction="LRU" flushInterval="300000" readOnly="true" size="1024"></cache>
+
+    <resultMap id="purchaseOrderCountBOResultMap" type="utry.data.modular.partsManagement.bo.PurchaseOrderCountBO">
+        <result property="warehouseCode" column="warehouseCode" jdbcType="VARCHAR"/>
+        <result property="partDrawingNumber" column="partDrawingNumber" jdbcType="VARCHAR"/>
+        <result property="partDrawingNo" column="partDrawingNo" jdbcType="VARCHAR"/>
+        <result property="count" column="count" jdbcType="INTEGER"/>
+    </resultMap>
+
+    <insert id="insertPurchaseOrder">
+        <if test="partInformationList != null and partInformationList != '' and partInformationList.size>0 ">
+            insert into t_purchase_order_detail (documentNo,partDrawingNo,partDrawingNumber,describedDrawingNo,factoryBriefly,orderNumber,
+            actualNumber,completeNumber,cancelNumber,costPrice,costAmout,factoryName,procurement,taxUnitPrice)
+            VALUES
+            <foreach collection="partInformationList" item="model" separator=",">
+                (#{documentNo},#{model.partDrawingNo},#{model.partDrawingNumber},
+                #{model.describedDrawingNo},#{model.factoryBriefly},#{model.orderNumber},#{model.actualNumber},#{model.completeNumber},#{model.cancelNumber},#{model.costPrice},
+                #{model.costAmout},#{model.factoryName},#{model.procurement},#{model.taxUnitPrice})
+            </foreach>
+            ;
+        </if>
+        insert into t_purchase_order (documentNo,documentDate,purchaseOrderType,purchaseTime,completionDate,orderType,
+        supplierCode,supplierName,speciesTotal,goodWarehouse,warehouseName,numberTotal,aggregateAmount,transportMethod,systemState)
+        values (#{documentNo},#{documentDate},#{purchaseOrderType},#{purchaseTime},#{completionDate},#{orderType},
+        #{supplierCode},#{supplierName},#{speciesTotal},#{goodWarehouse},#{warehouseName},#{numberTotal},#{aggregateAmount},#{transportMethod},#{systemState})
+    </insert>
+    
+    <!--采购订单详情数据修改-->
+    <update id="updatePurchaseOrder">
+        update t_purchase_order
+        <set>
+            <if test="documentDate != null and documentDate != ''">
+                documentDate=#{documentDate},
+            </if>
+            <if test="purchaseOrderType != null and purchaseOrderType != ''">
+                purchaseOrderType=#{purchaseOrderType},
+            </if>
+            <if test="purchaseTime != null and purchaseTime != ''">
+                purchaseTime=#{purchaseTime},
+            </if>
+            <if test="completionDate != null and completionDate != ''">
+                completionDate=#{completionDate},
+            </if>
+            <if test="orderType != null and orderType != ''">
+                orderType=#{orderType},
+            </if>
+            <if test="supplierCode != null and supplierCode != ''">
+                supplierCode=#{supplierCode},
+            </if>
+            <if test="supplierName != null and supplierName != ''">
+                supplierName=#{supplierName},
+            </if>
+            <if test="speciesTotal != null and speciesTotal != ''">
+                speciesTotal=#{speciesTotal},
+            </if>
+            <if test="goodWarehouse != null and goodWarehouse != ''">
+                goodWarehouse=#{goodWarehouse},
+            </if>
+            <if test="warehouseName != null and warehouseName != ''">
+                warehouseName=#{warehouseName},
+            </if>
+            <if test="numberTotal != null and numberTotal != ''">
+                numberTotal=#{numberTotal},
+            </if>
+            <if test="aggregateAmount != null and aggregateAmount != ''">
+                aggregateAmount=#{aggregateAmount},
+            </if>
+            <if test="transportMethod != null and transportMethod != ''">
+                transportMethod=#{transportMethod},
+            </if>
+            <if test="systemState != null and systemState != ''">
+                systemState=#{systemState},
+            </if>
+        </set>
+        where documentNo=#{documentNo}
+    </update>
+
+    <!--根据部件图号获取未完成采购订单数量-->
+    <select id="getPurchaseOrderCountByPartDrawingNo" resultType="java.lang.Integer">
+        select count(1) from t_purchase_order_detail tpod
+        LEFT JOIN t_purchase_order tpo
+        on tpod.documentNo=tpo.documentNo where tpod.partDrawingNo=#{partDrawingNo} and
+        completionDate is not null
+    </select>
+
+
+    <select id="getPurchaseOrderByPartDrawingNo" resultType="java.util.Map">
+        select tpo.documentDate,tpo.purchaseTime,tpo.completionDate,tpod.partDrawingNo from t_purchase_order_detail tpod
+        LEFT JOIN t_purchase_order tpo on tpod.documentNo=tpo.documentNo
+        where  tpo.documentNo not in(select purchaseOrderNo from t_cancel_purchase_order_detail)
+        and tpo.completionDate is null GROUP BY tpod.partDrawingNo having tpo.documentDate = MAX(tpo.documentDate)
+    </select>
+
+    <!--根据部件图号获取采购订单Vo-->
+    <select id="getPurchaseOrderVoByDocumentNo"
+            resultType="utry.data.modular.partsManagement.vo.PurchaseOrderVo">
+        select tpod.partDrawingNo,tpo.documentNo,tpo.documentDate,tpo.purchaseOrderType,tpo.purchaseTime,tpo.completionDate,tpo.orderType,
+        tpo.supplierCode,tpo.supplierName,tpo.speciesTotal,tpo.goodWarehouse,tpo.warehouseName,ROUND(tpo.numberTotal,2) numberTotal,ROUND(tpo.aggregateAmount,2) aggregateAmount,tpo.transportMethod,tpo.systemState
+        from t_purchase_order tpo
+        LEFT JOIN t_purchase_order_detail tpod on tpo.documentNo=tpod.documentNo
+        where tpo.documentNo=#{documentNo}
+        group by tpo.documentNo
+    </select>
+
+    <!--根据部件图号获取采购订单DTO-->
+    <select id="getPurchaseDTOByPartDrawingNo"
+            resultType="utry.data.modular.partsManagement.dto.PurchaseDTO">
+        select tpod.factoryName,tpo.documentDate as orderTime,tpl.purchaseLine,date_add(tpo.documentDate , interval tpo.purchaseTime day) as exceptGoodTime,
+        case WHEN tpo.completionDate is null THEN '未到货' else '已到货' END as state,tpo.documentNo
+        from t_purchase_order tpo
+        LEFT JOIN t_purchase_order_detail tpod on tpo.documentNo=tpod.documentNo
+        LEFT JOIN (select count(1) purchaseLine,documentNo from t_purchase_order_detail GROUP BY documentNo) tpl on tpl.documentNo=tpo.documentNo
+        where tpod.partDrawingNo=#{partDrawingNo}
+    </select>
+
+    <!--根据单据号获取采购订单详情-->
+    <select id="getPurchaseOrderDetailByNo"
+            resultType="utry.data.modular.partsManagement.model.PurchaseOrderDetail">
+        select partDrawingNo,describedDrawingNo,factoryBriefly,orderNumber,actualNumber,completeNumber,cancelNumber,
+        ROUND(costPrice ,2) costPrice,ROUND(costAmout ,2) costAmout,ROUND(procurement ,2) procurement,partDrawingNumber,ROUND(taxUnitPrice ,2) taxUnitPrice from t_purchase_order_detail where documentNo=#{documentNo}
+        <if test="partDrawingNo != null and partDrawingNo != '' ">
+            and partDrawingNo=#{partDrawingNo}
+        </if>
+    </select>
+
+    <!--根据部件图号获取最新的采购订单Vo-->
+    <select id="getPurchaseOrderVo" resultType="utry.data.modular.partsManagement.dto.PurchaseDTO">
+        select tpod.factoryName,tpo.documentDate as orderTime,tpo.completionDate,tpl.purchaseLine,date_add(tpo.documentDate , interval tpo.purchaseTime day) as exceptGoodTime,
+        case WHEN tpo.completionDate is null THEN '未到货' else '已到货' END as state,tpo.documentNo
+        from t_purchase_order tpo
+        LEFT JOIN t_purchase_order_detail tpod on tpo.documentNo=tpod.documentNo
+        LEFT JOIN (select count(1) purchaseLine,documentNo from t_purchase_order_detail GROUP BY documentNo) tpl on tpl.documentNo=tpo.documentNo
+        where tpod.partDrawingNo=#{partDrawingNo}
+        order By tpo.documentDate desc limit 1
+    </select>
+
+    <!--获取超时的采购订单数量-->
+    <select id="getTimeOutOrder" resultType="java.lang.Integer">
+        select count(1) from (
+        select 1 from t_miss_stock_up_order where associatedOrderNumber in (select documentNumber
+        from t_order_detail where DATE_FORMAT(NOW(), '%Y-%m-%d')>substring(exceptGoodTime,1,10) and documentNumber in (
+        select documentNumber from t_part_order where state='0'
+        )) GROUP BY documentNo) list
+    </select>
+
+
+    <select id="getFlag" resultType="java.lang.String">
+        select documentNo from t_purchase_order where documentNo=#{documentNo}
+    </select>
+
+    <!--获取采购订单列表-->
+    <select id="getPurchaseOrder" resultType="utry.data.modular.partsManagement.vo.PurchaseOrderListVo">
+        select documentNo,documentDate,purchaseOrderType,purchaseTime,orderAfter,completionDate,orderType,isAbnormal,abnormalTime,
+        supplierCode,supplierName,speciesTotal,goodWarehouse,warehouseName,numberTotal,aggregateAmount,transportMethod,systemState from (select
+        tpo.documentNo,substring(tpo.documentDate,1,10) documentDate,tpo.purchaseOrderType,tpo.purchaseTime,IF(tpo.systemState='已完成',TIMESTAMPDIFF(DAY,substring(tpo.documentDate,1,10),substring(tpo.completionDate,1,10)),
+        TIMESTAMPDIFF(DAY,substring(tpo.documentDate,1,10),DATE_FORMAT(NOW(), '%Y-%m-%d')))orderAfter,
+        IF(tpo.systemState='已完成',substring(tpo.completionDate,1,10),substring(date_add(tpo.documentDate, interval purchaseTime day),1,10)) as completionDate,
+        tpo.orderType,IF((tpo.systemState='已完成' and
+        TIMESTAMPDIFF(DAY,substring(tpo.documentDate,1,10),substring(tpo.completionDate,1,10))<![CDATA[ > ]]>tpo.purchaseTime) or
+        (tpo.systemState='已提交' and TIMESTAMPDIFF(DAY,substring(tpo.documentDate,1,10),DATE_FORMAT(NOW(), '%Y-%m-%d'))
+        <![CDATA[ > ]]> tpo.purchaseTime),'0','1')as isAbnormal,
+        IF(tpo.systemState='已完成',TIMESTAMPDIFF(DAY,substring(tpo.documentDate,1,10),substring(tpo.completionDate,1,10))-tpo.purchaseTime,
+        TIMESTAMPDIFF(DAY,substring(tpo.documentDate,1,10),DATE_FORMAT(NOW(), '%Y-%m-%d'))-tpo.purchaseTime)as abnormalTime,
+        tpo.supplierCode,tpo.supplierName,tpo.speciesTotal,tpo.goodWarehouse,tpo.warehouseName,tpo.numberTotal,tpo.aggregateAmount,tpo.transportMethod,tpo.systemState
+        from t_purchase_order tpo
+        left join t_purchase_order_detail tpod on tpo.documentNo=tpod.documentNo
+        LEFT JOIN t_inventory_warning tiw on tpod.partDrawingNo=tiw.partDrawingNo
+        where 1=1 and substring(tiw.inventoryDate,1,10)=#{inventoryDate}
+        <if test="startDate != null and startDate != ''">
+            and substring( tpo.documentDate, 1, 10 ) <![CDATA[ >= ]]> #{startDate}
+        </if>
+        <if test="endDate != null and endDate != ''">
+            and substring( tpo.documentDate, 1, 10 )  <![CDATA[ <= ]]> #{endDate}
+        </if>
+        <if test="factoryName != null and factoryName != ''">
+            and tiw.factoryName = #{factoryName}
+        </if>
+        <if test="partDrawingNo != null and partDrawingNo != ''">
+            and tpod.partDrawingNo = #{partDrawingNo}
+        </if>
+        group by tpo.documentNo
+        ) list where 1=1
+
+        <if test="isAbnormal != null and isAbnormal != ''">
+            and isAbnormal = #{isAbnormal}
+        </if>
+        <if test="documentNo != null and documentNo.type != '' and documentNo.type != null and documentNo.type=='0'.toString()">
+            and documentNo = #{documentNo.value}
+        </if>
+        <if test="documentNo != null and documentNo.type != '' and documentNo.type != null and documentNo.type=='1'.toString()">
+            and documentNo like concat('%',#{documentNo.value},'%')
+        </if>
+        <if test="documentNo != null and documentNo.type != '' and documentNo.type != null and documentNo.type=='2'.toString()">
+            and documentNo != #{documentNo.value}
+        </if>
+
+        <if test="documentDate != null and documentDate.type != '' and documentDate.type != null and documentDate.type=='0'.toString()">
+            and substring(documentDate,1,10) <![CDATA[ >= ]]> #{documentDate.startDate} and substring(documentDate,1,10) <![CDATA[ <= ]]> #{documentDate.endDate}
+        </if>
+        <if test="documentDate != null and documentDate.type != '' and documentDate.type != null and documentDate.type != null and documentDate.type=='1'.toString()">
+            and substring(documentDate,1,10) <![CDATA[ < ]]> #{documentDate.startDate}
+        </if>
+        <if test="documentDate != null and documentDate.type != '' and documentDate.type != null and documentDate.type != null and documentDate.type=='2'.toString()">
+            and substring(documentDate,1,10) <![CDATA[ > ]]> #{documentDate.startDate}
+        </if>
+        <if test="documentDate != null and documentDate.type != '' and documentDate.type != null and documentDate.type=='3'.toString()">
+            and substring(documentDate,1,10) = #{documentDate.startDate}
+        </if>
+
+        <if test="purchaseOrderType != null and purchaseOrderType.type != '' and purchaseOrderType.type != null and purchaseOrderType.type=='0'.toString()">
+            and purchaseOrderType = #{purchaseOrderType.value}
+        </if>
+        <if test="purchaseOrderType != null and purchaseOrderType.type != '' and purchaseOrderType.type != null and purchaseOrderType.type=='1'.toString()">
+            and purchaseOrderType like concat('%',#{purchaseOrderType.value},'%')
+        </if>
+        <if test="purchaseOrderType != null and purchaseOrderType.type != '' and purchaseOrderType.type != null and purchaseOrderType.type=='2'.toString()">
+            and purchaseOrderType != #{purchaseOrderType.value}
+        </if>
+
+        <if test="completionDate != null and completionDate.type != '' and completionDate.type != null and completionDate.type=='0'.toString()">
+            and substring(completionDate,1,10) <![CDATA[ >= ]]> #{completionDate.startDate} and substring(completionDate,1,10) <![CDATA[ <= ]]> #{completionDate.endDate}
+        </if>
+        <if test="completionDate != null and completionDate.type != '' and completionDate.type != null and completionDate.type != null and completionDate.type=='1'.toString()">
+            and substring(completionDate,1,10) <![CDATA[ < ]]> #{completionDate.startDate}
+        </if>
+        <if test="completionDate != null and completionDate.type != '' and completionDate.type != null and completionDate.type != null and completionDate.type=='2'.toString()">
+            and substring(completionDate,1,10) <![CDATA[ > ]]> #{completionDate.startDate}
+        </if>
+        <if test="completionDate != null and completionDate.type != '' and completionDate.type != null and completionDate.type=='3'.toString()">
+            and substring(completionDate,1,10) = #{completionDate.startDate}
+        </if>
+
+        <if test="orderType != null and orderType.type != '' and orderType.type != null and orderType.type=='0'.toString()">
+            and orderType = #{orderType.value}
+        </if>
+        <if test="orderType != null and orderType.type != '' and orderType.type != null and orderType.type=='1'.toString()">
+            and orderType like concat('%',#{orderType.value},'%')
+        </if>
+        <if test="orderType != null and orderType.type != '' and orderType.type != null and orderType.type=='2'.toString()">
+            and orderType != #{orderType.value}
+        </if>
+
+        <if test="supplierName != null and supplierName.type != '' and supplierName.type != null and supplierName.type=='0'.toString()">
+            and supplierName = #{supplierName.value}
+        </if>
+        <if test="supplierName != null and supplierName.type != '' and supplierName.type != null and supplierName.type=='1'.toString()">
+            and supplierName like concat('%',#{supplierName.value},'%')
+        </if>
+        <if test="supplierName != null and supplierName.type != '' and supplierName.type != null and supplierName.type=='2'.toString()">
+            and supplierName != #{supplierName.value}
+        </if>
+
+        <if test="goodWarehouse != null and goodWarehouse.type != '' and goodWarehouse.type != null and goodWarehouse.type=='0'.toString()">
+            and goodWarehouse = #{goodWarehouse.value}
+        </if>
+        <if test="goodWarehouse != null and goodWarehouse.type != '' and goodWarehouse.type != null and goodWarehouse.type=='1'.toString()">
+            and goodWarehouse like concat('%',#{goodWarehouse.value},'%')
+        </if>
+        <if test="goodWarehouse != null and goodWarehouse.type != '' and goodWarehouse.type != null and goodWarehouse.type=='2'.toString()">
+            and goodWarehouse != #{goodWarehouse.value}
+        </if>
+
+        <if test="aggregateAmount != null and aggregateAmount.type != '' and aggregateAmount.type != null">
+            and aggregateAmount ${aggregateAmount.type} #{aggregateAmount.value}
+        </if>
+
+        <if test="numberTotal != null and numberTotal.type != '' and numberTotal.type != null">
+            and numberTotal ${numberTotal.type} #{numberTotal.value}
+        </if>
+
+        <if test="speciesTotal != null and speciesTotal.type != '' and speciesTotal.type != null">
+            and speciesTotal ${speciesTotal.type} #{speciesTotal.value}
+        </if>
+
+        <if test="systemState != null and systemState.type != '' and systemState.type != null and systemState.type=='0'.toString()">
+            and systemState = #{systemState}
+        </if>
+        <if test="systemState != null and systemState.type != '' and systemState.type != null and systemState.type=='1'.toString()">
+            and systemState like concat('%',#{systemState},'%')
+        </if>
+        <if test="systemState != null and systemState.type != '' and systemState.type != null and systemState.type=='2'.toString()">
+            and systemState != #{systemState}
+        </if>
+
+        <if test="completionDate != null and completionDate.sort != null and completionDate.sort != ''">
+            order by completionDate ${completionDate.sort}
+        </if>
+        <if test="speciesTotal != null and speciesTotal.sort != null and speciesTotal.sort != ''">
+            order by speciesTotal ${speciesTotal.sort}
+        </if>
+        <if test="numberTotal != null and numberTotal.sort != null and numberTotal.sort != ''">
+            order by numberTotal ${numberTotal.sort}
+        </if>
+        <if test="aggregateAmount != null and aggregateAmount.sort != null and aggregateAmount.sort != ''">
+            order by aggregateAmount ${aggregateAmount.sort}
+        </if>
+        <if test="orderAfter != null and orderAfter.sort != null and orderAfter.sort != ''">
+            order by orderAfter ${orderAfter.sort}
+        </if>
+
+        <if test="completionDate.sort == '' and speciesTotal.sort == '' and numberTotal.sort == '' and aggregateAmount.sort == ''
+            and orderAfter.sort == '' ">
+            order by completionDate desc
+        </if>
+    </select>
+
+    <!--获取采购订单详情-->
+    <select id="getPurchaseOrderDetail" resultType="utry.data.modular.partsManagement.model.PurchaseOrder">
+        select documentNo,documentDate,purchaseOrderType,purchaseTime,completionDate,orderType,
+        supplierCode,supplierName,speciesTotal,goodWarehouse,warehouseName,numberTotal,aggregateAmount,transportMethod,systemState from t_purchase_order
+        where documentNo=#{documentNumber}
+    </select>
+
+    <!-- 根据日期查询采购在途订单数量 -->
+    <select id="selectPurchaseOrderCount" resultMap="purchaseOrderCountBOResultMap">
+        SELECT
+        t1.goodWarehouse AS warehouseCode,
+        t2.partDrawingNumber,
+        t2.partDrawingNo,
+        sum(IFNULL(t2.orderNumber,0) - IFNULL(t3.cancelNumber,0)) AS count
+        FROM (
+            SELECT
+            documentNo,
+            goodWarehouse
+            FROM t_purchase_order
+            WHERE (completionDate IS NULL OR completionDate &gt; #{date} ) and documentDate &gt;= #{date} AND  documentDate &lt; DATE_FORMAT(DATE_ADD(#{date}, INTERVAL 1 DAY), '%Y-%m-%d %H:%i:%s')
+        ) t1
+        LEFT JOIN t_purchase_order_detail t2 ON t1.documentNo = t2.documentNo
+        LEFT JOIN t_cancel_purchase_order_detail t3 ON t3.purchaseOrderNo = t1.documentNo AND t3.partDrawingNumber = t2.partDrawingNumber
+        GROUP BY t2.partDrawingNumber
+    </select>
+
+
+    <select id="getPartDrawingNo" resultType="java.lang.String">
+        select partDrawingNo from t_purchase_order_detail where documentNo=#{documentNo}
+    </select>
+
+<!--    根据日期查询采购在途订单量-->
+    <select id="getPurchaseOrderBO" resultType="utry.data.modular.partsManagement.bo.PurchaseOrderBO">
+         select t1.warehouseCode,t1.partDrawingNumber,t1.partDrawingNo,t2.abnormal,t1.total from (select t1.goodWarehouse AS warehouseCode,
+        t2.partDrawingNumber,t2.partDrawingNo,count(1) as total  from t_purchase_order t1 LEFT JOIN t_purchase_order_detail t2 ON t1.documentNo = t2.documentNo
+        where  (completionDate IS NULL OR completionDate &gt; #{date} ) and documentDate &gt;= #{date} AND  documentDate &lt; DATE_FORMAT(DATE_ADD(#{date}, INTERVAL 1 DAY), '%Y-%m-%d %H:%i:%s')
+        GROUP BY t2.partDrawingNumber,t2.partDrawingNo
+        ) t1 LEFT JOIN(select t1.goodWarehouse AS warehouseCode,t2.partDrawingNumber,t2.partDrawingNo,count(1) abnormal from t_purchase_order t1 LEFT JOIN t_purchase_order_detail t2 ON t1.documentNo = t2.documentNo
+        WHERE (completionDate IS NULL OR completionDate &gt; #{date} ) AND timestampdiff(DAY,documentDate,#{date}) &lt; purchaseTime+0 and documentDate &gt;= #{date} AND  documentDate &lt; DATE_FORMAT(DATE_ADD(#{date}, INTERVAL 1 DAY), '%Y-%m-%d %H:%i:%s')
+        GROUP BY t2.partDrawingNumber,t2.partDrawingNo
+        ) t2 on t1.warehouseCode=t2.warehouseCode and t1.partDrawingNo=t2.partDrawingNo and t1.partDrawingNumber=t2.partDrawingNumber
+    </select>
+
+
+</mapper>

@@ -1,0 +1,165 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="utry.data.modular.baseConfig.dao.TargetCoreConfigDao">
+
+    <select id="selectTarget" parameterType="utry.data.modular.baseConfig.model.Target"
+            resultType="utry.data.modular.baseConfig.model.Target">
+        SELECT
+        id,DATE_FORMAT(createTime, '%Y-%m-%d %H:%i:%s') as createTime,DATE_FORMAT(updateTime, '%Y-%m-%d %H:%i:%s') as updateTime,targetName,targetMonth
+        FROM
+        t_target
+        WHERE businessCode = #{businessCode} AND ifTarget = '1'
+        <if test="targetMonth != '' and targetMonth != null">
+            AND targetMonth = #{targetMonth}
+        </if>
+        ORDER BY targetMonth DESC
+    </select>
+
+    <select id="ifExist" parameterType="utry.data.modular.baseConfig.dto.TargetAddDTO"
+            resultType="java.lang.String">
+        SELECT
+        id
+        FROM
+        t_target
+        WHERE businessCode = #{businessCode} and ifTarget = '1'
+        <if test="targetMonth != '' and targetMonth != null">
+            AND targetMonth = #{targetMonth}
+        </if>
+    </select>
+
+    <insert id="addTarget" parameterType="utry.data.modular.baseConfig.dto.TargetAddDTO">
+        INSERT INTO t_target (
+            id,
+            businessCode,
+            createTime,
+            updateTime,
+            targetName,
+            targetMonth,
+            ifTarget
+        )
+        VALUES
+            (#{id},#{businessCode},NOW(),NOW(),#{targetName},#{targetMonth},'1')
+    </insert>
+
+    <insert id="addIndicator" parameterType="utry.data.modular.baseConfig.dto.TargetAddDTO">
+        INSERT INTO t_indicator_configuration (id, indicatorCode, indicatorName, indicatorValue, targetId)
+        VALUES
+        <foreach collection="list" item="item" separator=",">
+            (REPLACE(UUID(), _utf8'-', _utf8''),#{item.indicatorCode},#{item.indicatorName},#{item.indicatorValue},#{id})
+        </foreach>
+    </insert>
+
+    <select id="editQuery" parameterType="utry.data.modular.baseConfig.dto.TargetAddDTO"
+            resultType="utry.data.modular.baseConfig.dto.IndicatorDTO">
+        SELECT
+        c.id,c.indicatorCode,c.indicatorName,c.indicatorValue
+        FROM
+        t_target t
+        LEFT JOIN t_indicator_configuration c ON c.targetId  = t.id
+        WHERE t.id = #{id}
+        GROUP BY c.indicatorCode
+    </select>
+
+    <update id="edit" parameterType="utry.data.modular.baseConfig.dto.TargetAddDTO">
+        update t_indicator_configuration
+        <trim prefix="set" suffixOverrides=",">
+            <trim prefix="indicatorValue =case" suffix="end,">
+                <foreach collection="list" item="item" index="index">
+                    when id=#{item.id} then #{item.indicatorValue}
+                </foreach>
+            </trim>
+        </trim>
+        where id in
+        <foreach collection="list" index="index" item="item" separator="," open="(" close=")">
+            #{item.id}
+        </foreach>
+    </update>
+
+    <delete id="deleteTarget" parameterType="utry.data.modular.baseConfig.dto.TargetAddDTO">
+        DELETE
+        FROM
+            t_target
+        WHERE
+            id = #{id}
+    </delete>
+
+    <delete id="deleteIndicator" parameterType="utry.data.modular.baseConfig.dto.TargetAddDTO">
+        DELETE
+        FROM
+            t_indicator_configuration
+        WHERE
+            targetId = #{id}
+    </delete>
+
+    <update id="updateTarget" parameterType="utry.data.modular.baseConfig.dto.TargetAddDTO">
+        UPDATE t_target
+          <set>
+              updateTime = NOW(),
+              <if test="targetName != '' and targetName != null">
+                  targetName = #{targetName}
+              </if>
+          </set>
+        WHERE
+            id = #{id}
+    </update>
+
+    <select id="select"
+            resultType="utry.data.modular.baseConfig.dto.IndicatorDTO">
+        SELECT
+            c.id,c.indicatorCode,c.indicatorName,c.indicatorValue
+        FROM
+            t_target t
+                LEFT JOIN t_indicator_configuration c ON c.targetId  = t.id
+        WHERE t.businessCode = #{businessCode} AND t.targetMonth = #{month} AND ifTarget = '1'
+    </select>
+
+    <!--查询指定指标信息-->
+    <select id="selectTargetByIndicatorCode" resultType="utry.data.modular.baseConfig.dto.IndicatorDTO">
+        SELECT
+            c.id,c.indicatorCode,c.indicatorName,c.indicatorValue
+        FROM
+            t_target t
+                LEFT JOIN t_indicator_configuration c ON c.targetId  = t.id
+        WHERE t.businessCode = #{businessCode} AND t.targetMonth = #{month}
+        <if test="userId != '' and userId != null">
+            AND ifTarget = '0' AND c.indicatorUserId=#{userId}
+        </if>
+        <if test="userId == null">
+            AND ifTarget = '1'
+        </if>
+        AND c.indicatorCode=#{indicatorCode}
+    </select>
+
+    <!--查询最新的在库金额-->
+    <select id="getNewStockAmount" resultType="utry.data.modular.baseConfig.dto.IndicatorDTO">
+        SELECT
+            c.id,c.indicatorCode,c.indicatorName,c.indicatorValue
+        FROM
+            t_target t
+                LEFT JOIN t_indicator_configuration c ON c.targetId  = t.id
+        WHERE t.businessCode = 'partManagement'  AND c.indicatorCode='stockAmount'
+        <if test="userId != '' and userId != null">
+            AND ifTarget = '0' AND c.indicatorUserId=#{userId}
+        </if>
+        <if test="userId == null">
+            AND ifTarget = '1'
+        </if>
+        <if test="targetMonth != null and targetMonth!=''">
+            AND t.targetMonth = #{targetMonth}
+        </if>
+        order by t.targetMonth desc limit 1
+    </select>
+
+    <!--查询最新的部品出货即纳率-->
+    <select id="getshipment" resultType="utry.data.modular.baseConfig.dto.IndicatorDTO">
+        SELECT
+        c.id,c.indicatorCode,c.indicatorName,c.indicatorValue
+        FROM
+        t_target t
+        LEFT JOIN t_indicator_configuration c ON c.targetId  = t.id
+        WHERE t.businessCode = 'partManagement'  AND c.indicatorCode='partImmediate'
+        AND ifTarget = '1'
+        order by t.targetMonth desc limit 1
+    </select>
+</mapper>

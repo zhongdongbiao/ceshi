@@ -1,0 +1,211 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//ibatis.apache.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="utry.data.modular.ccBoard.common.dao.DosCallCenterQueueMonitorDao">
+
+    <resultMap id="queueMonitorBoResultMap" type="utry.data.modular.ccBoard.common.bo.QueueMonitorBo">
+        <result property="time" column="time"/>
+        <result property="queueNumber" column="queue_number"/>
+        <result property="totalEnterAcd" column="total_enter_acd"/>
+        <result property="totalAcdConnected" column="total_acd_connected"/>
+        <result property="toatlAcdMissed" column="toatl_acd_missed"/>
+        <result property="totalAcdConnectedRate" column="total_acd_connected_rate"/>
+        <result property="tenSecondConnectionRate" column="ten_second_connection_rate"/>
+        <result property="totalEnterAcdOfNow" column="total_enter_acd_of_now"/>
+        <result property="currentWaitNumber" column="current_wait_number"/>
+        <result property="currentRingers" column="current_ringers"/>
+        <result property="tenSecondConnection" column="ten_second_connection"/>
+        <result property="exceedTenSecondConnection" column="exceed_ten_second_connection"/>
+        <result property="avgCurrentAcdDuration" column="avg_current_acd_duration"/>
+        <result property="avgCurrentRingDuration" column="avg_current_ring_duration"/>
+        <result property="avgCurrentBillingSeconds" column="avg_current_billing_seconds"/>
+        <result property="busyAgents" column="busy_agents"/>
+        <result property="checkInAgents" column="check_in_agents"/>
+        <result property="freeTimeOutAgents" column="free_time_out_agents"/>
+        <result property="freeAgents" column="free_agents"/>
+        <result property="restAgents" column="rest_agents"/>
+        <result property="restTimeOutAgents" column="rest_time_out_agents"/>
+        <result property="afterAgents" column="after_agents"/>
+        <result property="afterTimeOutAgents" column="after_time_out_agents"/>
+        <result property="busyTimeOutAgents" column="busy_time_out_agents"/>
+        <result property="onCallAgents" column="on_call_agents"/>
+    </resultMap>
+
+    <resultMap id="onlineAgentBoResultMap" type="utry.data.modular.ccBoard.hotLineAgent.bo.OnlineAgentBo">
+        <result property="checkInAgents" column="check_in_agents"/>
+        <result property="freeAgents" column="free_agents"/>
+        <result property="freeTimeOutAgents" column="free_time_out_agents"/>
+        <result property="restAgents" column="rest_agents"/>
+        <result property="restTimeOutAgents" column="rest_time_out_agents"/>
+        <result property="afterAgents" column="after_agents"/>
+        <result property="afterTimeOutAgents" column="after_time_out_agents"/>
+        <result property="busyAgents" column="busy_agents"/>
+        <result property="busyTimeOutAgents" column="busy_time_out_agents"/>
+        <result property="onCallAgents" column="on_call_agents"/>
+    </resultMap>
+
+    <resultMap id="callServiceMonitorBoResultMap" type="utry.data.modular.ccBoard.hotLineAgent.bo.CallServiceMonitorBo">
+        <result property="totalEnterAcdOfNow" column="total_enter_acd_of_now"/>
+        <result property="currentWaitNumber" column="current_wait_number"/>
+        <result property="avgCurrentAcdDuration" column="avg_current_acd_duration"/>
+        <result property="allocateAgentNumber" column="allocate_agent_number"/>
+        <result property="avgCurrentRingDuration" column="avg_current_ring_duration"/>
+        <result property="exceedTenSecondConnection" column="exceed_ten_second_connection"/>
+        <result property="onCallAgents" column="on_call_agents"/>
+        <result property="avgCurrentBillingSeconds" column="avg_current_billing_seconds"/>
+        <result property="afterAgents" column="after_agents"/>
+        <result property="afterTimeOutAgents" column="after_time_out_agents"/>
+    </resultMap>
+
+    <!-- 根据队列id批量查询队列当前信息 -->
+    <select id="selectBatchQueueNumberByQueueId" resultMap="queueMonitorBoResultMap">
+        SELECT
+        queue_number,
+        current_wait_number
+        FROM dos_callcenter_queue_monitor
+        WHERE `time` = (
+            SELECT MAX(`time`) FROM dos_callcenter_queue_monitor
+        )
+        AND queue_number IN
+        <foreach collection="queueId" open="(" close=")" item="qId" separator=",">
+            #{qId}
+        </foreach>
+        ORDER BY queue_number
+    </select>
+
+    <!-- 根据队列id查询在线坐席 -->
+    <select id="selectOnlineAgentByQueueId" resultMap="onlineAgentBoResultMap">
+        SELECT
+        IFNULL(SUM(check_in_agents), 0) AS check_in_agents,
+        IFNULL(SUM(free_agents), 0) AS free_agents,
+        IFNULL(SUM(free_time_out_agents), 0) AS free_time_out_agents,
+        IFNULL(SUM(rest_agents), 0) AS rest_agents,
+        IFNULL(SUM(rest_time_out_agents), 0) AS rest_time_out_agents,
+        IFNULL(SUM(after_agents), 0) AS after_agents,
+        IFNULL(SUM(after_time_out_agents), 0) AS after_time_out_agents,
+        IFNULL(SUM(busy_agents), 0) AS busy_agents,
+        IFNULL(SUM(busy_time_out_agents), 0) AS busy_time_out_agents,
+        IFNULL(SUM(on_call_agents), 0) AS on_call_agents
+        FROM dos_callcenter_queue_monitor
+        <where>
+            `time` = (
+            SELECT MAX(`time`) FROM dos_callcenter_queue_monitor
+            )
+            <if test="queueId != null and queueId.size() > 0">
+                AND queue_number IN
+                <foreach collection="queueId" open="(" close=")" item="qId" separator=",">
+                    #{qId}
+                </foreach>
+            </if>
+        </where>
+    </select>
+
+    <!-- 查询实时排队数据 -->
+    <select id="selectRealTimeQueueChart" resultMap="queueMonitorBoResultMap">
+        SELECT
+            `time`,
+            queue_number,
+            IFNULL(SUM(current_wait_number), 0) AS current_wait_number
+        FROM dos_callcenter_queue_monitor
+        WHERE `time` BETWEEN #{startDate} AND #{endDate}
+        AND queue_number IN
+        <foreach collection="queueId" open="(" close=")" item="qId" separator=",">
+            #{qId}
+        </foreach>
+        GROUP BY `time`,queue_number
+        ORDER BY `time`,queue_number
+    </select>
+
+    <!-- 查询父级实时排队图表 -->
+    <select id="selectParentRealTimeQueueChart" resultMap="queueMonitorBoResultMap">
+        SELECT
+            `time`,
+            #{deptId} AS queue_number,
+            IFNULL(SUM(current_wait_number), 0) AS current_wait_number
+        FROM dos_callcenter_queue_monitor
+        WHERE `time` BETWEEN #{dto.startDate} AND #{dto.endDate}
+        AND queue_number IN
+        <foreach collection="dto.queueId" open="(" close=")" item="qId" separator=",">
+            #{qId}
+        </foreach>
+        GROUP BY `time`
+        ORDER BY `time`
+    </select>
+
+    <!-- 查询热线呼叫业务监控 -->
+    <select id="selectCallServiceMonitor" resultMap="callServiceMonitorBoResultMap">
+        SELECT
+            total_enter_acd_of_now,
+            current_wait_number,
+            avg_current_acd_duration,
+            allocate_agent_number,
+            avg_current_ring_duration,
+            exceed_ten_second_connection,
+            on_call_agents,
+            avg_current_billing_seconds,
+            after_agents,
+            after_time_out_agents
+        FROM (
+            SELECT
+                IFNULL(SUM(current_wait_number + current_ringers + on_call_agents), 0) AS total_enter_acd_of_now,
+                IFNULL(SUM(current_wait_number), 0) AS current_wait_number,
+                IFNULL(SUM(current_ringers), 0) AS allocate_agent_number,
+                IFNULL(exceed_ten_second_connection, 0) AS exceed_ten_second_connection,
+                IFNULL(SUM(on_call_agents), 0) AS on_call_agents,
+                IFNULL(SUM(after_agents), 0) AS after_agents,
+                IFNULL(SUM(after_time_out_agents), 0) AS after_time_out_agents
+            FROM dos_callcenter_queue_monitor
+            WHERE `time` = (
+                SELECT MAX(`time`) FROM dos_callcenter_queue_monitor
+            )
+            AND queue_number IN
+            <foreach collection="queueId" open="(" close=")" item="qId" separator=",">
+                #{qId}
+            </foreach>
+        ) t1,
+        (
+            SELECT
+                IFNULL(ROUND(AVG(ring_time), 1), 0) AS avg_current_ring_duration,
+                IFNULL(ROUND(AVG(billing_seconds), 1), 0) AS avg_current_billing_seconds,
+                IFNULL(ROUND(AVG(request_agent_wait_time - ring_time), 1), 0) AS avg_current_acd_duration
+            FROM dos_callcenter_record
+            WHERE first_queue_start_time BETWEEN #{startDate} AND CONCAT(#{endDate}, ' 23:59:59')
+            AND agent_from_queue IN
+            <foreach collection="queueId" open="(" close=")" item="qId" separator=",">
+                #{qId}
+            </foreach>
+            AND call_type = 'in'
+        ) t2
+    </select>
+
+    <!-- 查询历史实时排队数据 -->
+    <select id="selectHistoryRealTimeQueueChart" resultMap="queueMonitorBoResultMap">
+        SELECT
+            `time`,
+            queue_number,
+            current_wait_number
+        FROM dos_callcenter_queue_monitor_history
+        WHERE `time` BETWEEN #{startDate} AND CONCAT(#{endDate}, ' 23:59:59')
+        AND queue_number IN
+        <foreach collection="queueId" open="(" close=")" item="qId" separator=",">
+            #{qId}
+        </foreach>
+        GROUP BY `time`,queue_number
+        ORDER BY `time`,queue_number
+    </select>
+
+    <!-- 查询历史父级实时排队图表 -->
+    <select id="selectHistoryParentRealTimeQueueChart" resultMap="queueMonitorBoResultMap">
+        SELECT
+            `time`,
+            #{deptId} AS queue_number,
+            IFNULL(SUM(current_wait_number), 0) AS current_wait_number
+        FROM dos_callcenter_queue_monitor_history
+        WHERE `time` BETWEEN #{dto.startDate} AND CONCAT(#{dto.endDate}, ' 23:59:59')
+        AND queue_number IN
+        <foreach collection="dto.queueId" open="(" close=")" item="qId" separator=",">
+            #{qId}
+        </foreach>
+        GROUP BY `time`
+        ORDER BY `time`
+    </select>
+</mapper>

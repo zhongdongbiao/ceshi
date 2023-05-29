@@ -1,0 +1,268 @@
+import java.text.SimpleDateFormat
+
+buildscript {
+    ext {
+        springBootVersion = '2.2.10.RELEASE'
+    }
+    repositories {
+        maven {url "http://maven.aliyun.com/nexus/content/groups/public/"}
+        maven {url "http://10.0.33.40:8081/repository/platform/"}
+        maven {url "http://10.0.33.40:8081/repository/3rd-party/"}
+        mavenCentral()
+    }
+    dependencies {
+        classpath("org.springframework.boot:spring-boot-gradle-plugin:${springBootVersion}")
+    }
+}
+
+plugins {
+    id "org.sonarqube" version "2.6"
+}
+sonarqube{
+    properties{
+        property "sonar.host.url", "http://10.0.13.234:9000"     //sonarqube 服务器地址
+        property "sonar.verbose", "true"
+        property "sonar.login", "babac9e3de0a1b8b79d683d75fff355933260494"   //sonar.login 配置token,不用配置也可以检测
+        property "sonar.sourceEncoding", "UTF-8"
+    }
+}
+
+apply plugin: 'java'
+apply plugin: 'war'
+//apply plugin: 'eclipse'
+apply plugin: 'maven'
+//apply plugin: 'eclipse-wtp'
+apply plugin: 'groovy'
+apply plugin: 'maven-publish'
+//apply plugin: 'org.springframework.boot'
+
+sourceCompatibility = '1.8' //兼容版本
+targetCompatibility = '1.8' //使用的版本
+
+
+configurations.all {
+    resolutionStrategy.cacheChangingModulesFor 10, 'seconds'//10秒钟，可自定义，如10,'minutes'10分钟，10,'hours'10小时
+    all*.exclude group: 'org.springframework.boot', module: 'spring-boot-starter-logging'
+    exclude group: 'com.utry.tools', module: 'configtools'
+}
+
+repositories {
+
+    maven {url "http://maven.aliyun.com/nexus/content/groups/public/"}
+    maven {url "http://10.0.33.40:8081/repository/platform/"}
+    maven {url "http://10.0.33.40:8081/repository/3rd-party/"}
+    mavenCentral()
+}
+
+ext {
+    groupName = 'com.utry.platform'
+    projectName = 'data'
+    artifactName = "cloud-${projectName}-module"
+    clientArtifactName = "${projectName}Client-cloud"
+    version '0.40'
+    clientVersion = '0.7'
+    coreVersion = '2.2.10.F7.rc2'
+}
+
+war {
+    manifest {
+        attributes(
+                "commit": gitVersion(),
+                "createAt": now()
+        )
+    }
+
+    rootSpec.exclude '**/test/**'
+
+    copy {
+        from 'src/main/java/utry/hrm/dao/mapper/'
+        into "build/classes/main/utry/hrm/dao/mapper/"
+    }
+    baseName = "data"
+    archiveName "${projectName}.war"
+}
+
+dependencies {
+
+    compile 'com.fasterxml.jackson.core:jackson-annotations:2.9.10'
+    compile 'com.fasterxml.jackson.core:jackson-core:2.9.10'
+    compile 'com.fasterxml.jackson.core:jackson-databind:2.9.10.8'
+    
+    compile group: 'com.alibaba', name: 'fastjson', version: '1.2.83'
+//    compile(group: 'com.utry',name: 'license-starter',version: '3.5')
+    compile ("com.utry.platform:core-cloud:${coreVersion}")  {
+        exclude module: "netty-all"
+    }
+    
+    compile group: 'mysql', name: 'mysql-connector-java', version: '5.1.49'
+
+    compile group: 'org.springframework.cloud', name: 'spring-cloud-starter-netflix-ribbon', version: '2.2.2.RELEASE'
+    compile group: 'org.springframework.cloud', name: 'spring-cloud-starter-netflix-eureka-client', version: '2.2.2.RELEASE'
+    compile group: 'org.springframework.cloud', name: 'spring-cloud-starter-netflix-hystrix', version: '2.2.2.RELEASE'
+    compile group: 'org.springframework.cloud', name: 'spring-cloud-starter-config', version: '2.2.2.RELEASE'
+
+    compile group: 'org.mybatis.spring.boot', name: 'mybatis-spring-boot-starter', version: '1.3.0'
+
+    compile 'org.ow2.asm:asm:5.0.4'
+
+    compile 'org.postgresql:postgresql:9.4-1201-jdbc4'
+    compile 'com.utry.tools:newconfigtools:1.1'
+
+    compile 'net.sf.json-lib:json-lib:2.4:jdk15'
+    compile 'net.sf.ezmorph:ezmorph:1.0.6'
+
+    compile 'io.springfox:springfox-swagger2:2.7.0'
+    compile group: 'io.springfox', name: 'springfox-swagger-ui', version: '2.7.0'
+
+    //must fixed
+    compile 'com.netflix.hystrix:hystrix-core:1.5.12'
+    compile 'org.apache.commons:commons-lang3:3.3.2'
+    compile 'commons-io:commons-io:2.1'
+    compile 'org.ow2.asm:asm:5.0.4'
+    compile 'com.google.code.findbugs:jsr305:3.0.1'
+    compileOnly 'org.projectlombok:lombok:1.18.4'
+
+    compile 'xerces:xercesImpl:2.11.0'
+
+    compile 'com.dameng:DmJdbcDriver18:8.1.1.193'
+
+
+    // https://mvnrepository.com/artifact/commons-net/commons-net
+    compile group: 'commons-net', name: 'commons-net', version: '3.6'
+    // https://mvnrepository.com/artifact/net.sf.json-lib/json-lib
+    //compile group: 'net.sf.json-lib', name: 'json-lib', version: '2.4'
+    
+
+    testCompile 'junit:junit:4.12'
+    // https://mvnrepository.com/artifact/org.springframework.boot/spring-boot-starter-test
+    testCompile group: 'org.springframework.boot', name: 'spring-boot-starter-test'
+    // https://mvnrepository.com/artifact/org.springframework.boot/spring-boot-devtools
+//    compile group: 'org.springframework.boot', name: 'spring-boot-devtools'
+    // https://mvnrepository.com/artifact/cn.hutool/hutool-all
+    implementation group: 'cn.hutool', name: 'hutool-all', version: '5.7.18'
+    compile group: 'com.github.pagehelper', name: 'pagehelper', version: '4.1.0'
+    // https://mvnrepository.com/artifact/org.springframework.boot/spring-boot-starter-actuator
+    implementation group: 'org.springframework.boot', name: 'spring-boot-starter-actuator', version: '2.2.0.RELEASE'
+    // https://mvnrepository.com/artifact/org.apache.shardingsphere/sharding-jdbc-spring-boot-starter
+    implementation 'org.apache.shardingsphere:sharding-jdbc-spring-boot-starter:4.1.1'
+    // https://mvnrepository.com/artifact/com.baomidou/dynamic-datasource-spring-boot-starter
+    implementation group: 'com.baomidou', name: 'dynamic-datasource-spring-boot-starter', version: '3.1.1'
+    // https://mvnrepository.com/artifact/com.alibaba/easyexcel
+    implementation group: 'com.alibaba', name: 'easyexcel', version: '3.0.5'
+    // https://mvnrepository.com/artifact/org.apache.logging.log4j/log4j-core
+    implementation group: 'org.apache.logging.log4j', name: 'log4j-core', version: '2.18.0'
+    // https://mvnrepository.com/artifact/org.apache.logging.log4j/log4j-api
+    implementation group: 'org.apache.logging.log4j', name: 'log4j-api', version: '2.18.0'
+    // https://mvnrepository.com/artifact/org.apache.logging.log4j/log4j-slf4j-impl
+    implementation group: 'org.apache.logging.log4j', name: 'log4j-slf4j-impl', version: '2.18.0'
+    // https://mvnrepository.com/artifact/org.apache.logging.log4j/log4j-web
+    implementation group: 'org.apache.logging.log4j', name: 'log4j-web', version: '2.18.0'
+    // https://mvnrepository.com/artifact/org.apache.logging.log4j/log4j-layout-template-json
+    implementation group: 'org.apache.logging.log4j', name: 'log4j-layout-template-json', version: '2.18.0'
+// https://mvnrepository.com/artifact/com.thoughtworks.xstream/xstream
+    implementation group: 'com.thoughtworks.xstream', name: 'xstream', version: '1.4.19'
+    // https://mvnrepository.com/artifact/org.mybatis/mybatis
+    implementation group: 'org.mybatis', name: 'mybatis', version: '3.5.9'
+
+
+
+
+
+}
+
+tasks.withType(JavaCompile) { options.encoding = "UTF-8" }
+
+def gitVersion() {
+    ['git', 'rev-parse', '--short', 'HEAD'].execute().text.trim()
+}
+
+def now() {
+    new SimpleDateFormat('YYYY-MM-dd hh:mm:ss').format(new Date())
+}
+
+def hasTaskFromCMD(taskName) {
+    def contains = gradle.startParameter.taskNames.collect { it.toLowerCase() }.contains(taskName.toLowerCase())
+    println "hasTaskFromCMD ${taskName}: ${contains}"
+    return contains
+}
+
+task sourceJar(type: Jar) {
+    from sourceSets.main.allSource
+    classifier 'sources'
+}
+
+
+task clientJar(type: Jar, dependsOn: compileJava) {
+	from sourceSets.main.output
+
+    baseName clientArtifactName
+    version clientVersion
+
+    include '**/bo/DeptTreeDTO.class'
+    include '**/bo/AccountInfo.class'
+    include '**/bo/DepartmentInfo.class'
+    include '**/bo/RoleInfo.class'
+    include '**/bo/AccountSDTO.class'
+    include '**/bo/AccountRDTO.class'
+    include '**/bo/AccountInfoDTO.class'
+    include '**/bo/AccountForDepartment.class'
+    include '**/bo/CompanyDTO.class'
+    include '**/model/ResponseEntity.class'
+    include '**/model/ResponseEntity$Builder.class'
+    include '**/client/**'
+
+	exclude '**/mapper/**'
+	exclude '**/public/**'
+    exclude '**/util/**'
+    exclude '**/hrm/service/**'
+    exclude '**/dao/**'
+    exclude '**/hrm/controller/**'
+    exclude '**/restful/**'
+    exclude '**/config/**'
+    exclude '**/facade/**'
+    exclude '**/interceptor/**'
+    exclude '**/listener/**'
+
+}
+
+
+publishing {
+    publications {
+        cloud(MavenPublication) {
+            from components.java
+            groupId groupName
+            artifactId artifactName
+            version version
+
+            artifact sourceJar
+        }
+
+        client(MavenPublication) {
+            groupId groupName
+            artifactId clientArtifactName
+            version clientVersion
+
+            artifact file("build/libs/${clientArtifactName}-${clientVersion}.jar")
+        }
+    }
+
+    repositories {
+        maven {
+            url "http://10.0.33.40:8081/repository/platform_hosted/"
+            credentials {
+                username 'admin'
+                password 'admin123'
+            }
+        }
+    }
+}
+
+jar {
+    if (gradle.startParameter.taskNames.contains('war')) {
+        exclude '**/**Application.class'
+    }
+}
+
+test {
+    ignoreFailures = true
+}

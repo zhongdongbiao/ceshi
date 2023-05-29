@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC
+        "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="utry.data.modular.aop.dao.LogMapper">
+
+    <insert id="insertSongXiaLog" >
+        insert into t_songxia_calllog (id,path,operationDescribe,statusCode,createDay,createTime,
+                                      parameter,returnValue
+        )
+        values(#{dto.id},#{dto.path},#{dto.operationDescribe},#{dto.statusCode},#{dto.createDay},#{dto.createTime},
+                  #{dto.parameter},#{dto.returnValue}
+        )
+    </insert>
+</mapper>

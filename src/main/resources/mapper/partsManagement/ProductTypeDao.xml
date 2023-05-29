@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="utry.data.modular.partsManagement.dao.ProductTypeDao">
+
+    <insert id="insertProductType">
+        insert into t_product_type (id,productCategory,systemState,productTypeCode,productType,productCategoryCode)
+        values (REPLACE(UUID(), _utf8'-', _utf8''),#{productCategory},#{systemState},#{productTypeCode},#{productType},#{productCategoryCode})
+    </insert>
+
+    <delete id="batchDelete">
+        delete from t_product_type
+    </delete>
+
+    <insert id="batchProductTypeData" parameterType="java.util.List">
+        insert into t_product_type (id,productCategory,systemState,productTypeCode,productType,productCategoryCode)
+        values
+        <foreach collection="list" item="item" separator=",">
+            (REPLACE(UUID(), _utf8'-', _utf8''),#{item.productCategory},#{item.systemState},#{item.productTypeCode},#{item.productType},#{item.productCategoryCode})
+        </foreach>
+    </insert>
+</mapper>

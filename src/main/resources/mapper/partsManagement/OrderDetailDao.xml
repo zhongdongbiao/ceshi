@@ -1,0 +1,2824 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="utry.data.modular.partsManagement.dao.OrderDetailDao">
+    <!-- 开启二级缓存 -->
+    <cache eviction="LRU" flushInterval="300000" readOnly="true" size="1024"></cache>
+
+    <resultMap id="partDrawingNoNeedNumberBOResultMap" type="utry.data.modular.partsManagement.bo.PartDrawingNoNeedNumberBO">
+        <result property="warehouseCode" column="warehouseCode" jdbcType="VARCHAR"/>
+        <result property="partDrawingNo" column="partDrawingNo" jdbcType="VARCHAR"/>
+        <result property="needNumber" column="needNumber" jdbcType="INTEGER"/>
+    </resultMap>
+
+    <resultMap id="serviceStoreOrderCountBOResultMap" type="utry.data.modular.partsManagement.bo.ServiceStoreOrderCountBO">
+        <result property="partDrawingNo" column="partDrawingNo" jdbcType="VARCHAR"/>
+        <result property="count" column="count" jdbcType="INTEGER"/>
+    </resultMap>
+
+    <insert id="insertOrderDetail">
+        <if test="partInformationList != null and partInformationList != '' and partInformationList.size >0 ">
+            INSERT INTO t_part_order
+            (
+            documentNumber,partCode,partName,partDrawingNo,describedDrawingNo,unitPrice,orderNumber,goodNumber,
+            unitWeight,minQuantity,productModel,totalNumber,useStock
+            )
+            VALUES
+            <foreach collection="partInformationList" item="model" separator=",">
+                (
+                #{documentNumber},#{model.partCode},#{model.partName},#{model.partDrawingNo},
+                #{model.describedDrawingNo},#{model.unitPrice},#{model.orderNumber},#{model.goodNumber},#{model.unitWeight},#{model.minQuantity},#{model.productModel},#{model.totalNumber},#{model.useStock}
+                )
+            </foreach>
+            ;
+        </if>
+        insert into t_order_detail (documentNumber,documentDate,currentState,documentName,serviceNumber,storeNumber,
+        storeName,productModel,accountingCenter,accountingDistrict,accountingArea,useGoldPreType,warehouseCode,warehouseName,
+        amountAvailable,goodQuantity,aggregateAmount,totalWeight,orderStartTime,dispatchingOrder,orderSubmitTime,orderType,systemState,note,numberTotal)
+        values (#{documentNumber},#{documentDate},#{currentState},#{documentName},#{serviceNumber},#{storeNumber},
+        #{storeName},#{productModel},#{accountingCenter},#{accountingDistrict},#{accountingArea},#{useGoldPreType},
+        #{warehouseCode},#{warehouseName},#{amountAvailable},#{goodQuantity},#{aggregateAmount},#{totalWeight},
+        #{orderStartTime},#{dispatchingOrder},#{orderSubmitTime},#{orderType},#{systemState},#{note},#{numberTotal})
+    </insert>
+
+    <!--添加出货时间-->
+    <update id="addTimeOrder">
+        <foreach collection="orderValue" item="item" index="index" open="" close="" separator=";">
+            update t_part_order set isShipment = #{item.isShipment},shipmentTime=#{item.shipmentTime}
+            where documentNumber=#{item.documentNumber} and partDrawingNo=#{item.partDrawingNo}
+        </foreach>
+    </update>
+
+    <!--批量修改订单的预计完成时间预计采购时间-->
+    <update id="updateOrder">
+        <foreach collection="orderDetailVos" item="item" index="index" separator=";">
+            UPDATE t_order_detail
+            SET exceptCompletionTime = #{item.exceptCompletionTime},exceptGoodTime= #{item.exceptGoodTime}
+            WHERE documentNumber = #{item.documentNumber}
+        </foreach>
+    </update>
+
+    <!--修改已经完成的订单详情-->
+    <update id="updateOrderDatil">
+        update t_part_order a INNER JOIN (
+        select tpo.documentNumber,tpo.partDrawingNo,IF(IFNULL(tpo.orderNumber,0)-IFNULL(tcsod.cancelNumber,0)-IFNULL(tmsuo.cancelNumber,0)-IFNULL(trd.goodNumber,0)-IFNULL(trd.abnormalNumber,0)-IFNULL(trd.notReceive,0) <![CDATA[ <= ]]> 0,1,0) as state from t_part_order tpo
+		LEFT JOIN (select documentNumber,partDrawingNo,sum(IFNULL(cancelNumber,0)) cancelNumber from  t_cancel_service_order_detail GROUP BY documentNumber,partDrawingNo)  tcsod on tcsod.documentNumber=tpo.documentNumber
+        and  tcsod.partDrawingNo = tpo.partDrawingNo
+		LEFT JOIN(
+		select IFNULL(goodQuantity,0)-sum(IFNULL(processNumber,0)) cancelNumber,partDrawingNo,associatedOrderNumber,systemState from t_miss_stock_up_order where systemState='取消' or systemState='作废'
+        GROUP BY associatedOrderNumber,partDrawingNo) tmsuo
+		on tmsuo.associatedOrderNumber=tpo.documentNumber and tmsuo.partDrawingNo=tpo.partDrawingNo
+		LEFT JOIN (SELECT trd.associatedOrderNumber,trd.partDrawingNo,sum(IFNULL(trd.goodNumber,0)) goodNumber,sum(IFNULL(trd.abnormalNumber,0)) abnormalNumber,sum(IFNULL(trd.notReceive,0)) notReceive  from t_receipt_detail trd
+            LEFT JOIN t_receipt tr on trd.documentNumber=tr.documentNumber
+            where tr.appropriateInvestTime  is not null or tr.systemState ='已收货' GROUP BY trd.associatedOrderNumber,trd.partDrawingNo)  trd on trd.associatedOrderNumber=tpo.documentNumber
+        and trd.partDrawingNo=tpo.partDrawingNo
+		where  tpo.state='0') b on a.partDrawingNo=b.partDrawingNo and a.documentNumber=b.documentNumber set a.state=b.state
+    </update>
+
+    <!--修改已经完成的订单-->
+    <update id="updateNotOrder">
+        update t_order_detail a INNER JOIN (
+        select documentNumber,1 as state from t_order_detail where documentNumber  not in(
+		select documentNumber from t_part_order where state='0') GROUP BY documentNumber) b on  a.documentNumber=b.documentNumber set a.state=b.state
+    </update>
+    <update id="updateCancelOrderDatil">
+        update t_part_order a INNER JOIN (
+        select tpo.documentNumber,tpo.partDrawingNo,IF(IFNULL(tpo.orderNumber,0)-IFNULL(tcsod.cancelNumber,0)-IFNULL(tmsuo.cancelNumber,0)  <![CDATA[ <= ]]>  0,2,0) as state from t_part_order tpo
+        LEFT JOIN (select documentNumber,partDrawingNo,sum(IFNULL(cancelNumber,0)) cancelNumber from  t_cancel_service_order_detail GROUP BY documentNumber,partDrawingNo)  tcsod on tcsod.documentNumber=tpo.documentNumber
+        and  tcsod.partDrawingNo = tpo.partDrawingNo
+        LEFT JOIN(
+        select IFNULL(goodQuantity,0)-sum(IFNULL(processNumber,0)) cancelNumber,partDrawingNo,associatedOrderNumber,systemState from t_miss_stock_up_order where systemState='取消' or systemState='作废'
+        GROUP BY associatedOrderNumber,partDrawingNo) tmsuo
+        on tmsuo.associatedOrderNumber=tpo.documentNumber and tmsuo.partDrawingNo=tpo.partDrawingNo
+        where  tpo.state='0') b on a.partDrawingNo=b.partDrawingNo and a.documentNumber=b.documentNumber set a.state=b.state
+    </update>
+
+<!--  订单添加考核时间以及考核截至时间  -->
+    <update id="updateDeadLine">
+        <foreach collection="noDeadlineOrderBo" item="item" index="index" separator=";">
+            UPDATE t_order_detail
+            SET deadline = #{item.deadline},assessmentDate= #{item.assessmentDate}
+            WHERE documentNumber = #{item.documentNumber}
+        </foreach>
+    </update>
+
+    <!--根据订单日期时间段获取订单行数量-->
+    <select id="getCountByDate" resultType="java.lang.Integer">
+        select count(1) total from t_part_order tpo
+        LEFT JOIN t_inventory_warning tiw on tpo.partDrawingNo=tiw.partDrawingNo
+        LEFT JOIN t_factory_data tfd on tfd.factoryName=tiw.factoryName
+        LEFT JOIN t_user_factory tuf on tuf.factoryId=tfd.factoryCode
+        LEFT JOIN t_order_detail tod on tpo.documentNumber=tod.documentNumber
+        where  tpo.state!='2' and substring(tiw.inventoryDate,1,10)=#{inventoryDate}
+        and tod.deadline <![CDATA[ < ]]> DATE_FORMAT(NOW(), '%Y-%m-%d')
+        <if test="startDate != null and startDate != ''">
+            and tod.orderSubmitTime <![CDATA[ >= ]]> DATE_FORMAT(#{startDate}, '%Y-%m-%d %H:%i:%s')
+        </if>
+        <if test="endDate != null and endDate != ''">
+            and tod.orderSubmitTime <![CDATA[ < ]]> DATE_FORMAT(DATE_ADD(#{endDate}, INTERVAL 1 DAY), '%Y-%m-%d %H:%i:%s')
+        </if>
+        <if test="userId != null and userId != ''">
+            and tuf.userId=#{userId}
+        </if>
+    </select>
+
+    <!--获取发货进度-->
+    <select id="getDeliverySchedule" resultType="java.lang.String">
+        select CONCAT(IFNULL(packNumber, 0),'/',IFNULL(total, 0)) deliverySchedule,tpo.documentNumber from  (
+        select count(1) total,documentNumber  from t_part_order GROUP BY documentNumber)  tpo LEFT JOIN (
+        select count(1) packNumber,tpo.documentNumber from t_part_order tpo
+        LEFT JOIN (select packingListNo,associatedOrderNumber,partDrawingNo,SUM(outNumber) as outNumber from t_packing_list_detail
+        GROUP BY associatedOrderNumber,partDrawingNo) tpld on tpo.documentNumber=tpld.associatedOrderNumber and tpo.partDrawingNo=tpld.partDrawingNo
+        where tpld.outNumber<![CDATA[ >= ]]> tpo.orderNumber GROUP BY tpo.documentNumber) tpld
+        on tpo.documentNumber=tpld.documentNumber HAVING tpo.documentNumber=#{documentNumber}
+    </select>
+
+
+    <!--根据订单月份获取订单行数据-->
+    <select id="getPartOrderDTOByDate" resultType="utry.data.modular.partsManagement.dto.PartOrderDTO">
+        select t1.documentNumber,t1.partDrawingNo,t2.orderSubmitTime,t2.assessmentDate,t2.orderType,max(t4.loadingDate) as loadingDate from t_part_order t1
+        LEFT JOIN t_order_detail t2 on t1.documentNumber = t2.documentNumber
+        LEFT JOIN t_packing_list_detail t3 on t1.documentNumber = t3.associatedOrderNumber and t1.partDrawingNo=t3.partDrawingNo
+        LEFT JOIN t_packing_list t4 on t3.packingListNo = t4.packingListNo
+        where t1.state!='2' and t1.isShipment!='1' and  shipmentTime is null GROUP BY t1.documentNumber,t1.partDrawingNo  ORDER BY t1.documentNumber
+    </select>
+
+    <!--根据条件查询获取已妥投订单详细数据-->
+    <select id="getPackingListDetail" resultType="utry.data.modular.partsManagement.vo.OrderDetailVo">
+        select documentNumber,documentNo,partDrawingNo,bear,factoryName,storeName,exceptCompletionTime,goodQuantity,
+        documentDate,packingTime,deliveryTime,logisticsSingleNumber,appropriateInvestTime,
+        orderAfter,logisticsTime,isNds2Abnormal,currentState from (select DISTINCT(CONCAT(tod.documentNumber,'(',tod.orderType,')')) documentNumber,tod.documentNumber documentNo,tpo.partDrawingNo,GROUP_CONCAT(distinct tha.RealName) AS bear,GROUP_CONCAT(distinct tfd.factoryName) factoryName,CONCAT(tod.storeName,'(',tod.storeNumber,')') as storeName,tod.exceptCompletionTime,tod.goodQuantity,
+        substring(tod.documentDate,1,10) documentDate,tpl.loadingDate packingTime,tr.deliveryTime,tpl.billsLadingNo as logisticsSingleNumber,tr.appropriateInvestTime,
+        TIMESTAMPDIFF(DAY,substring(tod.orderSubmitTime,1,10),DATE_FORMAT(NOW(), '%Y-%m-%d')) AS orderAfter,
+        CASE WHEN TimeStampDiff(DAY,substring(tr.deliveryTime,1,10),IF(tr.appropriateInvestTime is null and tr.goodTime is null,curdate(),IF(IF(tr.appropriateInvestTime is null or tr.appropriateInvestTime='','3022-12-12',tr.appropriateInvestTime)>
+        IF(tr.goodTime is null or tr.goodTime='','3022-12-12',tr.goodTime), substring(tr.goodTime,1,10), substring(tr.appropriateInvestTime,1,10))))  >   2 THEN '0' ELSE '1' END AS isNds2Abnormal,
+        CASE WHEN ROUND(AVG(TIMESTAMPDIFF(HOUR,CONCAT(DATE_ADD(substring(tr.deliveryTime,1,10),INTERVAL 1 DAY),' 00:00:00'),tr.appropriateInvestTime)),0)<![CDATA[ < ]]>0 Then 24 else
+        ROUND(AVG(TIMESTAMPDIFF(HOUR,CONCAT(DATE_ADD(substring(tr.deliveryTime,1,10),INTERVAL 1 DAY),' 00:00:00'),tr.appropriateInvestTime)),0) END AS logisticsTime,
+        '4' as currentState
+        from t_order_detail tod
+        LEFT JOIN t_part_order tpo on tod.documentNumber=tpo.documentNumber
+        LEFT JOIN t_product_information tpi on tpo.productModel=tpi.productModel
+        LEFT JOIN t_inventory_warning tiw on tpo.partDrawingNo=tiw.partDrawingNo
+        LEFT JOIN t_factory_data tfd on tfd.factoryName=tiw.factoryName
+        LEFT JOIN t_user_factory tuf on tuf.factoryId=tfd.factoryCode
+        LEFT JOIN hrm_db.t_hrm_accountinfo tha on tuf.userId=tha.AccountID
+        LEFT JOIN t_receipt_detail trd on trd.associatedOrderNumber=tod.documentNumber and trd.partDrawingNo=tpo.partDrawingNo
+        LEFT JOIN t_receipt tr on tr.documentNumber=trd.documentNumber
+        LEFT JOIN t_packing_list_detail tpld on tpld.associatedOrderNumber=tod.documentNumber and tpld.partDrawingNo=tpo.partDrawingNo
+        LEFT JOIN t_packing_list tpl on tpld.packingListNo=tpl.packingListNo
+        where 1=1 and substring(tiw.inventoryDate,1,10)=#{inventoryDate}
+        <if test="startDate != null and startDate != ''">
+            and substring(tod.documentDate,1,10) <![CDATA[ >= ]]> #{startDate}
+        </if>
+        <if test="endDate != null and endDate != ''">
+            and substring(tod.documentDate,1,10)  <![CDATA[ <= ]]> #{endDate}
+        </if>
+        <if test="orderType != null and orderType != ''">
+            and tod.orderType=#{orderType}
+        </if>
+        <if test="productCategoryCode != null and productCategoryCode != ''">
+            and tpi.productCategoryCode=#{productCategoryCode}
+        </if>
+        <if test="partDrawingNos != null and partDrawingNos.size >0 ">
+            and tpo.partDrawingNo in
+            <foreach collection="partDrawingNos" index="index" item="id" open="(" separator="," close=")">
+                #{id}
+            </foreach>
+        </if>
+        and tod.documentNumber in(select trd.associatedOrderNumber from t_receipt tr LEFT JOIN t_receipt_detail trd on tr.documentNumber=trd.documentNumber
+        where tr.systemState='待收货' and tr.appropriateInvestTime is not null and tr.appropriateInvestTime!='')
+        and tod.documentNumber  in(select documentNumber from t_part_order where state='0' GROUP BY documentNumber)
+        GROUP BY tod.documentNumber) list
+        where 1=1
+        <if test="isNds2Abnormal != null and isNds2Abnormal != ''">
+            and isNds2Abnormal=#{isNds2Abnormal}
+        </if>
+        <if test="documentNumber != null and documentNumber.type != '' and documentNumber.type != null and documentNumber.type=='0'.toString()">
+            and documentNo = #{documentNumber.value}
+        </if>
+        <if test="documentNumber != null and documentNumber.type != '' and documentNumber.type != null and documentNumber.type=='1'.toString()">
+            and documentNumber like concat('%',#{documentNumber.value},'%')
+        </if>
+        <if test="documentNumber != null and documentNumber.type != '' and documentNumber.type != null and documentNumber.type=='2'.toString()">
+            and documentNo != #{documentNumber.value}
+        </if>
+
+        <if test="bear != null and bear.type != '' and bear.type != null and bear.type=='0'.toString()">
+            and bear = #{bear.value}
+        </if>
+        <if test="bear != null and bear.type != '' and bear.type != null and bear.type=='1'.toString()">
+            and bear like concat('%',#{bear.value},'%')
+        </if>
+        <if test="bear != null and bear.type != '' and bear.type != null and bear.type=='2'.toString()">
+            and bear != #{bear.value}
+        </if>
+
+        <if test="factoryName != null and factoryName.type != '' and factoryName.type != null and factoryName.type=='0'.toString()">
+            and factoryName = #{factoryName.value}
+        </if>
+        <if test="factoryName != null and factoryName.type != '' and factoryName.type != null and factoryName.type=='1'.toString()">
+            and factoryName like concat('%',#{factoryName.value},'%')
+        </if>
+        <if test="factoryName != null and factoryName.type != '' and factoryName.type != null and factoryName.type=='2'.toString()">
+            and factoryName != #{factoryName.value}
+        </if>
+
+        <if test="storeName != null and storeName.type != '' and storeName.type != null and storeName.type=='0'.toString()">
+            and storeName = #{storeName.value}
+        </if>
+        <if test="storeName != null and storeName.type != '' and storeName.type != null and storeName.type=='1'.toString()">
+            and storeName like concat('%',#{storeName.value},'%')
+        </if>
+        <if test="storeName != null and storeName.type != '' and storeName.type != null and storeName.type=='2'.toString()">
+            and storeName != #{storeName.value}
+        </if>
+
+        <if test="exceptCompletionTime != null and exceptCompletionTime.type != '' and exceptCompletionTime.type != null and exceptCompletionTime.type=='0'.toString()">
+            and exceptCompletionTime <![CDATA[ >= ]]> #{exceptCompletionTime.startDate} and exceptCompletionTime <![CDATA[ <= ]]> #{exceptCompletionTime.endDate}
+        </if>
+        <if test="exceptCompletionTime != null and exceptCompletionTime.type != '' and exceptCompletionTime.type != null and exceptCompletionTime.type != null and exceptCompletionTime.type=='1'.toString()">
+            and exceptCompletionTime <![CDATA[ < ]]> #{exceptCompletionTime.startDate}
+        </if>
+        <if test="exceptCompletionTime != null and exceptCompletionTime.type != '' and exceptCompletionTime.type != null and exceptCompletionTime.type != null and exceptCompletionTime.type=='2'.toString()">
+            and exceptCompletionTime <![CDATA[ > ]]> #{exceptCompletionTime.startDate}
+        </if>
+        <if test="exceptCompletionTime != null and exceptCompletionTime.type != '' and exceptCompletionTime.type != null and exceptCompletionTime.type=='3'.toString()">
+            and exceptCompletionTime = #{exceptCompletionTime.startDate}
+        </if>
+
+        <if test="documentDate != null and documentDate.type != '' and documentDate.type != null and documentDate.type=='0'.toString()">
+            and substring(documentDate,1,10) <![CDATA[ >= ]]> #{documentDate.startDate} and substring(documentDate,1,10) <![CDATA[ <= ]]> #{documentDate.endDate}
+        </if>
+        <if test="documentDate != null and documentDate.type != '' and documentDate.type != null and documentDate.type != null and documentDate.type=='1'.toString()">
+            and substring(documentDate,1,10) <![CDATA[ < ]]> #{documentDate.startDate}
+        </if>
+        <if test="documentDate != null and documentDate.type != '' and documentDate.type != null and documentDate.type != null and documentDate.type=='2'.toString()">
+            and substring(documentDate,1,10) <![CDATA[ > ]]> #{documentDate.startDate}
+        </if>
+        <if test="documentDate != null and documentDate.type != '' and documentDate.type != null and documentDate.type=='3'.toString()">
+            and substring(documentDate,1,10) = #{documentDate.startDate}
+        </if>
+
+        <if test="goodQuantity != null and goodQuantity.type != '' and goodQuantity.type != null">
+            and goodQuantity ${goodQuantity.type} #{goodQuantity.value}+0
+        </if>
+
+        <if test="orderAfter != null and orderAfter.type != '' and orderAfter.type != null">
+            and orderAfter ${orderAfter.type} #{orderAfter.value}+0
+        </if>
+
+        <if test="logisticsTime != null and logisticsTime.type != '' and logisticsTime.type != null">
+            and logisticsTime ${logisticsTime.type} #{logisticsTime.value}+0
+        </if>
+
+        <if test="exceptGoodTime != null and exceptGoodTime.type != '' and exceptGoodTime.type != null and exceptGoodTime.type=='0'.toString()">
+            and exceptGoodTime <![CDATA[ >= ]]> #{exceptGoodTime.startDate} and exceptGoodTime <![CDATA[ <= ]]> #{exceptGoodTime.endDate}
+        </if>
+        <if test="exceptGoodTime != null and exceptGoodTime.type != '' and exceptGoodTime.type != null and exceptGoodTime.type != null and exceptGoodTime.type=='1'.toString()">
+            and exceptGoodTime <![CDATA[ < ]]> #{exceptGoodTime.startDate}
+        </if>
+        <if test="exceptGoodTime != null and exceptGoodTime.type != '' and exceptGoodTime.type != null and exceptGoodTime.type != null and exceptGoodTime.type=='2'.toString()">
+            and exceptGoodTime <![CDATA[ > ]]> #{exceptGoodTime.startDate}
+        </if>
+        <if test="exceptGoodTime != null and exceptGoodTime.type != '' and exceptGoodTime.type != null and exceptGoodTime.type=='3'.toString()">
+            and exceptGoodTime = #{exceptGoodTime.startDate}
+        </if>
+
+        <if test="deliverySchedule != null and deliverySchedule.type != '' and deliverySchedule.type != null and deliverySchedule.type=='0'.toString()">
+            and deliverySchedule = #{deliverySchedule.value}
+        </if>
+        <if test="deliverySchedule != null and deliverySchedule.type != '' and deliverySchedule.type != null and deliverySchedule.type=='1'.toString()">
+            and deliverySchedule like concat('%',#{deliverySchedule.value},'%')
+        </if>
+        <if test="deliverySchedule != null and deliverySchedule.type != '' and deliverySchedule.type != null and deliverySchedule.type=='2'.toString()">
+            and deliverySchedule != #{deliverySchedule.value}
+        </if>
+
+        <if test="purchaseOrderNumber != null and purchaseOrderNumber.type != '' and purchaseOrderNumber.type != null">
+            and purchaseOrderNumber ${purchaseOrderNumber.type} #{purchaseOrderNumber.value}+0
+        </if>
+
+        <if test="packingTime != null and packingTime.type != '' and packingTime.type != null and packingTime.type=='0'.toString()">
+            and packingTime <![CDATA[ >= ]]> #{packingTime.startDate} and packingTime <![CDATA[ <= ]]> #{packingTime.endDate}
+        </if>
+        <if test="packingTime != null and packingTime.type != '' and packingTime.type != null and packingTime.type != null and packingTime.type=='1'.toString()">
+            and packingTime <![CDATA[ < ]]> #{packingTime.startDate}
+        </if>
+        <if test="packingTime != null and packingTime.type != '' and packingTime.type != null and packingTime.type != null and packingTime.type=='2'.toString()">
+            and packingTime <![CDATA[ > ]]> #{packingTime.startDate}
+        </if>
+        <if test="packingTime != null and packingTime.type != '' and packingTime.type != null and packingTime.type=='3'.toString()">
+            and packingTime = #{packingTime.startDate}
+        </if>
+
+        <if test="deliveryTime != null and deliveryTime.type != '' and deliveryTime.type != null and deliveryTime.type=='0'.toString()">
+            and deliveryTime <![CDATA[ >= ]]> #{deliveryTime.startDate} and deliveryTime <![CDATA[ <= ]]> #{deliveryTime.endDate}
+        </if>
+        <if test="deliveryTime != null and deliveryTime.type != '' and deliveryTime.type != null and deliveryTime.type != null and exceptGoodTime.type=='1'.toString()">
+            and deliveryTime <![CDATA[ < ]]> #{deliveryTime.startDate}
+        </if>
+        <if test="deliveryTime != null and deliveryTime.type != '' and deliveryTime.type != null and deliveryTime.type != null and exceptCompletionTime.type=='2'.toString()">
+            and deliveryTime <![CDATA[ > ]]> #{deliveryTime.startDate}
+        </if>
+        <if test="deliveryTime != null and deliveryTime.type != '' and deliveryTime.type != null and deliveryTime.type=='3'.toString()">
+            and deliveryTime = #{deliveryTime.startDate}
+        </if>
+
+        <if test="logisticsSingleNumber != null and logisticsSingleNumber.type != '' and logisticsSingleNumber.type != null and logisticsSingleNumber.type=='0'.toString()">
+            and logisticsSingleNumber = #{logisticsSingleNumber.value}
+        </if>
+        <if test="logisticsSingleNumber != null and logisticsSingleNumber.type != '' and logisticsSingleNumber.type != null and logisticsSingleNumber.type=='1'.toString()">
+            and logisticsSingleNumber like concat('%',#{logisticsSingleNumber.value},'%')
+        </if>
+        <if test="logisticsSingleNumber != null and logisticsSingleNumber.type != '' and logisticsSingleNumber.type != null and logisticsSingleNumber.type=='2'.toString()">
+            and logisticsSingleNumber != #{logisticsSingleNumber.value}
+        </if>
+
+        <if test="appropriateInvestTime != null and appropriateInvestTime.type != '' and appropriateInvestTime.type != null and appropriateInvestTime.type=='0'.toString()">
+            and appropriateInvestTime <![CDATA[ >= ]]> #{appropriateInvestTime.startDate} and appropriateInvestTime <![CDATA[ <= ]]> #{appropriateInvestTime.endDate}
+        </if>
+        <if test="appropriateInvestTime != null and appropriateInvestTime.type != '' and appropriateInvestTime.type != null and appropriateInvestTime.type != null and appropriateInvestTime.type=='1'.toString()">
+            and appropriateInvestTime <![CDATA[ < ]]> #{appropriateInvestTime.startDate}
+        </if>
+        <if test="appropriateInvestTime != null and appropriateInvestTime.type != '' and appropriateInvestTime.type != null and appropriateInvestTime.type != null and appropriateInvestTime.type=='2'.toString()">
+            and appropriateInvestTime <![CDATA[ > ]]> #{appropriateInvestTime.startDate}
+        </if>
+        <if test="appropriateInvestTime != null and appropriateInvestTime.type != '' and appropriateInvestTime.type != null and appropriateInvestTime.type=='3'.toString()">
+            and appropriateInvestTime = #{appropriateInvestTime.startDate}
+        </if>
+
+        <if test="exceptCompletionTime != null and exceptCompletionTime.sort != null and exceptCompletionTime.sort != ''">
+            order by exceptCompletionTime ${exceptCompletionTime.sort}
+        </if>
+        <if test="documentDate != null and documentDate.sort != null and documentDate.sort != ''">
+            order by documentDate ${documentDate.sort}
+        </if>
+        <if test="goodQuantity != null and goodQuantity.sort != null and goodQuantity.sort != ''">
+            order by goodQuantity ${goodQuantity.sort}
+        </if>
+        <if test="orderAfter != null and orderAfter.sort != null and orderAfter.sort != ''">
+            order by orderAfter ${orderAfter.sort}
+        </if>
+        <if test="logisticsTime != null and logisticsTime.sort != null and logisticsTime.sort != ''">
+            order by logisticsTime ${logisticsTime.sort}
+        </if>
+        <if test="exceptGoodTime != null and exceptGoodTime.sort != null and exceptGoodTime.sort != ''">
+            order by exceptGoodTime ${exceptGoodTime.sort}
+        </if>
+        <if test="purchaseOrderNumber != null and purchaseOrderNumber.sort != null and purchaseOrderNumber.sort != ''">
+            order by purchaseOrderNumber ${purchaseOrderNumber.sort}
+        </if>
+        <if test="packingTime != null and packingTime.sort != null and packingTime.sort != ''">
+            order by packingTime ${packingTime.sort}
+        </if>
+        <if test="deliveryTime != null and deliveryTime.sort != null and deliveryTime.sort != ''">
+            order by deliveryTime ${deliveryTime.sort}
+        </if>
+        <if test="appropriateInvestTime != null and appropriateInvestTime.sort != null and appropriateInvestTime.sort != ''">
+            order by appropriateInvestTime ${appropriateInvestTime.sort}
+        </if>
+        <if test="exceptCompletionTime.sort == '' and documentDate.sort == '' and goodQuantity.sort == '' and orderAfter.sort == ''
+           and exceptGoodTime.sort == '' and purchaseOrderNumber.sort == '' and packingTime.sort == ''
+          and logisticsTime.sort == '' and shipmentTime.sort == '' and deliveryTime.sort == '' and appropriateInvestTime.sort == ''">
+            order by documentDate desc
+        </if>
+    </select>
+
+    <!--根据条件查询获取已装箱订单详细数据-->
+    <select id="getVoteOrder" resultType="utry.data.modular.partsManagement.vo.OrderDetailVo">
+        select documentNumber,documentNo,partDrawingNo,bear,factoryName,storeName,exceptCompletionTime,deliverySchedule,
+        documentDate,packingTime,logisticsSingleNumber,
+        orderAfter,isNds2Abnormal,logisticsTime,currentState from (select DISTINCT(CONCAT(tod.documentNumber,'(',tod.orderType,')')) documentNumber,tod.documentNumber documentNo,tpo.partDrawingNo,GROUP_CONCAT(distinct tha.RealName) AS bear,GROUP_CONCAT(distinct tfd.factoryName) factoryName,CONCAT(tod.storeName,'(',tod.storeNumber,')') as storeName,tod.exceptCompletionTime,ds.deliverySchedule,
+        substring(tod.documentDate,1,10) documentDate,tpl.loadingDate packingTime,GROUP_CONCAT(distinct tpl.billsLadingNo) as logisticsSingleNumber,
+        TIMESTAMPDIFF(DAY,substring(tod.orderSubmitTime,1,10),DATE_FORMAT(NOW(), '%Y-%m-%d')) AS orderAfter,
+        CASE WHEN TimeStampDiff(DAY,substring(tpl.loadingDate,1,10),curdate())  >   2 THEN '0' ELSE '1' END AS isNds2Abnormal,
+        CASE WHEN ROUND(AVG(TIMESTAMPDIFF(HOUR,CONCAT(DATE_ADD(substring(tpl.loadingDate,1,10),INTERVAL 1 DAY),' 00:00:00'),DATE_FORMAT(NOW(), '%Y-%m-%d %H:%i:%s'))),0)<![CDATA[ < ]]>0 Then 24 else
+        ROUND(AVG(TIMESTAMPDIFF(HOUR,CONCAT(DATE_ADD(substring(tpl.loadingDate,1,10),INTERVAL 1 DAY),' 00:00:00'),DATE_FORMAT(NOW(), '%Y-%m-%d %H:%i:%s'))),0) END AS logisticsTime,'3' as currentState
+        from t_order_detail tod
+        LEFT JOIN t_part_order tpo on tod.documentNumber=tpo.documentNumber
+        LEFT JOIN t_product_information tpi on tpo.productModel=tpi.productModel
+        LEFT JOIN t_inventory_warning tiw on tpo.partDrawingNo=tiw.partDrawingNo
+        LEFT JOIN t_factory_data tfd on tfd.factoryName=tiw.factoryName
+        LEFT JOIN t_user_factory tuf on tuf.factoryId=tfd.factoryCode
+        LEFT JOIN hrm_db.t_hrm_accountinfo tha on tuf.userId=tha.AccountID
+        LEFT JOIN t_packing_list_detail tpld on tpld.associatedOrderNumber=tod.documentNumber
+        and tpo.partDrawingNo=tpld.partDrawingNo
+        LEFT JOIN t_packing_list tpl on tpl.packingListNo=tpld.packingListNo
+        LEFT JOIN (select CONCAT(IFNULL(packNumber, 0),'/',IFNULL(total, 0)) deliverySchedule,documentNumber from  (
+        select count(1) total,documentNumber  from t_part_order GROUP BY documentNumber) as tpo LEFT JOIN (
+        select count(1) packNumber,associatedOrderNumber from t_packing_list_detail GROUP BY associatedOrderNumber) tpld
+        on tpo.documentNumber=tpld.associatedOrderNumber) ds on ds.documentNumber=tod.documentNumber
+        where 1=1 and substring(tiw.inventoryDate,1,10)=#{inventoryDate}
+        <if test="startDate != null and startDate != ''">
+            and substring(tod.documentDate,1,10) <![CDATA[ >= ]]> #{startDate}
+        </if>
+        <if test="endDate != null and endDate != ''">
+            and substring(tod.documentDate,1,10)  <![CDATA[ <= ]]> #{endDate}
+        </if>
+        <if test="orderType != null and orderType != ''">
+            and tod.orderType=#{orderType}
+        </if>
+        <if test="productCategoryCode != null and productCategoryCode != ''">
+            and tpi.productCategoryCode=#{productCategoryCode}
+        </if>
+        <if test="partDrawingNos != null and partDrawingNos.size >0 ">
+            and tpo.partDrawingNo in
+            <foreach collection="partDrawingNos" index="index" item="id" open="(" separator="," close=")">
+                #{id}
+            </foreach>
+        </if>
+        and tod.documentNumber in (select associatedOrderNumber from t_packing_list_detail)
+        and tod.documentNumber in (select trd.associatedOrderNumber from t_receipt tr LEFT JOIN t_receipt_detail trd on tr.documentNumber=trd.documentNumber
+        where tr.systemState='待收货' and (tr.appropriateInvestTime is  null or tr.appropriateInvestTime=''))
+        and tod.documentNumber  in(select documentNumber from t_part_order where state='0' GROUP BY documentNumber) GROUP BY tod.documentNumber) list
+        where 1=1
+        <if test="isNds2Abnormal != null and isNds2Abnormal != ''">
+            and isNds2Abnormal=#{isNds2Abnormal}
+        </if>
+        <if test="documentNumber != null and documentNumber.type != '' and documentNumber.type != null and documentNumber.type=='0'.toString()">
+            and documentNo = #{documentNumber.value}
+        </if>
+        <if test="documentNumber != null and documentNumber.type != '' and documentNumber.type != null and documentNumber.type=='1'.toString()">
+            and documentNumber like concat('%',#{documentNumber.value},'%')
+        </if>
+        <if test="documentNumber != null and documentNumber.type != '' and documentNumber.type != null and documentNumber.type=='2'.toString()">
+            and documentNo != #{documentNumber.value}
+        </if>
+
+        <if test="bear != null and bear.type != '' and bear.type != null and bear.type=='0'.toString()">
+            and bear = #{bear.value}
+        </if>
+        <if test="bear != null and bear.type != '' and bear.type != null and bear.type=='1'.toString()">
+            and bear like concat('%',#{bear.value},'%')
+        </if>
+        <if test="bear != null and bear.type != '' and bear.type != null and bear.type=='2'.toString()">
+            and bear != #{bear.value}
+        </if>
+
+        <if test="factoryName != null and factoryName.type != '' and factoryName.type != null and factoryName.type=='0'.toString()">
+            and factoryName = #{factoryName.value}
+        </if>
+        <if test="factoryName != null and factoryName.type != '' and factoryName.type != null and factoryName.type=='1'.toString()">
+            and factoryName like concat('%',#{factoryName.value},'%')
+        </if>
+        <if test="factoryName != null and factoryName.type != '' and factoryName.type != null and factoryName.type=='2'.toString()">
+            and factoryName != #{factoryName.value}
+        </if>
+
+        <if test="storeName != null and storeName.type != '' and storeName.type != null and storeName.type=='0'.toString()">
+            and storeName = #{storeName.value}
+        </if>
+        <if test="storeName != null and storeName.type != '' and storeName.type != null and storeName.type=='1'.toString()">
+            and storeName like concat('%',#{storeName.value},'%')
+        </if>
+        <if test="storeName != null and storeName.type != '' and storeName.type != null and storeName.type=='2'.toString()">
+            and storeName != #{storeName.value}
+        </if>
+
+        <if test="exceptCompletionTime != null and exceptCompletionTime.type != '' and exceptCompletionTime.type != null and exceptCompletionTime.type=='0'.toString()">
+            and exceptCompletionTime <![CDATA[ >= ]]> #{exceptCompletionTime.startDate} and exceptCompletionTime <![CDATA[ <= ]]> #{exceptCompletionTime.endDate}
+        </if>
+        <if test="exceptCompletionTime != null and exceptCompletionTime.type != '' and exceptCompletionTime.type != null and exceptCompletionTime.type != null and exceptCompletionTime.type=='1'.toString()">
+            and exceptCompletionTime <![CDATA[ < ]]> #{exceptCompletionTime.startDate}
+        </if>
+        <if test="exceptCompletionTime != null and exceptCompletionTime.type != '' and exceptCompletionTime.type != null and exceptCompletionTime.type != null and exceptCompletionTime.type=='2'.toString()">
+            and exceptCompletionTime <![CDATA[ > ]]> #{exceptCompletionTime.startDate}
+        </if>
+        <if test="exceptCompletionTime != null and exceptCompletionTime.type != '' and exceptCompletionTime.type != null and exceptCompletionTime.type=='3'.toString()">
+            and exceptCompletionTime = #{exceptCompletionTime.startDate}
+        </if>
+
+        <if test="documentDate != null and documentDate.type != '' and documentDate.type != null and documentDate.type=='0'.toString()">
+            and substring(documentDate,1,10) <![CDATA[ >= ]]> #{documentDate.startDate} and substring(documentDate,1,10) <![CDATA[ <= ]]> #{documentDate.endDate}
+        </if>
+        <if test="documentDate != null and documentDate.type != '' and documentDate.type != null and documentDate.type != null and documentDate.type=='1'.toString()">
+            and substring(documentDate,1,10) <![CDATA[ < ]]> #{documentDate.startDate}
+        </if>
+        <if test="documentDate != null and documentDate.type != '' and documentDate.type != null and documentDate.type != null and documentDate.type=='2'.toString()">
+            and substring(documentDate,1,10) <![CDATA[ > ]]> #{documentDate.startDate}
+        </if>
+        <if test="documentDate != null and documentDate.type != '' and documentDate.type != null and documentDate.type=='3'.toString()">
+            and substring(documentDate,1,10) = #{documentDate.startDate}
+        </if>
+
+        <if test="goodQuantity != null and goodQuantity.type != '' and goodQuantity.type != null">
+            and goodQuantity ${goodQuantity.type} #{goodQuantity.value}+0
+        </if>
+
+        <if test="orderAfter != null and orderAfter.type != '' and orderAfter.type != null">
+            and orderAfter ${orderAfter.type} #{orderAfter.value}+0
+        </if>
+
+        <if test="logisticsTime != null and logisticsTime.type != '' and logisticsTime.type != null">
+            and logisticsTime ${logisticsTime.type} #{logisticsTime.value}+0
+        </if>
+
+        <if test="exceptGoodTime != null and exceptGoodTime.type != '' and exceptGoodTime.type != null and exceptGoodTime.type=='0'.toString()">
+            and exceptGoodTime <![CDATA[ >= ]]> #{exceptGoodTime.startDate} and exceptGoodTime <![CDATA[ <= ]]> #{exceptGoodTime.endDate}
+        </if>
+        <if test="exceptGoodTime != null and exceptGoodTime.type != '' and exceptGoodTime.type != null and exceptGoodTime.type != null and exceptGoodTime.type=='1'.toString()">
+            and exceptGoodTime <![CDATA[ < ]]> #{exceptGoodTime.startDate}
+        </if>
+        <if test="exceptGoodTime != null and exceptGoodTime.type != '' and exceptGoodTime.type != null and exceptGoodTime.type != null and exceptGoodTime.type=='2'.toString()">
+            and exceptGoodTime <![CDATA[ > ]]> #{exceptGoodTime.startDate}
+        </if>
+        <if test="exceptGoodTime != null and exceptGoodTime.type != '' and exceptGoodTime.type != null and exceptGoodTime.type=='3'.toString()">
+            and exceptGoodTime = #{exceptGoodTime.startDate}
+        </if>
+
+        <if test="deliverySchedule != null and deliverySchedule.type != '' and deliverySchedule.type != null and deliverySchedule.type=='0'.toString()">
+            and deliverySchedule = #{deliverySchedule.value}
+        </if>
+        <if test="deliverySchedule != null and deliverySchedule.type != '' and deliverySchedule.type != null and deliverySchedule.type=='1'.toString()">
+            and deliverySchedule like concat('%',#{deliverySchedule.value},'%')
+        </if>
+        <if test="deliverySchedule != null and deliverySchedule.type != '' and deliverySchedule.type != null and deliverySchedule.type=='2'.toString()">
+            and deliverySchedule != #{deliverySchedule.value}
+        </if>
+
+        <if test="purchaseOrderNumber != null and purchaseOrderNumber.type != '' and purchaseOrderNumber.type != null">
+            and purchaseOrderNumber ${purchaseOrderNumber.type} #{purchaseOrderNumber.value}+0
+        </if>
+
+        <if test="packingTime != null and packingTime.type != '' and packingTime.type != null and packingTime.type=='0'.toString()">
+            and packingTime <![CDATA[ >= ]]> #{packingTime.startDate} and packingTime <![CDATA[ <= ]]> #{packingTime.endDate}
+        </if>
+        <if test="packingTime != null and packingTime.type != '' and packingTime.type != null and packingTime.type != null and packingTime.type=='1'.toString()">
+            and packingTime <![CDATA[ < ]]> #{packingTime.startDate}
+        </if>
+        <if test="packingTime != null and packingTime.type != '' and packingTime.type != null and packingTime.type != null and packingTime.type=='2'.toString()">
+            and packingTime <![CDATA[ > ]]> #{packingTime.startDate}
+        </if>
+        <if test="packingTime != null and packingTime.type != '' and packingTime.type != null and packingTime.type=='3'.toString()">
+            and packingTime = #{packingTime.startDate}
+        </if>
+
+        <if test="deliveryTime != null and deliveryTime.type != '' and deliveryTime.type != null and deliveryTime.type=='0'.toString()">
+            and deliveryTime <![CDATA[ >= ]]> #{deliveryTime.startDate} and deliveryTime <![CDATA[ <= ]]> #{deliveryTime.endDate}
+        </if>
+        <if test="deliveryTime != null and deliveryTime.type != '' and deliveryTime.type != null and deliveryTime.type != null and exceptGoodTime.type=='1'.toString()">
+            and deliveryTime <![CDATA[ < ]]> #{deliveryTime.startDate}
+        </if>
+        <if test="deliveryTime != null and deliveryTime.type != '' and deliveryTime.type != null and deliveryTime.type != null and exceptCompletionTime.type=='2'.toString()">
+            and deliveryTime <![CDATA[ > ]]> #{deliveryTime.startDate}
+        </if>
+        <if test="deliveryTime != null and deliveryTime.type != '' and deliveryTime.type != null and deliveryTime.type=='3'.toString()">
+            and deliveryTime = #{deliveryTime.startDate}
+        </if>
+
+        <if test="logisticsSingleNumber != null and logisticsSingleNumber.type != '' and logisticsSingleNumber.type != null and logisticsSingleNumber.type=='0'.toString()">
+            and logisticsSingleNumber = #{logisticsSingleNumber.value}
+        </if>
+        <if test="logisticsSingleNumber != null and logisticsSingleNumber.type != '' and logisticsSingleNumber.type != null and logisticsSingleNumber.type=='1'.toString()">
+            and logisticsSingleNumber like concat('%',#{logisticsSingleNumber.value},'%')
+        </if>
+        <if test="logisticsSingleNumber != null and logisticsSingleNumber.type != '' and logisticsSingleNumber.type != null and logisticsSingleNumber.type=='2'.toString()">
+            and logisticsSingleNumber != #{logisticsSingleNumber.value}
+        </if>
+
+        <if test="appropriateInvestTime != null and appropriateInvestTime.type != '' and appropriateInvestTime.type != null and appropriateInvestTime.type=='0'.toString()">
+            and appropriateInvestTime <![CDATA[ >= ]]> #{appropriateInvestTime.startDate} and appropriateInvestTime <![CDATA[ <= ]]> #{appropriateInvestTime.endDate}
+        </if>
+        <if test="appropriateInvestTime != null and appropriateInvestTime.type != '' and appropriateInvestTime.type != null and appropriateInvestTime.type != null and appropriateInvestTime.type=='1'.toString()">
+            and appropriateInvestTime <![CDATA[ < ]]> #{appropriateInvestTime.startDate}
+        </if>
+        <if test="appropriateInvestTime != null and appropriateInvestTime.type != '' and appropriateInvestTime.type != null and appropriateInvestTime.type != null and appropriateInvestTime.type=='2'.toString()">
+            and appropriateInvestTime <![CDATA[ > ]]> #{appropriateInvestTime.startDate}
+        </if>
+        <if test="appropriateInvestTime != null and appropriateInvestTime.type != '' and appropriateInvestTime.type != null and appropriateInvestTime.type=='3'.toString()">
+            and appropriateInvestTime = #{appropriateInvestTime.startDate}
+        </if>
+
+        <if test="exceptCompletionTime != null and exceptCompletionTime.sort != null and exceptCompletionTime.sort != ''">
+            order by exceptCompletionTime ${exceptCompletionTime.sort}
+        </if>
+        <if test="documentDate != null and documentDate.sort != null and documentDate.sort != ''">
+            order by documentDate ${documentDate.sort}
+        </if>
+        <if test="goodQuantity != null and goodQuantity.sort != null and goodQuantity.sort != ''">
+            order by goodQuantity ${goodQuantity.sort}
+        </if>
+        <if test="orderAfter != null and orderAfter.sort != null and orderAfter.sort != ''">
+            order by orderAfter ${orderAfter.sort}
+        </if>
+        <if test="logisticsTime != null and logisticsTime.sort != null and logisticsTime.sort != ''">
+            order by logisticsTime ${logisticsTime.sort}
+        </if>
+        <if test="exceptGoodTime != null and exceptGoodTime.sort != null and exceptGoodTime.sort != ''">
+            order by exceptGoodTime ${exceptGoodTime.sort}
+        </if>
+        <if test="purchaseOrderNumber != null and purchaseOrderNumber.sort != null and purchaseOrderNumber.sort != ''">
+            order by purchaseOrderNumber ${purchaseOrderNumber.sort}
+        </if>
+        <if test="packingTime != null and packingTime.sort != null and packingTime.sort != ''">
+            order by packingTime ${packingTime.sort}
+        </if>
+        <if test="deliveryTime != null and deliveryTime.sort != null and deliveryTime.sort != ''">
+            order by deliveryTime ${deliveryTime.sort}
+        </if>
+        <if test="appropriateInvestTime != null and appropriateInvestTime.sort != null and appropriateInvestTime.sort != ''">
+            order by appropriateInvestTime ${appropriateInvestTime.sort}
+        </if>
+        <if test="exceptCompletionTime.sort == '' and documentDate.sort == '' and goodQuantity.sort == '' and orderAfter.sort == ''
+            and logisticsTime.sort == ''and exceptGoodTime.sort == '' and purchaseOrderNumber.sort == '' and packingTime.sort == ''
+            and deliveryTime.sort == '' and appropriateInvestTime.sort == ''">
+            order by documentDate desc
+        </if>
+    </select>
+
+    <!--根据条件查询获取缺件处理订单详细数据-->
+    <select id="getMissStockUpOrder" resultType="utry.data.modular.partsManagement.vo.OrderDetailVo">
+        select documentNumber,documentNo,partDrawingNo,bear,factoryName,storeName,exceptGoodTime,deliverySchedule,
+        purchaseOrderNumber,documentDate,orderAfter,
+        isShipAbnormal,currentState,purchaseTime from(select DISTINCT(CONCAT(tod.documentNumber,'(',tod.orderType,')')) documentNumber,tod.documentNumber documentNo,tpo.partDrawingNo,GROUP_CONCAT(distinct tha.RealName) AS bear,GROUP_CONCAT(distinct tfd.factoryName) factoryName,CONCAT(tod.storeName,'(',tod.storeNumber,')') as storeName,tmsuo.goodarrivalTime as exceptGoodTime,ds.deliverySchedule,
+        sum(pon.purchaseOrderNumber) purchaseOrderNumber,substring(tod.documentDate,1,10) documentDate,TIMESTAMPDIFF(DAY,substring(tod.orderSubmitTime,1,10),DATE_FORMAT(NOW(), '%Y-%m-%d')) AS orderAfter,
+        CASE WHEN MIN(tpo.isShipment)='0' THEN '0' else '1' END  AS isShipAbnormal,'2' as currentState,
+        TIMESTAMPDIFF(DAY,tod.documentDate,pon.documentDate) AS purchaseTime
+        from t_order_detail tod
+        LEFT JOIN t_part_order tpo on tod.documentNumber=tpo.documentNumber
+        LEFT JOIN t_product_information tpi on tpo.productModel=tpi.productModel
+        LEFT JOIN t_inventory_warning tiw on tpo.partDrawingNo=tiw.partDrawingNo
+        LEFT JOIN t_factory_data tfd on tfd.factoryName=tiw.factoryName
+        LEFT JOIN t_user_factory tuf on tuf.factoryId=tfd.factoryCode
+        LEFT JOIN hrm_db.t_hrm_accountinfo tha on tuf.userId=tha.AccountID
+        LEFT JOIN t_miss_stock_up_order tmsuo on tmsuo.associatedOrderNumber=tpo.documentNumber
+        and tpo.partDrawingNo =  tmsuo.partDrawingNo
+        LEFT JOIN (select count(1) purchaseOrderNumber,partDrawingNo,documentDate from t_purchase_order_detail tpod
+        LEFT JOIN t_purchase_order tpo on tpo.documentNo=tpod.documentNo where tpo.systemState='已提交'
+        GROUP BY partDrawingNo) pon on pon.partDrawingNo=tpo.partDrawingNo
+        LEFT JOIN (select CONCAT(IFNULL(packNumber, 0),'/',IFNULL(total, 0)) deliverySchedule,tpo.documentNumber from  (
+        select count(1) total,documentNumber  from t_part_order GROUP BY documentNumber) as tpo LEFT JOIN (
+        select count(1) packNumber,tpo.documentNumber from t_part_order tpo
+        LEFT JOIN (select packingListNo,associatedOrderNumber,partDrawingNo,SUM(outNumber) as outNumber from t_packing_list_detail
+        GROUP BY associatedOrderNumber,partDrawingNo) tpld on tpo.documentNumber=tpld.associatedOrderNumber and tpo.partDrawingNo=tpld.partDrawingNo
+        where tpld.outNumber<![CDATA[ >= ]]> tpo.orderNumber GROUP BY tpo.documentNumber) tpld
+        on tpo.documentNumber=tpld.documentNumber) ds on ds.documentNumber=tod.documentNumber
+        where 1=1  and substring(tiw.inventoryDate,1,10)=#{inventoryDate}
+        <if test="startDate != null and startDate != ''">
+            and substring(tod.documentDate,1,10) <![CDATA[ >= ]]> #{startDate}
+        </if>
+        <if test="endDate != null and endDate != ''">
+            and substring(tod.documentDate,1,10)  <![CDATA[ <= ]]> #{endDate}
+        </if>
+        <if test="orderType != null and orderType != ''">
+            and tod.orderType=#{orderType}
+        </if>
+        <if test="productCategoryCode != null and productCategoryCode != ''">
+            and tpi.productCategoryCode=#{productCategoryCode}
+        </if>
+        <if test="partDrawingNos != null and partDrawingNos.size >0 ">
+            and tpo.partDrawingNo in
+            <foreach collection="partDrawingNos" index="index" item="id" open="(" separator="," close=")">
+                #{id}
+            </foreach>
+        </if>
+        and tod.documentNumber  in(select documentNumber from t_part_order where state='0' GROUP BY documentNumber)
+        and tod.documentNumber in (select associatedOrderNumber from t_miss_stock_up_order where systemState!='取消' and systemState!='作废' )
+        and tod.documentNumber not in(
+        select documentNumber from  (
+        select count(1) total,documentNumber  from t_part_order GROUP BY documentNumber) as tpo LEFT JOIN (
+        select count(1) packNumber,associatedOrderNumber from t_packing_list_detail GROUP BY associatedOrderNumber) tpld
+        on tpo.documentNumber=tpld.associatedOrderNumber where IFNULL(packNumber, 0)<![CDATA[ >= ]]>IFNULL(total, 0))
+        GROUP BY tod.documentNumber) list
+        where 1=1
+        <if test="isShipAbnormal != null and isShipAbnormal != ''">
+            and isShipAbnormal=#{isShipAbnormal}
+        </if>
+        <if test="documentNumber != null and documentNumber.type != '' and documentNumber.type != null and documentNumber.type=='0'.toString()">
+            and documentNo = #{documentNumber.value}
+        </if>
+        <if test="documentNumber != null and documentNumber.type != '' and documentNumber.type != null and documentNumber.type=='1'.toString()">
+            and documentNumber like concat('%',#{documentNumber.value},'%')
+        </if>
+        <if test="documentNumber != null and documentNumber.type != '' and documentNumber.type != null and documentNumber.type=='2'.toString()">
+            and documentNo != #{documentNumber.value}
+        </if>
+
+        <if test="bear != null and bear.type != '' and bear.type != null and bear.type=='0'.toString()">
+            and bear = #{bear.value}
+        </if>
+        <if test="bear != null and bear.type != '' and bear.type != null and bear.type=='1'.toString()">
+            and bear like concat('%',#{bear.value},'%')
+        </if>
+        <if test="bear != null and bear.type != '' and bear.type != null and bear.type=='2'.toString()">
+            and bear != #{bear.value}
+        </if>
+
+        <if test="factoryName != null and factoryName.type != '' and factoryName.type != null and factoryName.type=='0'.toString()">
+            and factoryName = #{factoryName.value}
+        </if>
+        <if test="factoryName != null and factoryName.type != '' and factoryName.type != null and factoryName.type=='1'.toString()">
+            and factoryName like concat('%',#{factoryName.value},'%')
+        </if>
+        <if test="factoryName != null and factoryName.type != '' and factoryName.type != null and factoryName.type=='2'.toString()">
+            and factoryName != #{factoryName.value}
+        </if>
+
+        <if test="storeName != null and storeName.type != '' and storeName.type != null and storeName.type=='0'.toString()">
+            and storeName = #{storeName.value}
+        </if>
+        <if test="storeName != null and storeName.type != '' and storeName.type != null and storeName.type=='1'.toString()">
+            and storeName like concat('%',#{storeName.value},'%')
+        </if>
+        <if test="storeName != null and storeName.type != '' and storeName.type != null and storeName.type=='2'.toString()">
+            and storeName != #{storeName.value}
+        </if>
+
+        <if test="exceptCompletionTime != null and exceptCompletionTime.type != '' and exceptCompletionTime.type != null and exceptCompletionTime.type=='0'.toString()">
+            and exceptCompletionTime <![CDATA[ >= ]]> #{exceptCompletionTime.startDate} and exceptCompletionTime <![CDATA[ <= ]]> #{exceptCompletionTime.endDate}
+        </if>
+        <if test="exceptCompletionTime != null and exceptCompletionTime.type != '' and exceptCompletionTime.type != null and exceptCompletionTime.type != null and exceptCompletionTime.type=='1'.toString()">
+            and exceptCompletionTime <![CDATA[ < ]]> #{exceptCompletionTime.startDate}
+        </if>
+        <if test="exceptCompletionTime != null and exceptCompletionTime.type != '' and exceptCompletionTime.type != null and exceptCompletionTime.type != null and exceptCompletionTime.type=='2'.toString()">
+            and exceptCompletionTime <![CDATA[ > ]]> #{exceptCompletionTime.startDate}
+        </if>
+        <if test="exceptCompletionTime != null and exceptCompletionTime.type != '' and exceptCompletionTime.type != null and exceptCompletionTime.type=='3'.toString()">
+            and exceptCompletionTime = #{exceptCompletionTime.startDate}
+        </if>
+
+        <if test="documentDate != null and documentDate.type != '' and documentDate.type != null and documentDate.type=='0'.toString()">
+            and substring(documentDate,1,10) <![CDATA[ >= ]]> #{documentDate.startDate} and substring(documentDate,1,10) <![CDATA[ <= ]]> #{documentDate.endDate}
+        </if>
+        <if test="documentDate != null and documentDate.type != '' and documentDate.type != null and documentDate.type != null and documentDate.type=='1'.toString()">
+            and substring(documentDate,1,10) <![CDATA[ < ]]> #{documentDate.startDate}
+        </if>
+        <if test="documentDate != null and documentDate.type != '' and documentDate.type != null and documentDate.type != null and documentDate.type=='2'.toString()">
+            and substring(documentDate,1,10) <![CDATA[ > ]]> #{documentDate.startDate}
+        </if>
+        <if test="documentDate != null and documentDate.type != '' and documentDate.type != null and documentDate.type=='3'.toString()">
+            and substring(documentDate,1,10) = #{documentDate.startDate}
+        </if>
+
+        <if test="goodQuantity != null and goodQuantity.type != '' and goodQuantity.type != null">
+            and goodQuantity ${goodQuantity.type} #{goodQuantity.value}+0
+        </if>
+
+        <if test="orderAfter != null and orderAfter.type != '' and orderAfter.type != null">
+            and orderAfter ${orderAfter.type} #{orderAfter.value}+0
+        </if>
+
+        <if test="exceptGoodTime != null and exceptGoodTime.type != '' and exceptGoodTime.type != null and exceptGoodTime.type=='0'.toString()">
+            and exceptGoodTime <![CDATA[ >= ]]> #{exceptGoodTime.startDate} and exceptGoodTime <![CDATA[ <= ]]> #{exceptGoodTime.endDate}
+        </if>
+        <if test="exceptGoodTime != null and exceptGoodTime.type != '' and exceptGoodTime.type != null and exceptGoodTime.type != null and exceptGoodTime.type=='1'.toString()">
+            and exceptGoodTime <![CDATA[ < ]]> #{exceptGoodTime.startDate}
+        </if>
+        <if test="exceptGoodTime != null and exceptGoodTime.type != '' and exceptGoodTime.type != null and exceptGoodTime.type != null and exceptGoodTime.type=='2'.toString()">
+            and exceptGoodTime <![CDATA[ > ]]> #{exceptGoodTime.startDate}
+        </if>
+        <if test="exceptGoodTime != null and exceptGoodTime.type != '' and exceptGoodTime.type != null and exceptGoodTime.type=='3'.toString()">
+            and exceptGoodTime = #{exceptGoodTime.startDate}
+        </if>
+
+        <if test="deliverySchedule != null and deliverySchedule.type != '' and deliverySchedule.type != null and deliverySchedule.type=='0'.toString()">
+            and deliverySchedule = #{deliverySchedule.value}
+        </if>
+        <if test="deliverySchedule != null and deliverySchedule.type != '' and deliverySchedule.type != null and deliverySchedule.type=='1'.toString()">
+            and deliverySchedule like concat('%',#{deliverySchedule.value},'%')
+        </if>
+        <if test="deliverySchedule != null and deliverySchedule.type != '' and deliverySchedule.type != null and deliverySchedule.type=='2'.toString()">
+            and deliverySchedule != #{deliverySchedule.value}
+        </if>
+
+        <if test="purchaseOrderNumber != null and purchaseOrderNumber.type != '' and purchaseOrderNumber.type != null">
+            and purchaseOrderNumber ${purchaseOrderNumber.type} #{purchaseOrderNumber.value}+0
+        </if>
+
+        <if test="packingTime != null and packingTime.type != '' and packingTime.type != null and packingTime.type=='0'.toString()">
+            and packingTime <![CDATA[ >= ]]> #{packingTime.startDate} and packingTime <![CDATA[ <= ]]> #{packingTime.endDate}
+        </if>
+        <if test="packingTime != null and packingTime.type != '' and packingTime.type != null and packingTime.type != null and packingTime.type=='1'.toString()">
+            and packingTime <![CDATA[ < ]]> #{packingTime.startDate}
+        </if>
+        <if test="packingTime != null and packingTime.type != '' and packingTime.type != null and packingTime.type != null and packingTime.type=='2'.toString()">
+            and packingTime <![CDATA[ > ]]> #{packingTime.startDate}
+        </if>
+        <if test="packingTime != null and packingTime.type != '' and packingTime.type != null and packingTime.type=='3'.toString()">
+            and packingTime = #{packingTime.startDate}
+        </if>
+
+        <if test="deliveryTime != null and deliveryTime.type != '' and deliveryTime.type != null and deliveryTime.type=='0'.toString()">
+            and deliveryTime <![CDATA[ >= ]]> #{deliveryTime.startDate} and deliveryTime <![CDATA[ <= ]]> #{deliveryTime.endDate}
+        </if>
+        <if test="deliveryTime != null and deliveryTime.type != '' and deliveryTime.type != null and deliveryTime.type != null and exceptGoodTime.type=='1'.toString()">
+            and deliveryTime <![CDATA[ < ]]> #{deliveryTime.startDate}
+        </if>
+        <if test="deliveryTime != null and deliveryTime.type != '' and deliveryTime.type != null and deliveryTime.type != null and exceptCompletionTime.type=='2'.toString()">
+            and deliveryTime <![CDATA[ > ]]> #{deliveryTime.startDate}
+        </if>
+        <if test="deliveryTime != null and deliveryTime.type != '' and deliveryTime.type != null and deliveryTime.type=='3'.toString()">
+            and deliveryTime = #{deliveryTime.startDate}
+        </if>
+
+        <if test="logisticsSingleNumber != null and logisticsSingleNumber.type != '' and logisticsSingleNumber.type != null and logisticsSingleNumber.type=='0'.toString()">
+            and logisticsSingleNumber = #{logisticsSingleNumber.value}
+        </if>
+        <if test="logisticsSingleNumber != null and logisticsSingleNumber.type != '' and logisticsSingleNumber.type != null and logisticsSingleNumber.type=='1'.toString()">
+            and logisticsSingleNumber like concat('%',#{logisticsSingleNumber.value},'%')
+        </if>
+        <if test="logisticsSingleNumber != null and logisticsSingleNumber.type != '' and logisticsSingleNumber.type != null and logisticsSingleNumber.type=='2'.toString()">
+            and logisticsSingleNumber != #{logisticsSingleNumber.value}
+        </if>
+
+        <if test="appropriateInvestTime != null and appropriateInvestTime.type != '' and appropriateInvestTime.type != null and appropriateInvestTime.type=='0'.toString()">
+            and appropriateInvestTime <![CDATA[ >= ]]> #{appropriateInvestTime.startDate} and appropriateInvestTime <![CDATA[ <= ]]> #{appropriateInvestTime.endDate}
+        </if>
+        <if test="appropriateInvestTime != null and appropriateInvestTime.type != '' and appropriateInvestTime.type != null and appropriateInvestTime.type != null and appropriateInvestTime.type=='1'.toString()">
+            and appropriateInvestTime <![CDATA[ < ]]> #{appropriateInvestTime.startDate}
+        </if>
+        <if test="appropriateInvestTime != null and appropriateInvestTime.type != '' and appropriateInvestTime.type != null and appropriateInvestTime.type != null and appropriateInvestTime.type=='2'.toString()">
+            and appropriateInvestTime <![CDATA[ > ]]> #{appropriateInvestTime.startDate}
+        </if>
+        <if test="appropriateInvestTime != null and appropriateInvestTime.type != '' and appropriateInvestTime.type != null and appropriateInvestTime.type=='3'.toString()">
+            and appropriateInvestTime = #{appropriateInvestTime.startDate}
+        </if>
+
+        <if test="exceptCompletionTime != null and exceptCompletionTime.sort != null and exceptCompletionTime.sort != ''">
+            order by exceptCompletionTime ${exceptCompletionTime.sort}
+        </if>
+        <if test="documentDate != null and documentDate.sort != null and documentDate.sort != ''">
+            order by documentDate ${documentDate.sort}
+        </if>
+        <if test="goodQuantity != null and goodQuantity.sort != null and goodQuantity.sort != ''">
+            order by goodQuantity ${goodQuantity.sort}
+        </if>
+        <if test="orderAfter != null and orderAfter.sort != null and orderAfter.sort != ''">
+            order by orderAfter ${orderAfter.sort}
+        </if>
+        <if test="exceptGoodTime != null and exceptGoodTime.sort != null and exceptGoodTime.sort != ''">
+            order by exceptGoodTime ${exceptGoodTime.sort}
+        </if>
+        <if test="purchaseOrderNumber != null and purchaseOrderNumber.sort != null and purchaseOrderNumber.sort != ''">
+            order by purchaseOrderNumber ${purchaseOrderNumber.sort}
+        </if>
+        <if test="packingTime != null and packingTime.sort != null and packingTime.sort != ''">
+            order by packingTime ${packingTime.sort}
+        </if>
+        <if test="deliveryTime != null and deliveryTime.sort != null and deliveryTime.sort != ''">
+            order by deliveryTime ${deliveryTime.sort}
+        </if>
+        <if test="appropriateInvestTime != null and appropriateInvestTime.sort != null and appropriateInvestTime.sort != ''">
+            order by appropriateInvestTime ${appropriateInvestTime.sort}
+        </if>
+        <if test="exceptCompletionTime.sort == '' and documentDate.sort == '' and goodQuantity.sort == '' and orderAfter.sort == ''
+            and exceptGoodTime.sort == '' and purchaseOrderNumber.sort == '' and packingTime.sort == ''
+            and deliveryTime.sort == '' and appropriateInvestTime.sort == ''">
+            order by documentDate desc
+        </if>
+    </select>
+
+    <select id="getOrderDetailVoCount" resultType="java.lang.Integer">
+        select count(1) from t_order_detail where documentNumber=#{documentNumber}
+    </select>
+
+    <!--根据日期时间段获取非工作日天数-->
+    <select id="getWorkDayCount" resultType="utry.data.modular.calendar.model.CalendarDto">
+        select year, month, day, fullDate, type, dayOfWeek from t_calendar where fullDate <![CDATA[ >= ]]> date_format(#{startDate}, '%Y-%m-%d')
+        and fullDate <![CDATA[ <= ]]> date_format(#{endDate}, '%Y-%m-%d') and type='1'
+    </select>
+
+    <!--根获取非工作日天数-->
+    <select id="getAllWorkDayCount" resultType="utry.data.modular.calendar.model.CalendarDto">
+        select year, month, day, fullDate, type, dayOfWeek from t_calendar where  type='1'
+    </select>
+
+    <!--根据时间获取未更新的订单详情-->
+    <select id="getUpdatePartOrder" resultType="utry.data.modular.partsManagement.dto.PartOrderDTO">
+        select t1.documentNumber,t2.storeNumber,t2.storeName,t2.accountingCenter,t1.partDrawingNo,t2.orderSubmitTime,
+        t2.orderType from t_part_order t1
+        LEFT JOIN t_order_detail t2 on t1.documentNumber = t2.documentNumber
+        where 1=1 and t2.state ='0' and  t2.exceptCompletionTime is  null
+        <if test="startDate != null and startDate != ''">
+            and DATE_FORMAT(t2.orderStartTime, '%Y-%m-%d %H:%i:%s') <![CDATA[ >= ]]> #{startDate}
+        </if>
+        <if test="endDate != null and endDate != ''">
+            and DATE_FORMAT(t2.orderStartTime, '%Y-%m-%d %H:%i:%s')  <![CDATA[ <= ]]> #{endDate}
+        </if>
+
+    </select>
+
+    <!--根据条件查询获取待处理订单详细数据-->
+    <select id="getprocessedOrder" resultType="utry.data.modular.partsManagement.vo.OrderDetailVo">
+        select documentNumber,documentNo,partDrawingNo,bear,factoryName,storeName,goodQuantity,
+        documentDate,orderAfter,isShipAbnormal,exceptCompletionTime,currentState from (select DISTINCT(CONCAT(tod.documentNumber,'(',tod.orderType,')')) documentNumber,tod.documentNumber documentNo,tpo.partDrawingNo,GROUP_CONCAT(distinct tha.RealName) AS bear,GROUP_CONCAT(distinct tfd.factoryName) factoryName,CONCAT(tod.storeName,'(',tod.storeNumber,')') as storeName,tod.goodQuantity as goodQuantity,
+        substring(tod.documentDate,1,10) documentDate,TIMESTAMPDIFF(DAY,substring(tod.orderSubmitTime,1,10),DATE_FORMAT(NOW(), '%Y-%m-%d')) AS orderAfter,
+        CASE WHEN MIN(tpo.isShipment)='0' THEN '0' else '1' END  AS isShipAbnormal,tod.exceptCompletionTime,'1' as currentState
+		from t_order_detail tod
+		LEFT JOIN t_part_order tpo on tod.documentNumber=tpo.documentNumber
+        LEFT JOIN t_product_information tpi on tpo.productModel=tpi.productModel
+        LEFT JOIN t_inventory_warning tiw on tpo.partDrawingNo=tiw.partDrawingNo
+        LEFT JOIN t_factory_data tfd on tfd.factoryName=tiw.factoryName
+		LEFT JOIN t_user_factory tuf on tuf.factoryId=tfd.factoryCode
+		LEFT JOIN hrm_db.t_hrm_accountinfo tha on tuf.userId=tha.AccountID
+		where 1=1 and substring(tiw.inventoryDate,1,10)=#{inventoryDate}
+        <if test="startDate != null and startDate != ''">
+            and substring(tod.documentDate,1,10) <![CDATA[ >= ]]> #{startDate}
+        </if>
+        <if test="endDate != null and endDate != ''">
+            and substring(tod.documentDate,1,10)  <![CDATA[ <= ]]> #{endDate}
+        </if>
+        <if test="orderType != null and orderType != ''">
+            and tod.orderType=#{orderType}
+        </if>
+        <if test="productCategoryCode != null and productCategoryCode != ''">
+            and tpi.productCategoryCode=#{productCategoryCode}
+        </if>
+        <if test="partDrawingNos != null and partDrawingNos.size >0 ">
+            and tpo.partDrawingNo in
+            <foreach collection="partDrawingNos" index="index" item="id" open="(" separator="," close=")">
+                #{id}
+            </foreach>
+        </if>
+        and tod.documentNumber in(
+        select documentNumber from t_part_order where state='0' GROUP BY documentNumber)
+		and tod.documentNumber not in(
+        select documentNumber from  (
+        select count(1) total,documentNumber  from t_part_order GROUP BY documentNumber) as tpo LEFT JOIN (
+        select count(1) packNumber,associatedOrderNumber from t_packing_list_detail GROUP BY associatedOrderNumber) tpld
+        on tpo.documentNumber=tpld.associatedOrderNumber where IFNULL(packNumber, 0)<![CDATA[ >= ]]>IFNULL(total, 0))
+		GROUP BY tod.documentNumber) list
+		where 1=1
+        <if test="isShipAbnormal != null and isShipAbnormal != ''">
+            and isShipAbnormal=#{isShipAbnormal}
+        </if>
+        <if test="documentNumber != null and documentNumber.type != '' and documentNumber.type != null and documentNumber.type=='0'.toString()">
+            and documentNo = #{documentNumber.value}
+        </if>
+        <if test="documentNumber != null and documentNumber.type != '' and documentNumber.type != null and documentNumber.type=='1'.toString()">
+            and documentNumber like concat('%',#{documentNumber.value},'%')
+        </if>
+        <if test="documentNumber != null and documentNumber.type != '' and documentNumber.type != null and documentNumber.type=='2'.toString()">
+            and documentNo != #{documentNumber.value}
+        </if>
+
+        <if test="bear != null and bear.type != '' and bear.type != null and bear.type=='0'.toString()">
+            and bear = #{bear.value}
+        </if>
+        <if test="bear != null and bear.type != '' and bear.type != null and bear.type=='1'.toString()">
+            and bear like concat('%',#{bear.value},'%')
+        </if>
+        <if test="bear != null and bear.type != '' and bear.type != null and bear.type=='2'.toString()">
+            and bear != #{bear.value}
+        </if>
+
+        <if test="factoryName != null and factoryName.type != '' and factoryName.type != null and factoryName.type=='0'.toString()">
+            and factoryName = #{factoryName.value}
+        </if>
+        <if test="factoryName != null and factoryName.type != '' and factoryName.type != null and factoryName.type=='1'.toString()">
+            and factoryName like concat('%',#{factoryName.value},'%')
+        </if>
+        <if test="factoryName != null and factoryName.type != '' and factoryName.type != null and factoryName.type=='2'.toString()">
+            and factoryName != #{factoryName.value}
+        </if>
+
+        <if test="storeName != null and storeName.type != '' and storeName.type != null and storeName.type=='0'.toString()">
+            and storeName = #{storeName.value}
+        </if>
+        <if test="storeName != null and storeName.type != '' and storeName.type != null and storeName.type=='1'.toString()">
+            and storeName like concat('%',#{storeName.value},'%')
+        </if>
+        <if test="storeName != null and storeName.type != '' and storeName.type != null and storeName.type=='2'.toString()">
+            and storeName != #{storeName.value}
+        </if>
+
+        <if test="exceptCompletionTime != null and exceptCompletionTime.type != '' and exceptCompletionTime.type != null and exceptCompletionTime.type=='0'.toString()">
+            and exceptCompletionTime <![CDATA[ >= ]]> #{exceptCompletionTime.startDate} and exceptCompletionTime <![CDATA[ <= ]]> #{exceptCompletionTime.endDate}
+        </if>
+        <if test="exceptCompletionTime != null and exceptCompletionTime.type != '' and exceptCompletionTime.type != null and exceptCompletionTime.type != null and exceptCompletionTime.type=='1'.toString()">
+            and exceptCompletionTime <![CDATA[ < ]]> #{exceptCompletionTime.startDate}
+        </if>
+        <if test="exceptCompletionTime != null and exceptCompletionTime.type != '' and exceptCompletionTime.type != null and exceptCompletionTime.type != null and exceptCompletionTime.type=='2'.toString()">
+            and exceptCompletionTime <![CDATA[ > ]]> #{exceptCompletionTime.startDate}
+        </if>
+        <if test="exceptCompletionTime != null and exceptCompletionTime.type != '' and exceptCompletionTime.type != null and exceptCompletionTime.type=='3'.toString()">
+            and exceptCompletionTime = #{exceptCompletionTime.startDate}
+        </if>
+
+        <if test="documentDate != null and documentDate.type != '' and documentDate.type != null and documentDate.type=='0'.toString()">
+            and substring(documentDate,1,10) <![CDATA[ >= ]]> #{documentDate.startDate} and substring(documentDate,1,10) <![CDATA[ <= ]]> #{documentDate.endDate}
+        </if>
+        <if test="documentDate != null and documentDate.type != '' and documentDate.type != null and documentDate.type != null and documentDate.type=='1'.toString()">
+            and substring(documentDate,1,10) <![CDATA[ < ]]> #{documentDate.startDate}
+        </if>
+        <if test="documentDate != null and documentDate.type != '' and documentDate.type != null and documentDate.type != null and documentDate.type=='2'.toString()">
+            and substring(documentDate,1,10) <![CDATA[ > ]]> #{documentDate.startDate}
+        </if>
+        <if test="documentDate != null and documentDate.type != '' and documentDate.type != null and documentDate.type=='3'.toString()">
+            and substring(documentDate,1,10) = #{documentDate.startDate}
+        </if>
+
+        <if test="goodQuantity != null and goodQuantity.type != '' and goodQuantity.type != null">
+            and goodQuantity ${goodQuantity.type} #{goodQuantity.value}+0
+        </if>
+
+        <if test="orderAfter != null and orderAfter.type != '' and orderAfter.type != null">
+            and orderAfter ${orderAfter.type} #{orderAfter.value}+0
+        </if>
+
+        <if test="exceptGoodTime != null and exceptGoodTime.type != '' and exceptGoodTime.type != null and exceptGoodTime.type=='0'.toString()">
+            and exceptGoodTime <![CDATA[ >= ]]> #{exceptGoodTime.startDate} and exceptGoodTime <![CDATA[ <= ]]> #{exceptGoodTime.endDate}
+        </if>
+        <if test="exceptGoodTime != null and exceptGoodTime.type != '' and exceptGoodTime.type != null and exceptGoodTime.type != null and exceptGoodTime.type=='1'.toString()">
+            and exceptGoodTime <![CDATA[ < ]]> #{exceptGoodTime.startDate}
+        </if>
+        <if test="exceptGoodTime != null and exceptGoodTime.type != '' and exceptGoodTime.type != null and exceptGoodTime.type != null and exceptGoodTime.type=='2'.toString()">
+            and exceptGoodTime <![CDATA[ > ]]> #{exceptGoodTime.startDate}
+        </if>
+        <if test="exceptGoodTime != null and exceptGoodTime.type != '' and exceptGoodTime.type != null and exceptGoodTime.type=='3'.toString()">
+            and exceptGoodTime = #{exceptGoodTime.startDate}
+        </if>
+
+        <if test="deliverySchedule != null and deliverySchedule.type != '' and deliverySchedule.type != null and deliverySchedule.type=='0'.toString()">
+            and deliverySchedule = #{deliverySchedule.value}
+        </if>
+        <if test="deliverySchedule != null and deliverySchedule.type != '' and deliverySchedule.type != null and deliverySchedule.type=='1'.toString()">
+            and deliverySchedule like concat('%',#{deliverySchedule.value},'%')
+        </if>
+        <if test="deliverySchedule != null and deliverySchedule.type != '' and deliverySchedule.type != null and deliverySchedule.type=='2'.toString()">
+            and deliverySchedule != #{deliverySchedule.value}
+        </if>
+
+        <if test="purchaseOrderNumber != null and purchaseOrderNumber.type != '' and purchaseOrderNumber.type != null">
+            and purchaseOrderNumber ${purchaseOrderNumber.type} #{purchaseOrderNumber.value}+0
+        </if>
+
+        <if test="packingTime != null and packingTime.type != '' and packingTime.type != null and packingTime.type=='0'.toString()">
+            and packingTime <![CDATA[ >= ]]> #{packingTime.startDate} and packingTime <![CDATA[ <= ]]> #{packingTime.endDate}
+        </if>
+        <if test="packingTime != null and packingTime.type != '' and packingTime.type != null and packingTime.type != null and packingTime.type=='1'.toString()">
+            and packingTime <![CDATA[ < ]]> #{packingTime.startDate}
+        </if>
+        <if test="packingTime != null and packingTime.type != '' and packingTime.type != null and packingTime.type != null and packingTime.type=='2'.toString()">
+            and packingTime <![CDATA[ > ]]> #{packingTime.startDate}
+        </if>
+        <if test="packingTime != null and packingTime.type != '' and packingTime.type != null and packingTime.type=='3'.toString()">
+            and packingTime = #{packingTime.startDate}
+        </if>
+
+        <if test="deliveryTime != null and deliveryTime.type != '' and deliveryTime.type != null and deliveryTime.type=='0'.toString()">
+            and deliveryTime <![CDATA[ >= ]]> #{deliveryTime.startDate} and deliveryTime <![CDATA[ <= ]]> #{deliveryTime.endDate}
+        </if>
+        <if test="deliveryTime != null and deliveryTime.type != '' and deliveryTime.type != null and deliveryTime.type != null and exceptGoodTime.type=='1'.toString()">
+            and deliveryTime <![CDATA[ < ]]> #{deliveryTime.startDate}
+        </if>
+        <if test="deliveryTime != null and deliveryTime.type != '' and deliveryTime.type != null and deliveryTime.type != null and exceptCompletionTime.type=='2'.toString()">
+            and deliveryTime <![CDATA[ > ]]> #{deliveryTime.startDate}
+        </if>
+        <if test="deliveryTime != null and deliveryTime.type != '' and deliveryTime.type != null and deliveryTime.type=='3'.toString()">
+            and deliveryTime = #{deliveryTime.startDate}
+        </if>
+
+        <if test="logisticsSingleNumber != null and logisticsSingleNumber.type != '' and logisticsSingleNumber.type != null and logisticsSingleNumber.type=='0'.toString()">
+            and logisticsSingleNumber = #{logisticsSingleNumber.value}
+        </if>
+        <if test="logisticsSingleNumber != null and logisticsSingleNumber.type != '' and logisticsSingleNumber.type != null and logisticsSingleNumber.type=='1'.toString()">
+            and logisticsSingleNumber like concat('%',#{logisticsSingleNumber.value},'%')
+        </if>
+        <if test="logisticsSingleNumber != null and logisticsSingleNumber.type != '' and logisticsSingleNumber.type != null and logisticsSingleNumber.type=='2'.toString()">
+            and logisticsSingleNumber != #{logisticsSingleNumber.value}
+        </if>
+
+        <if test="appropriateInvestTime != null and appropriateInvestTime.type != '' and appropriateInvestTime.type != null and appropriateInvestTime.type=='0'.toString()">
+            and appropriateInvestTime <![CDATA[ >= ]]> #{appropriateInvestTime.startDate} and appropriateInvestTime <![CDATA[ <= ]]> #{appropriateInvestTime.endDate}
+        </if>
+        <if test="appropriateInvestTime != null and appropriateInvestTime.type != '' and appropriateInvestTime.type != null and appropriateInvestTime.type != null and appropriateInvestTime.type=='1'.toString()">
+            and appropriateInvestTime <![CDATA[ < ]]> #{appropriateInvestTime.startDate}
+        </if>
+        <if test="appropriateInvestTime != null and appropriateInvestTime.type != '' and appropriateInvestTime.type != null and appropriateInvestTime.type != null and appropriateInvestTime.type=='2'.toString()">
+            and appropriateInvestTime <![CDATA[ > ]]> #{appropriateInvestTime.startDate}
+        </if>
+        <if test="appropriateInvestTime != null and appropriateInvestTime.type != '' and appropriateInvestTime.type != null and appropriateInvestTime.type=='3'.toString()">
+            and appropriateInvestTime = #{appropriateInvestTime.startDate}
+        </if>
+
+        <if test="exceptCompletionTime != null and exceptCompletionTime.sort != null and exceptCompletionTime.sort != ''">
+            order by exceptCompletionTime ${exceptCompletionTime.sort}
+        </if>
+        <if test="documentDate != null and documentDate.sort != null and documentDate.sort != ''">
+            order by documentDate ${documentDate.sort}
+        </if>
+        <if test="goodQuantity != null and goodQuantity.sort != null and goodQuantity.sort != ''">
+            order by goodQuantity ${goodQuantity.sort}
+        </if>
+        <if test="orderAfter != null and orderAfter.sort != null and orderAfter.sort != ''">
+            order by orderAfter ${orderAfter.sort}
+        </if>
+        <if test="exceptGoodTime != null and exceptGoodTime.sort != null and exceptGoodTime.sort != ''">
+            order by exceptGoodTime ${exceptGoodTime.sort}
+        </if>
+        <if test="purchaseOrderNumber != null and purchaseOrderNumber.sort != null and purchaseOrderNumber.sort != ''">
+            order by purchaseOrderNumber ${purchaseOrderNumber.sort}
+        </if>
+        <if test="packingTime != null and packingTime.sort != null and packingTime.sort != ''">
+            order by packingTime ${packingTime.sort}
+        </if>
+        <if test="deliveryTime != null and deliveryTime.sort != null and deliveryTime.sort != ''">
+            order by deliveryTime ${deliveryTime.sort}
+        </if>
+        <if test="appropriateInvestTime != null and appropriateInvestTime.sort != null and appropriateInvestTime.sort != ''">
+            order by appropriateInvestTime ${appropriateInvestTime.sort}
+        </if>
+        <if test="exceptCompletionTime.sort == '' and documentDate.sort == '' and goodQuantity.sort == '' and orderAfter.sort == ''
+            and exceptGoodTime.sort == '' and purchaseOrderNumber.sort == '' and packingTime.sort == ''
+            and deliveryTime.sort == '' and appropriateInvestTime.sort == ''">
+            order by documentDate desc
+        </if>
+    </select>
+
+    <!--根据作业订单号获取作业订单DTO-->
+    <select id="getOrderDetailDTO" resultType="utry.data.modular.partsManagement.dto.OrderDetailDTO">
+        select documentNumber,exceptCompletionTime,exceptGoodTime,documentDate,currentState,documentName,serviceNumber,storeNumber,
+        storeName,productModel,accountingCenter,accountingDistrict,accountingArea,useGoldPreType,warehouseCode,warehouseName,
+        amountAvailable,goodQuantity,aggregateAmount,totalWeight,orderStartTime,dispatchingOrder,orderSubmitTime,orderType,systemState,note,numberTotal
+        from t_order_detail where documentNumber=#{documentNumber}
+    </select>
+
+    <!--获取作业订单详情-->
+    <select id="getPartOrder" resultType="utry.data.modular.partsManagement.model.PartOrder">
+        select tpo.documentNumber,tha.RealName as bear,tpo.partCode,tpo.partName,tpo.partDrawingNo,tpo.describedDrawingNo,tpo.unitPrice,tpo.productModel,tpo.goodNumber,tpo.orderNumber,IFNULL(tpld.outNumber,0) as outNumber,IF(IFNULL(tpld.outNumber,0)<![CDATA[ < ]]>tpo.orderNumber,0,1) as abnormal,
+        tpo.unitWeight,tpo.minQuantity,tpo.totalNumber,tpo.isShipment,tpo.shipmentTime,tpo.useStock from t_part_order tpo
+        LEFT JOIN t_inventory_warning tiw on tpo.partDrawingNo=tiw.partDrawingNo
+        LEFT JOIN t_factory_data tfd on tfd.factoryName=tiw.factoryName
+        LEFT JOIN t_user_factory tuf on tuf.factoryId=tfd.factoryCode
+        LEFT JOIN hrm_db.t_hrm_accountinfo tha on tuf.userId=tha.AccountID
+        LEFT JOIN (select packingListNo,associatedOrderNumber,partDrawingNo,SUM(outNumber) as outNumber from t_packing_list_detail GROUP BY associatedOrderNumber,partDrawingNo) tpld on tpo.documentNumber=tpld.associatedOrderNumber and tpo.partDrawingNo=tpld.partDrawingNo
+        where documentNumber=#{documentNumber} and substring(tiw.inventoryDate,1,10)=#{inventoryDate}
+    </select>
+
+    <!--获取某个时间段的所有作业订单数-->
+    <select id="getOrderCountByDate" resultType="java.lang.Integer">
+      select count(1) from t_order_detail where documentNumber not in(select documentNumber
+      from t_cancel_service_order_detail) and substring(orderStartTime,1,10) <![CDATA[ >= ]]> #{startDate}
+      and substring(orderStartTime,1,10) <![CDATA[ <= ]]> #{endDate}
+    </select>
+
+    <!--获取某个时间段超时的作业订单数-->
+    <select id="getTimeOutOrderCountByDate" resultType="java.lang.Integer">
+        SELECT COUNT(1) from (
+        select 1 from t_order_detail where state='0'
+        and deadline <![CDATA[ < ]]> DATE_FORMAT(CURRENT_DATE, '%Y-%m-%d')
+        and documentNumber in(
+        select documentNumber from t_part_order where state='0' and isShipment='0' GROUP BY documentNumber)
+		GROUP BY documentNumber) list
+    </select>
+
+    <!--获取所有作业订单-->
+    <select id="selectAllDetail" resultType="utry.data.modular.partsManagement.vo.OrderDetailVo">
+        select documentNumber,documentNo,partDrawingNo,bear,factoryName,storeName,goodQuantity,documentDate,orderAfter,orderNeed,purchaseTime,
+        exceptGoodTime,deliverySchedule,purchaseOrderNumber,packingTime,deliveryTime,logisticsSingleNumber,appropriateInvestTime,
+        isShipAbnormal,isNds2Abnormal,exceptCompletionTime,currentState from (
+        select documentNumber,documentNo,partDrawingNo,bear,factoryName,storeName,goodQuantity,documentDate,orderAfter,orderNeed,purchaseTime,
+        exceptGoodTime,deliverySchedule,purchaseOrderNumber,packingTime,deliveryTime,logisticsSingleNumber,appropriateInvestTime,isNds2Abnormal,
+        isShipAbnormal,exceptCompletionTime,currentState from (SELECT DISTINCT
+        (
+        CONCAT(
+        tod.documentNumber,
+        '(',
+        tod.orderType,
+        ')'
+        )
+        ) documentNumber,
+        tod.documentNumber documentNo,
+        tpo.partDrawingNo,
+        GROUP_CONCAT(distinct tha.RealName) AS bear,GROUP_CONCAT(distinct tfd.factoryName) factoryName,
+        CONCAT(
+        tod.storeName,
+        '(',
+        tod.storeNumber,
+        ')'
+        ) AS storeName,
+        tod.goodQuantity,
+        substring(tod.documentDate,1,10) documentDate,
+        TIMESTAMPDIFF(
+        DAY,
+        substring(tod.orderSubmitTime,1,10),
+        DATE_FORMAT(NOW(), '%Y-%m-%d')
+        ) AS orderAfter,
+        sum(IFNULL(tpo.orderNumber,0)) orderNeed,
+        NULL AS purchaseTime,
+        NULL AS exceptGoodTime,
+        NULL AS deliverySchedule,
+        NULL AS purchaseOrderNumber,
+        NULL AS packingTime,
+        NULL AS deliveryTime,
+        NULL AS logisticsSingleNumber,
+        NULL AS appropriateInvestTime,
+        NULL AS isNds2Abnormal,
+        CASE WHEN MIN(tpo.isShipment)='0' THEN '0' else '1' END  AS isShipAbnormal,
+        tod.exceptCompletionTime,
+        '1' AS currentState
+        from t_order_detail tod
+        LEFT JOIN t_part_order tpo on tod.documentNumber=tpo.documentNumber
+        LEFT JOIN t_product_information tpi on tpo.productModel=tpi.productModel
+        LEFT JOIN t_inventory_warning tiw on tpo.partDrawingNo=tiw.partDrawingNo
+        LEFT JOIN t_factory_data tfd on tfd.factoryName=tiw.factoryName
+        LEFT JOIN t_user_factory tuf on tuf.factoryId=tfd.factoryCode
+        LEFT JOIN hrm_db.t_hrm_accountinfo tha on tuf.userId=tha.AccountID
+        where 1=1 and substring(tiw.inventoryDate,1,10)=#{inventoryDate}
+        <if test="startDate != null and startDate != ''">
+            and substring(tod.documentDate,1,10) <![CDATA[ >= ]]> #{startDate}
+        </if>
+        <if test="endDate != null and endDate != ''">
+            and substring(tod.documentDate,1,10)  <![CDATA[ <= ]]> #{endDate}
+        </if>
+        <if test="orderType != null and orderType != ''">
+            and tod.orderType=#{orderType}
+        </if>
+        <if test="productCategoryCode != null and productCategoryCode != ''">
+            and tpi.productCategoryCode=#{productCategoryCode}
+        </if>
+        <if test="partDrawingNos != null and partDrawingNos.size >0 ">
+            and tpo.partDrawingNo in
+            <foreach collection="partDrawingNos" index="index" item="id" open="(" separator="," close=")">
+                #{id}
+            </foreach>
+        </if>
+        and tod.documentNumber in(
+        select documentNumber from t_part_order where state='0' GROUP BY documentNumber)
+        and tod.documentNumber not in(
+        select documentNumber from  (
+        select count(1) total,documentNumber  from t_part_order GROUP BY documentNumber) as tpo LEFT JOIN (
+        select count(1) packNumber,associatedOrderNumber from t_packing_list_detail GROUP BY associatedOrderNumber) tpld
+        on tpo.documentNumber=tpld.associatedOrderNumber where IFNULL(packNumber, 0)<![CDATA[ >= ]]>IFNULL(total, 0))
+        GROUP BY tod.documentNumber) list
+        union all
+        select documentNumber,documentNo,partDrawingNo,bear,factoryName,storeName,goodQuantity,documentDate,orderAfter,orderNeed,purchaseTime,
+        exceptGoodTime,deliverySchedule,purchaseOrderNumber,packingTime,deliveryTime,logisticsSingleNumber,appropriateInvestTime,isNds2Abnormal,
+        isShipAbnormal,exceptCompletionTime,currentState from(SELECT DISTINCT
+        (
+        CONCAT(
+        tod.documentNumber,
+        '(',
+        tod.orderType,
+        ')'
+        )
+        ) documentNumber,
+        tod.documentNumber documentNo,
+        tpo.partDrawingNo,
+        GROUP_CONCAT(distinct tha.RealName) AS bear,GROUP_CONCAT(distinct tfd.factoryName) factoryName,
+        CONCAT(
+        tod.storeName,
+        '(',
+        tod.storeNumber,
+        ')'
+        ) AS storeName,
+        NULL AS goodQuantity,
+        substring(tod.documentDate,1,10) documentDate,
+        TIMESTAMPDIFF(
+        DAY,
+        substring(tod.orderSubmitTime,1,10),
+        DATE_FORMAT(NOW(), '%Y-%m-%d')
+        ) AS orderAfter,
+        sum(IFNULL(tpo.orderNumber,0)) orderNeed,
+        TIMESTAMPDIFF(
+        DAY,tod.documentDate,pon.documentDate) AS purchaseTime,
+        tmsuo.goodarrivalTime as exceptGoodTime,
+        ds.deliverySchedule,
+        sum(pon.purchaseOrderNumber) purchaseOrderNumber,
+        NULL AS packingTime,
+        NULL AS deliveryTime,
+        NULL AS logisticsSingleNumber,
+        NULL AS appropriateInvestTime,
+        NULL AS isNds2Abnormal,
+        CASE WHEN MIN(tpo.isShipment)='0' THEN '0' else '1' END  AS isShipAbnormal,
+        null as exceptCompletionTime,
+        '2' AS currentState
+        from t_order_detail tod
+        LEFT JOIN t_part_order tpo on tod.documentNumber=tpo.documentNumber
+        LEFT JOIN t_product_information tpi on tpo.productModel=tpi.productModel
+        LEFT JOIN t_inventory_warning tiw on tpo.partDrawingNo=tiw.partDrawingNo
+        LEFT JOIN t_factory_data tfd on tfd.factoryName=tiw.factoryName
+        LEFT JOIN t_user_factory tuf on tuf.factoryId=tfd.factoryCode
+        LEFT JOIN hrm_db.t_hrm_accountinfo tha on tuf.userId=tha.AccountID
+        LEFT JOIN t_miss_stock_up_order tmsuo on tmsuo.associatedOrderNumber=tpo.documentNumber
+        and tpo.partDrawingNo =  tmsuo.partDrawingNo
+        LEFT JOIN (select count(1) purchaseOrderNumber,partDrawingNo,documentDate from t_purchase_order_detail tpod
+        LEFT JOIN t_purchase_order tpo on tpo.documentNo=tpod.documentNo where tpo.systemState='已提交'
+        GROUP BY partDrawingNo) pon on pon.partDrawingNo=tpo.partDrawingNo
+        LEFT JOIN (select CONCAT(IFNULL(packNumber, 0),'/',IFNULL(total, 0)) deliverySchedule,documentNumber from  (
+        select count(1) total,documentNumber  from t_part_order GROUP BY documentNumber) as tpo LEFT JOIN (
+        select count(1) packNumber,associatedOrderNumber from t_packing_list_detail GROUP BY associatedOrderNumber) tpld
+        on tpo.documentNumber=tpld.associatedOrderNumber) ds on ds.documentNumber=tod.documentNumber
+        where 1=1 and substring(tiw.inventoryDate,1,10)=#{inventoryDate}
+        <if test="startDate != null and startDate != ''">
+            and substring(tod.documentDate,1,10) <![CDATA[ >= ]]> #{startDate}
+        </if>
+        <if test="endDate != null and endDate != ''">
+            and substring(tod.documentDate,1,10)  <![CDATA[ <= ]]> #{endDate}
+        </if>
+        <if test="orderType != null and orderType != ''">
+            and tod.orderType=#{orderType}
+        </if>
+        <if test="productCategoryCode != null and productCategoryCode != ''">
+            and tpi.productCategoryCode=#{productCategoryCode}
+        </if>
+        <if test="partDrawingNos != null and partDrawingNos.size >0 ">
+            and tpo.partDrawingNo in
+            <foreach collection="partDrawingNos" index="index" item="id" open="(" separator="," close=")">
+                #{id}
+            </foreach>
+        </if>
+        and tod.documentNumber  in(select documentNumber from t_part_order where state='0' GROUP BY documentNumber)
+        and tod.documentNumber in (select associatedOrderNumber from t_miss_stock_up_order)
+        and tod.documentNumber not in(
+        select documentNumber from  (
+        select count(1) total,documentNumber  from t_part_order GROUP BY documentNumber) as tpo LEFT JOIN (
+        select count(1) packNumber,associatedOrderNumber from t_packing_list_detail GROUP BY associatedOrderNumber) tpld
+        on tpo.documentNumber=tpld.associatedOrderNumber where IFNULL(packNumber, 0)<![CDATA[ >= ]]>IFNULL(total, 0))
+        GROUP BY tod.documentNumber) list
+        union all
+        select documentNumber,documentNo,partDrawingNo,bear,factoryName,storeName,goodQuantity,documentDate,orderAfter,orderNeed,purchaseTime,
+        exceptGoodTime,deliverySchedule,purchaseOrderNumber,packingTime,deliveryTime,logisticsSingleNumber,appropriateInvestTime,isNds2Abnormal,
+        isShipAbnormal,exceptCompletionTime,currentState from (SELECT DISTINCT
+        (
+        CONCAT(
+        tod.documentNumber,
+        '(',
+        tod.orderType,
+        ')'
+        )
+        ) documentNumber,
+        tod.documentNumber documentNo,
+        tpo.partDrawingNo,
+        GROUP_CONCAT(distinct tha.RealName) AS bear,GROUP_CONCAT(distinct tfd.factoryName) factoryName,
+        CONCAT(
+        tod.storeName,
+        '(',
+        tod.storeNumber,
+        ')'
+        ) AS storeName,
+        NULL AS goodQuantity,
+        substring(tod.documentDate,1,10) documentDate,
+        TIMESTAMPDIFF(
+        DAY,
+        substring(tod.orderSubmitTime,1,10),
+        DATE_FORMAT(NOW(), '%Y-%m-%d')
+        ) AS orderAfter,
+        sum(IFNULL(tpo.orderNumber,0)) orderNeed,
+        NULL AS purchaseTime,
+        NULL AS exceptGoodTime,
+        ds.deliverySchedule,
+        NULL AS purchaseOrderNumber,
+        tpl.loadingDate packingTime,
+        NULL AS deliveryTime,
+        GROUP_CONCAT(distinct tpl.billsLadingNo) as logisticsSingleNumber,
+        NULL AS appropriateInvestTime,
+        CASE WHEN TimeStampDiff(DAY,substring(tpl.loadingDate,1,10),curdate())  >   2 THEN '0' ELSE '1' END AS isNds2Abnormal,
+        NULL AS isShipAbnormal,
+        tod.exceptCompletionTime,
+        '3' AS currentState
+        from t_order_detail tod
+        LEFT JOIN t_part_order tpo on tod.documentNumber=tpo.documentNumber
+        LEFT JOIN t_product_information tpi on tpo.productModel=tpi.productModel
+        LEFT JOIN t_inventory_warning tiw on tpo.partDrawingNo=tiw.partDrawingNo
+        LEFT JOIN t_factory_data tfd on tfd.factoryName=tiw.factoryName
+        LEFT JOIN t_user_factory tuf on tuf.factoryId=tfd.factoryCode
+        LEFT JOIN hrm_db.t_hrm_accountinfo tha on tuf.userId=tha.AccountID
+        LEFT JOIN t_packing_list_detail tpld on tpld.associatedOrderNumber=tod.documentNumber
+        and tpo.partDrawingNo=tpld.partDrawingNo
+        LEFT JOIN t_packing_list tpl on tpl.packingListNo=tpld.packingListNo
+        LEFT JOIN (select CONCAT(IFNULL(packNumber, 0),'/',IFNULL(total, 0)) deliverySchedule,documentNumber from  (
+        select count(1) total,documentNumber  from t_part_order GROUP BY documentNumber) as tpo LEFT JOIN (
+        select count(1) packNumber,associatedOrderNumber from t_packing_list_detail GROUP BY associatedOrderNumber) tpld
+        on tpo.documentNumber=tpld.associatedOrderNumber) ds on ds.documentNumber=tod.documentNumber
+        where 1=1 and substring(tiw.inventoryDate,1,10)=#{inventoryDate}
+            <if test="startDate != null and startDate != ''">
+                and substring(tod.documentDate,1,10) <![CDATA[ >= ]]> #{startDate}
+            </if>
+            <if test="endDate != null and endDate != ''">
+                and substring(tod.documentDate,1,10)  <![CDATA[ <= ]]> #{endDate}
+            </if>
+            <if test="orderType != null and orderType != ''">
+                and tod.orderType=#{orderType}
+            </if>
+        <if test="productCategoryCode != null and productCategoryCode != ''">
+            and tpi.productCategoryCode=#{productCategoryCode}
+        </if>
+        <if test="partDrawingNos != null and partDrawingNos.size >0 ">
+            and tpo.partDrawingNo in
+            <foreach collection="partDrawingNos" index="index" item="id" open="(" separator="," close=")">
+                #{id}
+            </foreach>
+        </if>
+        and tod.documentNumber in (select associatedOrderNumber from t_packing_list_detail)
+        and tod.documentNumber in (select trd.associatedOrderNumber from t_receipt tr LEFT JOIN t_receipt_detail trd on tr.documentNumber=trd.documentNumber
+        where tr.systemState='待收货' and (tr.appropriateInvestTime is  null or tr.appropriateInvestTime=''))
+        and tod.documentNumber  in(select documentNumber from t_part_order where state='0' GROUP BY documentNumber) GROUP BY tod.documentNumber) list
+        union all
+        select documentNumber,documentNo,partDrawingNo,bear,factoryName,storeName,goodQuantity,documentDate,orderAfter,orderNeed,purchaseTime,
+        exceptGoodTime,deliverySchedule,purchaseOrderNumber,packingTime,deliveryTime,logisticsSingleNumber,appropriateInvestTime,isNDS2Abnormal,
+        isShipAbnormal,exceptCompletionTime,currentState from (SELECT DISTINCT
+        (
+        CONCAT(
+        tod.documentNumber,
+        '(',
+        tod.orderType,
+        ')'
+        )
+        ) documentNumber,
+        tod.documentNumber documentNo,
+        tpo.partDrawingNo,
+        GROUP_CONCAT(distinct tha.RealName) AS bear,GROUP_CONCAT(distinct tfd.factoryName) factoryName,
+        CONCAT(
+        tod.storeName,
+        '(',
+        tod.storeNumber,
+        ')'
+        ) AS storeName,
+        tod.goodQuantity,
+        substring(tod.documentDate,1,10) documentDate,
+        TIMESTAMPDIFF(DAY,substring(tod.orderSubmitTime,1,10),DATE_FORMAT(NOW(), '%Y-%m-%d')) AS orderAfter,
+        sum(IFNULL(tpo.orderNumber,0)) orderNeed,
+        NULL AS purchaseTime,
+        NULL AS exceptGoodTime,
+        NULL AS deliverySchedule,
+        NULL AS purchaseOrderNumber,
+        tpl.loadingDate packingTime,
+        tr.deliveryTime,
+        tpl.billsLadingNo as logisticsSingleNumber,
+        tr.appropriateInvestTime,
+        CASE WHEN TimeStampDiff(DAY,substring(tr.deliveryTime,1,10),IF(tr.appropriateInvestTime is null and tr.goodTime is null,curdate(),IF(IF(tr.appropriateInvestTime is null or tr.appropriateInvestTime='','3022-12-12',tr.appropriateInvestTime)>
+        IF(tr.goodTime is null or tr.goodTime='','3022-12-12',tr.goodTime), substring(tr.goodTime,1,10), substring(tr.appropriateInvestTime,1,10))))  >   2 THEN '0' ELSE '1' END AS isNds2Abnormal,
+        NULL AS isShipAbnormal,
+        tod.exceptCompletionTime,
+        '4' AS currentState
+        from t_order_detail tod
+        LEFT JOIN t_part_order tpo on tod.documentNumber=tpo.documentNumber
+        LEFT JOIN t_product_information tpi on tpo.productModel=tpi.productModel
+        LEFT JOIN t_inventory_warning tiw on tpo.partDrawingNo=tiw.partDrawingNo
+        LEFT JOIN t_factory_data tfd on tfd.factoryName=tiw.factoryName
+        LEFT JOIN t_user_factory tuf on tuf.factoryId=tfd.factoryCode
+        LEFT JOIN hrm_db.t_hrm_accountinfo tha on tuf.userId=tha.AccountID
+        LEFT JOIN t_receipt_detail trd on trd.associatedOrderNumber=tod.documentNumber
+        LEFT JOIN t_receipt tr on tr.documentNumber=trd.documentNumber
+        LEFT JOIN t_packing_list_detail tpld on tpld.associatedOrderNumber=tod.documentNumber and tpld.partDrawingNo=tpo.partDrawingNo
+        LEFT JOIN t_packing_list tpl on tpld.packingListNo=tpl.packingListNo
+        where 1=1 and substring(tiw.inventoryDate,1,10)=#{inventoryDate}
+            <if test="startDate != null and startDate != ''">
+                and substring(tod.documentDate,1,10) <![CDATA[ >= ]]> #{startDate}
+            </if>
+            <if test="endDate != null and endDate != ''">
+                and substring(tod.documentDate,1,10)  <![CDATA[ <= ]]> #{endDate}
+            </if>
+            <if test="orderType != null and orderType != ''">
+                and tod.orderType=#{orderType}
+            </if>
+        <if test="productCategoryCode != null and productCategoryCode != ''">
+            and tpi.productCategoryCode=#{productCategoryCode}
+        </if>
+        <if test="partDrawingNos != null and partDrawingNos.size >0 ">
+            and tpo.partDrawingNo in
+            <foreach collection="partDrawingNos" index="index" item="id" open="(" separator="," close=")">
+                #{id}
+            </foreach>
+        </if>
+        and tod.documentNumber in(select trd.associatedOrderNumber from t_receipt tr LEFT JOIN t_receipt_detail trd on tr.documentNumber=trd.documentNumber
+        where tr.systemState='待收货' and tr.appropriateInvestTime is not null and tr.appropriateInvestTime!='')
+        and tod.documentNumber  in(select documentNumber from t_part_order where state='0' GROUP BY documentNumber)
+        GROUP BY tod.documentNumber) list
+        union all
+        select documentNumber,documentNo,partDrawingNo,bear,factoryName,storeName,goodQuantity,documentDate,orderAfter,orderNeed,purchaseTime,
+        exceptGoodTime,deliverySchedule,purchaseOrderNumber,packingTime,deliveryTime,logisticsSingleNumber,appropriateInvestTime,isNDS2Abnormal,
+        isShipAbnormal,exceptCompletionTime,currentState from (SELECT DISTINCT
+        (
+        CONCAT(
+        tod.documentNumber,
+        '(',
+        tod.orderType,
+        ')'
+        )
+        ) documentNumber,
+        tod.documentNumber documentNo,
+        tpo.partDrawingNo,
+        GROUP_CONCAT(distinct tha.RealName) AS bear,GROUP_CONCAT(distinct tfd.factoryName) factoryName,
+        CONCAT(
+        tod.storeName,
+        '(',
+        tod.storeNumber,
+        ')'
+        ) AS storeName,
+        tod.goodQuantity,
+        substring(tod.documentDate,1,10) documentDate,
+        ROUND(AVG(coalesce(TIMESTAMPDIFF(DAY,substring(tod.orderSubmitTime,1,10),substring(IF(tr.goodTime is null,tmsuo.documentDate,tr.goodTime),1,10)),0)),0) AS orderAfter,
+        sum(IFNULL(tpo.orderNumber,0)) orderNeed,
+        NULL AS purchaseTime,
+        NULL AS exceptGoodTime,
+        NULL AS deliverySchedule,
+        NULL AS purchaseOrderNumber,
+        tpl.loadingDate packingTime,
+        tr.deliveryTime,
+        tpl.billsLadingNo as logisticsSingleNumber,
+        tr.appropriateInvestTime,
+        CASE WHEN (TimeStampDiff(DAY,substring(tr.deliveryTime,1,10),IF(tr.appropriateInvestTime is null and tr.goodTime is null,curdate(),IF(IF(tr.appropriateInvestTime is null or tr.appropriateInvestTime='','3022-12-12',tr.appropriateInvestTime)>
+        IF(tr.goodTime is null or tr.goodTime='','3022-12-12',tr.goodTime), substring(tr.goodTime,1,10), substring(tr.appropriateInvestTime,1,10))))  >   2)  THEN '0' ELSE '1' END AS isNDS2Abnormal,
+        CASE WHEN MIN(tpo.isShipment)='0' THEN '0' ELSE '1' END AS isShipAbnormal,
+        tod.exceptCompletionTime,
+        '5' AS currentState
+        from t_order_detail tod
+        LEFT JOIN t_part_order tpo on tod.documentNumber=tpo.documentNumber
+        LEFT JOIN t_product_information tpi on tpo.productModel=tpi.productModel
+        LEFT JOIN t_inventory_warning tiw on tpo.partDrawingNo=tiw.partDrawingNo
+        LEFT JOIN t_factory_data tfd on tfd.factoryName=tiw.factoryName
+        LEFT JOIN t_user_factory tuf on tuf.factoryId=tfd.factoryCode
+        LEFT JOIN hrm_db.t_hrm_accountinfo tha on tuf.userId=tha.AccountID
+        LEFT JOIN t_receipt_detail trd on trd.associatedOrderNumber=tod.documentNumber and trd.partDrawingNo=tpo.partDrawingNo
+        LEFT JOIN t_receipt tr on tr.documentNumber=trd.documentNumber
+        LEFT JOIN t_packing_list_detail tpld on tpld.associatedOrderNumber=tod.documentNumber and tpld.partDrawingNo=tpo.partDrawingNo
+        LEFT JOIN t_packing_list tpl on tpld.packingListNo=tpl.packingListNo
+        left join t_miss_stock_up_order tmsuo on tod.documentNumber=tmsuo.associatedOrderNumber and tmsuo.partDrawingNo=tpo.partDrawingNo
+        where 1=1 and substring(tiw.inventoryDate,1,10)=#{inventoryDate}
+        and tod.documentNumber in(select documentNumber from t_order_detail where state='1')
+        <if test="startDate != null and startDate != ''">
+            and substring(tod.documentDate,1,10) <![CDATA[ >= ]]> #{startDate}
+        </if>
+        <if test="endDate != null and endDate != ''">
+            and substring(tod.documentDate,1,10)  <![CDATA[ <= ]]> #{endDate}
+        </if>
+        <if test="orderType != null and orderType != ''">
+            and tod.orderType=#{orderType}
+        </if>
+        <if test="productCategoryCode != null and productCategoryCode != ''">
+            and tpi.productCategoryCode=#{productCategoryCode}
+        </if>
+        <if test="partDrawingNos != null and partDrawingNos.size >0 ">
+            and tpo.partDrawingNo in
+            <foreach collection="partDrawingNos" index="index" item="id" open="(" separator="," close=")">
+                #{id}
+            </foreach>
+        </if>
+        GROUP BY tod.documentNumber) list
+        ) deatil
+        <where>
+            <if test="isShipAbnormal != null and isShipAbnormal != ''">
+                and isShipAbnormal=#{isShipAbnormal}
+            </if>
+            <if test="isNds2Abnormal != null and isNds2Abnormal != ''">
+                and isNds2Abnormal=#{isNds2Abnormal}
+            </if>
+            <if test="documentNumber != null and documentNumber.type != '' and documentNumber.type != null and documentNumber.type=='0'.toString()">
+                and documentNo = #{documentNumber.value}
+            </if>
+            <if test="documentNumber != null and documentNumber.type != '' and documentNumber.type != null and documentNumber.type=='1'.toString()">
+                and documentNumber like concat('%',#{documentNumber.value},'%')
+            </if>
+            <if test="documentNumber != null and documentNumber.type != '' and documentNumber.type != null and documentNumber.type=='2'.toString()">
+                and documentNo != #{documentNumber.value}
+            </if>
+
+            <if test="bear != null and bear.type != '' and bear.type != null and bear.type=='0'.toString()">
+                and bear = #{bear.value}
+            </if>
+            <if test="bear != null and bear.type != '' and bear.type != null and bear.type=='1'.toString()">
+                and bear like concat('%',#{bear.value},'%')
+            </if>
+            <if test="bear != null and bear.type != '' and bear.type != null and bear.type=='2'.toString()">
+                and bear != #{bear.value}
+            </if>
+
+            <if test="factoryName != null and factoryName.type != '' and factoryName.type != null and factoryName.type=='0'.toString()">
+                and factoryName = #{factoryName.value}
+            </if>
+            <if test="factoryName != null and factoryName.type != '' and factoryName.type != null and factoryName.type=='1'.toString()">
+                and factoryName like concat('%',#{factoryName.value},'%')
+            </if>
+            <if test="factoryName != null and factoryName.type != '' and factoryName.type != null and factoryName.type=='2'.toString()">
+                and factoryName != #{factoryName.value}
+            </if>
+
+            <if test="storeName != null and storeName.type != '' and storeName.type != null and storeName.type=='0'.toString()">
+                and storeName = #{storeName.value}
+            </if>
+            <if test="storeName != null and storeName.type != '' and storeName.type != null and storeName.type=='1'.toString()">
+                and storeName like concat('%',#{storeName.value},'%')
+            </if>
+            <if test="storeName != null and storeName.type != '' and storeName.type != null and storeName.type=='2'.toString()">
+                and storeName != #{storeName.value}
+            </if>
+
+            <if test="exceptCompletionTime != null and exceptCompletionTime.type != '' and exceptCompletionTime.type != null and exceptCompletionTime.type=='0'.toString()">
+                and exceptCompletionTime <![CDATA[ >= ]]> #{exceptCompletionTime.startDate} and exceptCompletionTime <![CDATA[ <= ]]> #{exceptCompletionTime.endDate}
+            </if>
+            <if test="exceptCompletionTime != null and exceptCompletionTime.type != '' and exceptCompletionTime.type != null and exceptCompletionTime.type != null and exceptCompletionTime.type=='1'.toString()">
+                and exceptCompletionTime <![CDATA[ < ]]> #{exceptCompletionTime.startDate}
+            </if>
+            <if test="exceptCompletionTime != null and exceptCompletionTime.type != '' and exceptCompletionTime.type != null and exceptCompletionTime.type != null and exceptCompletionTime.type=='2'.toString()">
+                and exceptCompletionTime <![CDATA[ > ]]> #{exceptCompletionTime.startDate}
+            </if>
+            <if test="exceptCompletionTime != null and exceptCompletionTime.type != '' and exceptCompletionTime.type != null and exceptCompletionTime.type=='3'.toString()">
+                and exceptCompletionTime = #{exceptCompletionTime.startDate}
+            </if>
+
+            <if test="documentDate != null and documentDate.type != '' and documentDate.type != null and documentDate.type=='0'.toString()">
+                and substring(documentDate,1,10) <![CDATA[ >= ]]> #{documentDate.startDate} and substring(documentDate,1,10) <![CDATA[ <= ]]> #{documentDate.endDate}
+            </if>
+            <if test="documentDate != null and documentDate.type != '' and documentDate.type != null and documentDate.type != null and documentDate.type=='1'.toString()">
+                and substring(documentDate,1,10) <![CDATA[ < ]]> #{documentDate.startDate}
+            </if>
+            <if test="documentDate != null and documentDate.type != '' and documentDate.type != null and documentDate.type != null and documentDate.type=='2'.toString()">
+                and substring(documentDate,1,10) <![CDATA[ > ]]> #{documentDate.startDate}
+            </if>
+            <if test="documentDate != null and documentDate.type != '' and documentDate.type != null and documentDate.type=='3'.toString()">
+                and substring(documentDate,1,10) = #{documentDate.startDate}
+            </if>
+
+            <if test="goodQuantity != null and goodQuantity.type != '' and goodQuantity.type != null">
+                and goodQuantity ${goodQuantity.type} #{goodQuantity.value}+0
+            </if>
+
+            <if test="orderAfter != null and orderAfter.type != '' and orderAfter.type != null">
+                and orderAfter ${orderAfter.type} #{orderAfter.value}+0
+            </if>
+
+            <if test="orderNeed != null and orderNeed.type != '' and orderNeed.type != null">
+                and orderNeed ${orderNeed.type} #{orderNeed.value}+0
+            </if>
+
+            <if test="exceptGoodTime != null and exceptGoodTime.type != '' and exceptGoodTime.type != null and exceptGoodTime.type=='0'.toString()">
+                and exceptGoodTime <![CDATA[ >= ]]> #{exceptGoodTime.startDate} and exceptGoodTime <![CDATA[ <= ]]> #{exceptGoodTime.endDate}
+            </if>
+            <if test="exceptGoodTime != null and exceptGoodTime.type != '' and exceptGoodTime.type != null and exceptGoodTime.type != null and exceptGoodTime.type=='1'.toString()">
+                and exceptGoodTime <![CDATA[ < ]]> #{exceptGoodTime.startDate}
+            </if>
+            <if test="exceptGoodTime != null and exceptGoodTime.type != '' and exceptGoodTime.type != null and exceptGoodTime.type != null and exceptGoodTime.type=='2'.toString()">
+                and exceptGoodTime <![CDATA[ > ]]> #{exceptGoodTime.startDate}
+            </if>
+            <if test="exceptGoodTime != null and exceptGoodTime.type != '' and exceptGoodTime.type != null and exceptGoodTime.type=='3'.toString()">
+                and exceptGoodTime = #{exceptGoodTime.startDate}
+            </if>
+
+            <if test="deliverySchedule != null and deliverySchedule.type != '' and deliverySchedule.type != null and deliverySchedule.type=='0'.toString()">
+                and deliverySchedule = #{deliverySchedule.value}
+            </if>
+            <if test="deliverySchedule != null and deliverySchedule.type != '' and deliverySchedule.type != null and deliverySchedule.type=='1'.toString()">
+                and deliverySchedule like concat('%',#{deliverySchedule.value},'%')
+            </if>
+            <if test="deliverySchedule != null and deliverySchedule.type != '' and deliverySchedule.type != null and deliverySchedule.type=='2'.toString()">
+                and deliverySchedule != #{deliverySchedule.value}
+            </if>
+
+            <if test="purchaseOrderNumber != null and purchaseOrderNumber.type != '' and purchaseOrderNumber.type != null">
+                and purchaseOrderNumber ${purchaseOrderNumber.type} #{purchaseOrderNumber.value}+0
+            </if>
+
+            <if test="packingTime != null and packingTime.type != '' and packingTime.type != null and packingTime.type=='0'.toString()">
+                and packingTime <![CDATA[ >= ]]> #{packingTime.startDate} and packingTime <![CDATA[ <= ]]> #{packingTime.endDate}
+            </if>
+            <if test="packingTime != null and packingTime.type != '' and packingTime.type != null and packingTime.type != null and packingTime.type=='1'.toString()">
+                and packingTime <![CDATA[ < ]]> #{packingTime.startDate}
+            </if>
+            <if test="packingTime != null and packingTime.type != '' and packingTime.type != null and packingTime.type != null and packingTime.type=='2'.toString()">
+                and packingTime <![CDATA[ > ]]> #{packingTime.startDate}
+            </if>
+            <if test="packingTime != null and packingTime.type != '' and packingTime.type != null and packingTime.type=='3'.toString()">
+                and packingTime = #{packingTime.startDate}
+            </if>
+
+            <if test="deliveryTime != null and deliveryTime.type != '' and deliveryTime.type != null and deliveryTime.type=='0'.toString()">
+                and deliveryTime <![CDATA[ >= ]]> #{deliveryTime.startDate} and deliveryTime <![CDATA[ <= ]]> #{deliveryTime.endDate}
+            </if>
+            <if test="deliveryTime != null and deliveryTime.type != '' and deliveryTime.type != null and deliveryTime.type != null and exceptGoodTime.type=='1'.toString()">
+                and deliveryTime <![CDATA[ < ]]> #{deliveryTime.startDate}
+            </if>
+            <if test="deliveryTime != null and deliveryTime.type != '' and deliveryTime.type != null and deliveryTime.type != null and exceptCompletionTime.type=='2'.toString()">
+                and deliveryTime <![CDATA[ > ]]> #{deliveryTime.startDate}
+            </if>
+            <if test="deliveryTime != null and deliveryTime.type != '' and deliveryTime.type != null and deliveryTime.type=='3'.toString()">
+                and deliveryTime = #{deliveryTime.startDate}
+            </if>
+
+            <if test="logisticsSingleNumber != null and logisticsSingleNumber.type != '' and logisticsSingleNumber.type != null and logisticsSingleNumber.type=='0'.toString()">
+                and logisticsSingleNumber = #{logisticsSingleNumber.value}
+            </if>
+            <if test="logisticsSingleNumber != null and logisticsSingleNumber.type != '' and logisticsSingleNumber.type != null and logisticsSingleNumber.type=='1'.toString()">
+                and logisticsSingleNumber like concat('%',#{logisticsSingleNumber.value},'%')
+            </if>
+            <if test="logisticsSingleNumber != null and logisticsSingleNumber.type != '' and logisticsSingleNumber.type != null and logisticsSingleNumber.type=='2'.toString()">
+                and logisticsSingleNumber != #{logisticsSingleNumber.value}
+            </if>
+
+            <if test="appropriateInvestTime != null and appropriateInvestTime.type != '' and appropriateInvestTime.type != null and appropriateInvestTime.type=='0'.toString()">
+                and appropriateInvestTime <![CDATA[ >= ]]> #{appropriateInvestTime.startDate} and appropriateInvestTime <![CDATA[ <= ]]> #{appropriateInvestTime.endDate}
+            </if>
+            <if test="appropriateInvestTime != null and appropriateInvestTime.type != '' and appropriateInvestTime.type != null and appropriateInvestTime.type != null and appropriateInvestTime.type=='1'.toString()">
+                and appropriateInvestTime <![CDATA[ < ]]> #{appropriateInvestTime.startDate}
+            </if>
+            <if test="appropriateInvestTime != null and appropriateInvestTime.type != '' and appropriateInvestTime.type != null and appropriateInvestTime.type != null and appropriateInvestTime.type=='2'.toString()">
+                and appropriateInvestTime <![CDATA[ > ]]> #{appropriateInvestTime.startDate}
+            </if>
+            <if test="appropriateInvestTime != null and appropriateInvestTime.type != '' and appropriateInvestTime.type != null and appropriateInvestTime.type=='3'.toString()">
+                and appropriateInvestTime = #{appropriateInvestTime.startDate}
+            </if>
+        </where>
+        <if test="exceptCompletionTime != null and exceptCompletionTime.sort != null and exceptCompletionTime.sort != ''">
+            order by exceptCompletionTime ${exceptCompletionTime.sort}
+        </if>
+        <if test="documentDate != null and documentDate.sort != null and documentDate.sort != ''">
+            order by documentDate ${documentDate.sort}
+        </if>
+        <if test="goodQuantity != null and goodQuantity.sort != null and goodQuantity.sort != ''">
+            order by goodQuantity ${goodQuantity.sort}
+        </if>
+        <if test="orderAfter != null and orderAfter.sort != null and orderAfter.sort != ''">
+            order by orderAfter ${orderAfter.sort}
+        </if>
+        <if test="orderNeed != null and orderNeed.sort != null and orderNeed.sort != ''">
+            order by orderNeed ${orderNeed.sort}
+        </if>
+        <if test="exceptGoodTime != null and exceptGoodTime.sort != null and exceptGoodTime.sort != ''">
+            order by exceptGoodTime ${exceptGoodTime.sort}
+        </if>
+        <if test="purchaseOrderNumber != null and purchaseOrderNumber.sort != null and purchaseOrderNumber.sort != ''">
+            order by purchaseOrderNumber ${purchaseOrderNumber.sort}
+        </if>
+        <if test="packingTime != null and packingTime.sort != null and packingTime.sort != ''">
+            order by packingTime ${packingTime.sort}
+        </if>
+        <if test="deliveryTime != null and deliveryTime.sort != null and deliveryTime.sort != ''">
+            order by deliveryTime ${deliveryTime.sort}
+        </if>
+        <if test="appropriateInvestTime != null and appropriateInvestTime.sort != null and appropriateInvestTime.sort != ''">
+            order by appropriateInvestTime ${appropriateInvestTime.sort}
+        </if>
+        <if test="exceptCompletionTime.sort == '' and documentDate.sort == '' and goodQuantity.sort == '' and orderAfter.sort == ''
+           and exceptGoodTime.sort == '' and purchaseOrderNumber.sort == '' and packingTime.sort == ''
+            and deliveryTime.sort == '' and appropriateInvestTime.sort == ''">
+            order by documentDate desc
+        </if>
+
+    </select>
+
+    <!--获取实时的作业订单数-->
+    <select id="getRealOrderCount" resultType="java.lang.Integer">
+        SELECT COUNT(1) from (
+        select 1 from t_order_detail where
+        state='0' and
+		documentNumber in(
+        select documentNumber from t_part_order where state='0' GROUP BY documentNumber)) list
+    </select>
+
+    <!--根据关联订单号查询是否存在于订单详情列表-->
+    <select id="getOrderDetailFlag" resultType="java.lang.String">
+        select documentNumber from t_order_detail where documentNumber=#{documentNumber}
+    </select>
+
+    <!--获取已经完成的订单详情-->
+    <select id="selectNoOrderDetail" resultType="java.util.Map">
+        select tpo.documentNumber,tpo.partDrawingNo from t_part_order tpo
+		LEFT JOIN (select documentNumber,partDrawingNo,sum(IFNULL(cancelNumber,0)) cancelNumber from  t_cancel_service_order_detail GROUP BY documentNumber,partDrawingNo)  tcsod on tcsod.documentNumber=tpo.documentNumber
+        and  tcsod.partDrawingNo = tpo.partDrawingNo
+		LEFT JOIN(
+		select IFNULL(goodQuantity,0)-sum(IFNULL(processNumber,0)) cancelNumber,partDrawingNo,associatedOrderNumber,systemState from t_miss_stock_up_order where systemState='取消' or systemState='作废'
+        GROUP BY associatedOrderNumber,partDrawingNo) tmsuo
+		on tmsuo.associatedOrderNumber=tpo.documentNumber and tmsuo.partDrawingNo=tpo.partDrawingNo
+		LEFT JOIN (SELECT associatedOrderNumber,partDrawingNo,sum(IFNULL(goodNumber,0)) goodNumber,sum(IFNULL(abnormalNumber,0)) abnormalNumber,sum(IFNULL(notReceive,0)) notReceive  from t_receipt_detail GROUP BY associatedOrderNumber,partDrawingNo)  trd on trd.associatedOrderNumber=tpo.documentNumber
+        and trd.partDrawingNo=tpo.partDrawingNo
+		where IFNULL(tpo.orderNumber,0)-IFNULL(tcsod.cancelNumber,0)-IFNULL(tmsuo.cancelNumber,0)-IFNULL(trd.goodNumber,0)-IFNULL(trd.abnormalNumber,0)-IFNULL(trd.notReceive,0)=0 and  tpo.state!='1' and  tpo.state!='2' LIMIT 1,20000
+    </select>
+
+    <!--获取已经完成的订单-->
+    <select id="selectNoOrder" resultType="java.util.Map">
+        select documentNumber from t_order_detail where documentNumber  not in(
+		select documentNumber from t_part_order where state='0') GROUP BY documentNumber
+    </select>
+
+    <!--获取已经取消的订单详情-->
+    <select id="selectCancelOrderDetail" resultType="java.util.Map">
+        select tpo.documentNumber,tpo.partDrawingNo from t_part_order tpo
+		LEFT JOIN (select documentNumber,partDrawingNo,sum(cancelNumber) cancelNumber from t_cancel_service_order_detail group by documentNumber,partDrawingNo) tcsod on tcsod.documentNumber=tpo.documentNumber
+        and  tcsod.partDrawingNo = tpo.partDrawingNo
+		where IFNULL(tpo.orderNumber,0)-IFNULL(tcsod.cancelNumber,0)=0 and   tpo.state!='1' and  tpo.state!='2'
+    </select>
+
+    <!--查询出货时间-->
+    <select id="selectTimeOrderDetail" resultType="java.util.Map">
+        select tpo.documentNumber,tpo.partDrawingNo,tod.documentDate,tpl.loadingDate,timestampdiff(DAY,tod.documentDate,tpl.loadingDate) time from t_part_order tpo LEFT JOIN t_packing_list_detail tpld on tpo.partDrawingNo=tpld.partDrawingNo and tpo.documentNumber=tpld.associatedOrderNumber
+        LEFT JOIN t_packing_list tpl on tpld.packingListNo=tpl.packingListNo
+        LEFT JOIN t_order_detail tod on tpo.documentNumber=tod.documentNumber
+        where tpo.state!='2' and time is null
+        GROUP BY tpo.documentNumber,tpo.partDrawingNo
+    </select>
+
+    <!--根据订单日期时间段获取符合出货即纳率订单行数量-->
+    <select id="countByOrder" resultType="java.lang.Integer">
+        select count(1) total from t_part_order tpo
+        LEFT JOIN t_inventory_warning tiw on tpo.partDrawingNo=tiw.partDrawingNo
+        LEFT JOIN t_factory_data tfd on tfd.factoryName=tiw.factoryName
+        LEFT JOIN t_user_factory tuf on tuf.factoryId=tfd.factoryCode
+        LEFT JOIN t_order_detail tod on tpo.documentNumber=tod.documentNumber
+        where  tpo.state!='2' and tpo.isShipment='1' and substring(tiw.inventoryDate,1,10)=#{inventoryDate}
+        and tod.deadline <![CDATA[ < ]]> DATE_FORMAT(NOW(), '%Y-%m-%d')
+        <if test="startDate != null and startDate != ''">
+            and tod.orderSubmitTime <![CDATA[ >= ]]> DATE_FORMAT(#{startDate}, '%Y-%m-%d %H:%i:%s')
+        </if>
+        <if test="endDate != null and endDate != ''">
+            and tod.orderSubmitTime <![CDATA[ < ]]> DATE_FORMAT(DATE_ADD(#{endDate}, INTERVAL 1 DAY), '%Y-%m-%d %H:%i:%s')
+        </if>
+        <if test="userId != null and userId != ''">
+            and tuf.userId=#{userId}
+        </if>
+    </select>
+
+    <!--根据订单日期时间段获取出货时间-->
+    <select id="getShipmentTime" resultType="java.util.Map">
+        select tpi.productCategoryCode,IFNULL(TRUNCATE(avg(tpo.shipmentTime),2),0) shipmentTime from t_part_order tpo
+        LEFT JOIN t_product_information tpi on tpo.productModel=tpi.productModel
+        LEFT JOIN t_order_detail tod on tpo.documentNumber=tod.documentNumber
+        where 1=1 and  tpo.state!='2'
+        and tod.deadline <![CDATA[ < ]]> DATE_FORMAT(NOW(), '%Y-%m-%d')
+        <if test="startDate != null and startDate != ''">
+            and tod.orderSubmitTime <![CDATA[ >= ]]> DATE_FORMAT(#{startDate}, '%Y-%m-%d %H:%i:%s')
+        </if>
+        <if test="endDate != null and endDate != ''">
+            and tod.orderSubmitTime <![CDATA[ < ]]> DATE_FORMAT(DATE_ADD(#{endDate}, INTERVAL 1 DAY), '%Y-%m-%d %H:%i:%s')
+        </if>
+        GROUP BY tpi.productCategoryCode
+    </select>
+
+    <!--根据品类获取所有的订单行数-->
+    <select id="getCountByDateByProductCategory" resultType="java.util.Map">
+        select count(1) total,tpi.productCategoryCode from t_part_order tpo
+        LEFT JOIN t_product_information tpi on tpo.productModel=tpi.productModel
+        LEFT JOIN t_order_detail tod on tpo.documentNumber=tod.documentNumber
+        where 1=1 and tpo.state!='2'
+        and tod.deadline <![CDATA[ < ]]> DATE_FORMAT(NOW(), '%Y-%m-%d')
+        <if test="startDate != null and startDate != ''">
+            and tod.orderSubmitTime <![CDATA[ >= ]]> DATE_FORMAT(#{startDate}, '%Y-%m-%d %H:%i:%s')
+        </if>
+        <if test="endDate != null and endDate != ''">
+            and tod.orderSubmitTime <![CDATA[ < ]]> DATE_FORMAT(DATE_ADD(#{endDate}, INTERVAL 1 DAY), '%Y-%m-%d %H:%i:%s')
+        </if>
+        GROUP BY tpi.productCategoryCode
+    </select>
+
+    <!--根据品类获取所有符合订单行数-->
+    <select id="countByOrderByProductCategory" resultType="java.util.Map">
+        select count(1) total,tpi.productCategoryCode from t_part_order tpo
+        LEFT JOIN t_product_information tpi on tpo.productModel=tpi.productModel
+        LEFT JOIN t_order_detail tod on tpo.documentNumber=tod.documentNumber
+        where 1=1 and tpo.state!='2' and tpo.isShipment='1'
+        and tod.deadline <![CDATA[ < ]]> DATE_FORMAT(NOW(), '%Y-%m-%d')
+        <if test="startDate != null and startDate != ''">
+            and tod.orderSubmitTime <![CDATA[ >= ]]> DATE_FORMAT(#{startDate}, '%Y-%m-%d %H:%i:%s')
+        </if>
+        <if test="endDate != null and endDate != ''">
+            and tod.orderSubmitTime <![CDATA[ < ]]> DATE_FORMAT(DATE_ADD(#{endDate}, INTERVAL 1 DAY), '%Y-%m-%d %H:%i:%s')
+        </if>
+        GROUP BY tpi.productCategoryCode
+    </select>
+
+    <!--获取时间段内的作业订单-->
+    <select id="getWorkOrder" resultType="java.lang.Integer">
+        SELECT count(*) from (
+        select 1 from t_order_detail tod
+        LEFT JOIN t_part_order tpo on tod.documentNumber=tpo.documentNumber
+        LEFT JOIN t_product_information tpi on tpo.productModel=tpi.productModel
+        LEFT JOIN t_inventory_warning tiw on tpo.partDrawingNo=tiw.partDrawingNo
+        where tod.orderType='作业订单' and substring(tiw.inventoryDate,1,10)=#{inventoryDate}
+        <if test="chartConditionDto.startDate != null and chartConditionDto.startDate != ''">
+            and tod.orderSubmitTime <![CDATA[ >= ]]> DATE_FORMAT(#{chartConditionDto.startDate}, '%Y-%m-%d %H:%i:%s')
+        </if>
+        <if test="chartConditionDto.endDate != null and chartConditionDto.endDate != ''">
+            and tod.orderSubmitTime <![CDATA[ < ]]> DATE_FORMAT(DATE_ADD(#{chartConditionDto.endDate}, INTERVAL 1 DAY), '%Y-%m-%d %H:%i:%s')
+        </if>
+        <if test="chartConditionDto.factoryName != null and chartConditionDto.factoryName != ''">
+            and tiw.factoryName =  #{chartConditionDto.factoryName}
+        </if>
+        <if test="chartConditionDto.productCategory != null and chartConditionDto.productCategory != ''">
+            and tpi.productCategoryCode = #{chartConditionDto.productCategory}
+        </if>
+        GROUP BY tod.documentNumber) list
+    </select>
+
+    <!--获取时间段内的备货订单-->
+    <select id="getGoodOrder" resultType="java.lang.Integer">
+        SELECT count(*) from (
+        select 1 from t_order_detail tod
+        LEFT JOIN t_part_order tpo on tod.documentNumber=tpo.documentNumber
+        LEFT JOIN t_product_information tpi on tpo.productModel=tpi.productModel
+        LEFT JOIN t_inventory_warning tiw on tpo.partDrawingNo=tiw.partDrawingNo
+        where tod.orderType='服务店备货订单' and substring(tiw.inventoryDate,1,10)=#{inventoryDate}
+        <if test="chartConditionDto.startDate != null and chartConditionDto.startDate != ''">
+            and tod.orderSubmitTime <![CDATA[ >= ]]> DATE_FORMAT(#{chartConditionDto.startDate}, '%Y-%m-%d %H:%i:%s')
+        </if>
+        <if test="chartConditionDto.endDate != null and chartConditionDto.endDate != ''">
+            and tod.orderSubmitTime <![CDATA[ < ]]> DATE_FORMAT(DATE_ADD(#{chartConditionDto.endDate}, INTERVAL 1 DAY), '%Y-%m-%d %H:%i:%s')
+        </if>
+        <if test="chartConditionDto.factoryName != null and chartConditionDto.factoryName != ''">
+            and tiw.factoryName =  #{chartConditionDto.factoryName}
+        </if>
+        <if test="chartConditionDto.productCategory != null and chartConditionDto.productCategory != ''">
+            and tpi.productCategoryCode = #{chartConditionDto.productCategory}
+        </if>
+        GROUP BY tod.documentNumber) list
+    </select>
+
+    <!--获取时间段内的缺件采购中订单-->
+    <select id="getMissOrder" resultType="java.lang.Integer">
+        SELECT count(*) from (
+        select 1 from t_order_detail tod
+        LEFT JOIN t_part_order tpo on tod.documentNumber=tpo.documentNumber
+        LEFT JOIN t_product_information tpi on tpo.productModel=tpi.productModel
+        LEFT JOIN t_inventory_warning tiw on tpo.partDrawingNo=tiw.partDrawingNo
+        where tod.documentNumber in (select associatedOrderNumber from t_miss_stock_up_order) and substring(tiw.inventoryDate,1,10)=#{inventoryDate}
+        <if test="chartConditionDto.startDate != null and chartConditionDto.startDate != ''">
+            and tod.orderSubmitTime <![CDATA[ >= ]]> DATE_FORMAT(#{chartConditionDto.startDate}, '%Y-%m-%d %H:%i:%s')
+        </if>
+        <if test="chartConditionDto.endDate != null and chartConditionDto.endDate != ''">
+            and tod.orderSubmitTime <![CDATA[ < ]]> DATE_FORMAT(DATE_ADD(#{chartConditionDto.endDate}, INTERVAL 1 DAY), '%Y-%m-%d %H:%i:%s')
+        </if>
+        <if test="chartConditionDto.factoryName != null and chartConditionDto.factoryName != ''">
+            and tiw.factoryName <![CDATA[ <= ]]> #{chartConditionDto.factoryName}
+        </if>
+        <if test="chartConditionDto.productCategory != null and chartConditionDto.productCategory != ''">
+            and tpi.productCategoryCode = #{chartConditionDto.productCategory}
+        </if>
+        GROUP BY tod.documentNumber) list
+    </select>
+
+    <select id="getMissOrderDetail" resultType="java.lang.Integer">
+        select count(*) from t_order_detail tod
+        LEFT JOIN t_part_order tpo on tod.documentNumber=tpo.documentNumber
+        LEFT JOIN t_miss_stock_up_order tmsuo on tmsuo.associatedOrderNumber =tpo.documentNumber and  tpo.partDrawingNo=tmsuo.partDrawingNo
+        where tmsuo.documentNo is not null
+        <if test="date != null and date != ''">
+            and substring(tod.orderSubmitTime,1,10) =  #{date}
+        </if>
+
+    </select>
+
+    <!--获取时间段内的已装箱订单-->
+    <select id="getPakageOrder" resultType="java.lang.Integer">
+        SELECT count(*) from (
+        select 1 from t_order_detail tod
+        LEFT JOIN t_part_order tpo on tod.documentNumber=tpo.documentNumber
+        LEFT JOIN t_product_information tpi on tpo.productModel=tpi.productModel
+        LEFT JOIN t_inventory_warning tiw on tpo.partDrawingNo=tiw.partDrawingNo
+        where tod.documentNumber in (select associatedOrderNumber from t_packing_list_detail) and substring(tiw.inventoryDate,1,10)=#{inventoryDate}
+        <if test="chartConditionDto.startDate != null and chartConditionDto.startDate != ''">
+            and tod.orderSubmitTime <![CDATA[ >= ]]> DATE_FORMAT(#{chartConditionDto.startDate}, '%Y-%m-%d %H:%i:%s')
+        </if>
+        <if test="chartConditionDto.endDate != null and chartConditionDto.endDate != ''">
+            and tod.orderSubmitTime <![CDATA[ < ]]> DATE_FORMAT(DATE_ADD(#{chartConditionDto.endDate}, INTERVAL 1 DAY), '%Y-%m-%d %H:%i:%s')
+        </if>
+        <if test="chartConditionDto.factoryName != null and chartConditionDto.factoryName != ''">
+            and tiw.factoryName =  #{chartConditionDto.factoryName}
+        </if>
+        <if test="chartConditionDto.productCategory != null and chartConditionDto.productCategory != ''">
+            and tpi.productCategoryCode = #{chartConditionDto.productCategory}
+        </if>
+        GROUP BY tod.documentNumber) list
+    </select>
+
+    <!--获取时间段内的已妥投订单-->
+    <select id="getAlreadyVoteOrder" resultType="java.lang.Integer">
+        SELECT count(*) from (
+        select 1 from t_order_detail tod
+        LEFT JOIN t_part_order tpo on tod.documentNumber=tpo.documentNumber
+        LEFT JOIN t_product_information tpi on tpo.productModel=tpi.productModel
+        LEFT JOIN t_inventory_warning tiw on tpo.partDrawingNo=tiw.partDrawingNo
+        where tod.documentNumber in (select associatedOrderNumber from t_receipt_detail) and substring(tiw.inventoryDate,1,10)=#{inventoryDate}
+        <if test="chartConditionDto.startDate != null and chartConditionDto.startDate != ''">
+            and tod.orderSubmitTime <![CDATA[ >= ]]> DATE_FORMAT(#{chartConditionDto.startDate}, '%Y-%m-%d %H:%i:%s')
+        </if>
+        <if test="chartConditionDto.endDate != null and chartConditionDto.endDate != ''">
+            and tod.orderSubmitTime <![CDATA[ < ]]> DATE_FORMAT(DATE_ADD(#{chartConditionDto.endDate}, INTERVAL 1 DAY), '%Y-%m-%d %H:%i:%s')
+        </if>
+        <if test="chartConditionDto.factoryName != null and chartConditionDto.factoryName != ''">
+            and tiw.factoryName =  #{chartConditionDto.factoryName}
+        </if>
+        <if test="chartConditionDto.productCategory != null and chartConditionDto.productCategory != ''">
+            and tpi.productCategoryCode = #{chartConditionDto.productCategory}
+        </if>
+        GROUP BY tod.documentNumber) list
+    </select>
+
+    <!--获取时间段内的待处理订单-->
+    <select id="getProcesseOrder" resultType="java.lang.Integer">
+        SELECT count(*) from (
+        select 1 from t_order_detail tod
+        LEFT JOIN t_part_order tpo on tod.documentNumber=tpo.documentNumber
+        LEFT JOIN t_product_information tpi on tpo.productModel=tpi.productModel
+        LEFT JOIN t_inventory_warning tiw on tpo.partDrawingNo=tiw.partDrawingNo
+        where tod.documentNumber not in (select associatedOrderNumber from t_miss_stock_up_order)
+        and tod.documentNumber not in (select associatedOrderNumber from t_receipt_detail)
+        and tod.documentNumber not in (select associatedOrderNumber from t_packing_list_detail)
+        and substring(tiw.inventoryDate,1,10)=#{inventoryDate}
+        <if test="chartConditionDto.startDate != null and chartConditionDto.startDate != ''">
+            and tod.orderSubmitTime <![CDATA[ >= ]]> DATE_FORMAT(#{chartConditionDto.startDate}, '%Y-%m-%d %H:%i:%s')
+        </if>
+        <if test="chartConditionDto.endDate != null and chartConditionDto.endDate != ''">
+            and tod.orderSubmitTime <![CDATA[ < ]]> DATE_FORMAT(DATE_ADD(#{chartConditionDto.endDate}, INTERVAL 1 DAY), '%Y-%m-%d %H:%i:%s')
+        </if>
+        <if test="chartConditionDto.factoryName != null and chartConditionDto.factoryName != ''">
+            and tiw.factoryName =  #{chartConditionDto.factoryName}
+        </if>
+        <if test="chartConditionDto.productCategory != null and chartConditionDto.productCategory != ''">
+            and tpi.productCategoryCode = #{chartConditionDto.productCategory}
+        </if>
+        GROUP BY tod.documentNumber) list
+    </select>
+
+    <!--获取时间段内的服务店备货订单缺件采购中订单-->
+    <select id="getGoodMissOrder" resultType="java.lang.Integer">
+        SELECT count(*) from (
+        select 1 from t_order_detail tod
+        LEFT JOIN t_part_order tpo on tod.documentNumber=tpo.documentNumber
+        LEFT JOIN t_product_information tpi on tpo.productModel=tpi.productModel
+        LEFT JOIN t_inventory_warning tiw on tpo.partDrawingNo=tiw.partDrawingNo
+        where tod.orderType='服务店备货订单' and  tod.documentNumber in (select associatedOrderNumber from t_miss_stock_up_order) and substring(tiw.inventoryDate,1,10)=#{inventoryDate}
+        <if test="chartConditionDto.startDate != null and chartConditionDto.startDate != ''">
+            and tod.orderSubmitTime <![CDATA[ >= ]]> DATE_FORMAT(#{chartConditionDto.startDate}, '%Y-%m-%d %H:%i:%s')
+        </if>
+        <if test="chartConditionDto.endDate != null and chartConditionDto.endDate != ''">
+            and tod.orderSubmitTime <![CDATA[ < ]]> DATE_FORMAT(DATE_ADD(#{chartConditionDto.endDate}, INTERVAL 1 DAY), '%Y-%m-%d %H:%i:%s')
+        </if>
+        <if test="chartConditionDto.factoryName != null and chartConditionDto.factoryName != ''">
+            and tiw.factoryName <![CDATA[ <= ]]> #{chartConditionDto.factoryName}
+        </if>
+        <if test="chartConditionDto.productCategory != null and chartConditionDto.productCategory != ''">
+            and tpi.productCategoryCode = #{chartConditionDto.productCategory}
+        </if>
+        GROUP BY tod.documentNumber) list
+    </select>
+
+    <!--获取时间段内的服务店作业订单缺件采购中订单-->
+    <select id="getWorkMissOrder" resultType="java.lang.Integer">
+        SELECT count(*) from (
+        select 1 from t_order_detail tod
+        LEFT JOIN t_part_order tpo on tod.documentNumber=tpo.documentNumber
+        LEFT JOIN t_product_information tpi on tpo.productModel=tpi.productModel
+        LEFT JOIN t_inventory_warning tiw on tpo.partDrawingNo=tiw.partDrawingNo
+        where tod.orderType='作业订单' and substring(tiw.inventoryDate,1,10)=#{inventoryDate} and tod.documentNumber in (select associatedOrderNumber from t_miss_stock_up_order)
+        <if test="chartConditionDto.startDate != null and chartConditionDto.startDate != ''">
+            and tod.orderSubmitTime <![CDATA[ >= ]]> DATE_FORMAT(#{chartConditionDto.startDate}, '%Y-%m-%d %H:%i:%s')
+        </if>
+        <if test="chartConditionDto.endDate != null and chartConditionDto.endDate != ''">
+            and tod.orderSubmitTime <![CDATA[ < ]]> DATE_FORMAT(DATE_ADD(#{chartConditionDto.endDate}, INTERVAL 1 DAY), '%Y-%m-%d %H:%i:%s')
+        </if>
+        <if test="chartConditionDto.factoryName != null and chartConditionDto.factoryName != ''">
+            and tiw.factoryName <![CDATA[ <= ]]> #{chartConditionDto.factoryName}
+        </if>
+        <if test="chartConditionDto.productCategory != null and chartConditionDto.productCategory != ''">
+            and tpi.productCategoryCode = #{chartConditionDto.productCategory}
+        </if>
+        GROUP BY tod.documentNumber) list
+    </select>
+
+    <!--根据出货历时天数获取订单行数-->
+    <select id="getOrderShipmentTime" resultType="java.lang.Integer">
+        select count(1) from t_part_order tpo
+        LEFT JOIN t_order_detail tod on tpo.documentNumber=tod.documentNumber
+        LEFT JOIN t_product_information tpi on tpo.productModel=tpi.productModel
+        LEFT JOIN t_inventory_warning tiw on tpo.partDrawingNo=tiw.partDrawingNo
+        where 1=1 and substring(tiw.inventoryDate,1,10)=#{inventoryDate}
+        <if test="days != null and days != '' and days=='1'.toString()">
+            and tpo.shipmentTime <![CDATA[<= ]]> 2
+        </if>
+        <if test="days != null and days != '' and days=='2'.toString()">
+            and tpo.shipmentTime <![CDATA[> ]]> 2 and tpo.shipmentTime <![CDATA[<= ]]> 4
+        </if>
+        <if test="days != null and days != '' and days=='3'.toString()">
+            and tpo.shipmentTime <![CDATA[> ]]> 4 and tpo.shipmentTime <![CDATA[<= ]]> 6
+        </if>
+        <if test="days != null and days != '' and days=='4'.toString()">
+            and tpo.shipmentTime > 6
+        </if>
+        <if test="chartConditionDto.startDate != null and chartConditionDto.startDate != ''">
+            and tod.orderSubmitTime <![CDATA[ >= ]]> DATE_FORMAT(#{chartConditionDto.startDate}, '%Y-%m-%d %H:%i:%s')
+        </if>
+        <if test="chartConditionDto.endDate != null and chartConditionDto.endDate != ''">
+            and tod.orderSubmitTime <![CDATA[ < ]]> DATE_FORMAT(DATE_ADD(#{chartConditionDto.endDate}, INTERVAL 1 DAY), '%Y-%m-%d %H:%i:%s')
+        </if>
+        <if test="chartConditionDto.factoryName != null and chartConditionDto.factoryName != ''">
+            and tiw.factoryName =  #{chartConditionDto.factoryName}
+        </if>
+        <if test="chartConditionDto.productCategory != null and chartConditionDto.productCategory != ''">
+            and tpi.productCategoryCode = #{chartConditionDto.productCategory}
+        </if>
+    </select>
+
+    <!--根据出货历时天数获取缺货订单行数-->
+    <select id="getMisOrderShipmentTime" resultType="java.lang.Integer">
+        select count(1) from t_part_order tpo
+        LEFT JOIN t_order_detail tod on tpo.documentNumber=tod.documentNumber
+        LEFT JOIN t_product_information tpi on tpo.productModel=tpi.productModel
+        LEFT JOIN t_inventory_warning tiw on tpo.partDrawingNo=tiw.partDrawingNo
+        where tod.documentNumber in (select associatedOrderNumber from t_miss_stock_up_order) and substring(tiw.inventoryDate,1,10)=#{inventoryDate}
+        <if test="days != null and days != '' and days=='1'.toString()">
+            and tpo.shipmentTime <![CDATA[<= ]]> 2
+        </if>
+        <if test="days != null and days != '' and days=='2'.toString()">
+            and tpo.shipmentTime <![CDATA[> ]]> 2 and tpo.shipmentTime <![CDATA[<= ]]> 4
+        </if>
+        <if test="days != null and days != '' and days=='3'.toString()">
+            and tpo.shipmentTime <![CDATA[> ]]> 4 and tpo.shipmentTime <![CDATA[<= ]]> 6
+        </if>
+        <if test="days != null and days != '' and days=='4'.toString()">
+            and tpo.shipmentTime > 6
+        </if>
+        <if test="chartConditionDto.startDate != null and chartConditionDto.startDate != ''">
+            and tod.orderSubmitTime <![CDATA[ >= ]]> DATE_FORMAT(#{chartConditionDto.startDate}, '%Y-%m-%d %H:%i:%s')
+        </if>
+        <if test="chartConditionDto.endDate != null and chartConditionDto.endDate != ''">
+            and tod.orderSubmitTime <![CDATA[ < ]]> DATE_FORMAT(DATE_ADD(#{chartConditionDto.endDate}, INTERVAL 1 DAY), '%Y-%m-%d %H:%i:%s')
+        </if>
+        <if test="chartConditionDto.factoryName != null and chartConditionDto.factoryName != ''">
+            and tiw.factoryName =  #{chartConditionDto.factoryName}
+        </if>
+        <if test="chartConditionDto.productCategory != null and chartConditionDto.productCategory != ''">
+            and tpi.productCategoryCode = #{chartConditionDto.productCategory}
+        </if>
+    </select>
+
+
+    <select id="getProductCategory" resultType="utry.data.modular.partsManagement.vo.ProductCategoryVo">
+        select tbear.productCategory,tbear.productCategoryCode,tbear.bear,orderTotal.asOrder,noComplete.noCom,timeOut.noTime,TRUNCATE(isShip.isShipNu/ship.shipNumber*100,2)  ship,TRUNCATE(comTime.comTime,0) comTime
+        from (select tpi.productCategory as productCategory,tpi.productCategoryCode,GROUP_CONCAT(distinct tha.RealName) AS bear from t_order_detail tod
+        LEFT JOIN t_part_order tpo on tod.documentNumber=tpo.documentNumber
+        LEFT JOIN t_product_information tpi on tpo.productModel=tpi.productModel
+        LEFT JOIN t_inventory_warning tiw on tpo.partDrawingNo=tiw.partDrawingNo
+        LEFT JOIN t_factory_data tfd on tfd.factoryName=tiw.factoryName
+        LEFT JOIN t_user_factory tuf on tuf.factoryId=tfd.factoryCode
+        LEFT JOIN hrm_db.t_hrm_accountinfo tha on tuf.userId=tha.AccountID
+        where 1=1 and tpo.state!='2' and substring(tiw.inventoryDate,1,10)=#{inventoryDate} and tpi.productCategory is not null
+        <if test="startDate != null and startDate != ''">
+            and tod.orderSubmitTime <![CDATA[ >= ]]> DATE_FORMAT(#{startDate}, '%Y-%m-%d %H:%i:%s')
+        </if>
+        <if test="endDate != null and endDate != ''">
+            and tod.orderSubmitTime <![CDATA[ < ]]> DATE_FORMAT(DATE_ADD(#{endDate}, INTERVAL 1 DAY), '%Y-%m-%d %H:%i:%s')
+        </if>
+        GROUP BY tpi.productCategory,tpi.productCategoryCode) tbear
+        LEFT JOIN (select count(1) asOrder,productCategory from (select tod.documentNumber,tpi.productCategory from t_part_order tpo
+        LEFT JOIN t_product_information tpi on tpo.productModel=tpi.productModel
+        LEFT JOIN t_order_detail tod on tpo.documentNumber=tod.documentNumber
+        where 1=1 and tpo.state!='2'
+        <if test="startDate != null and startDate != ''">
+            and tod.orderSubmitTime <![CDATA[ >= ]]> DATE_FORMAT(#{startDate}, '%Y-%m-%d %H:%i:%s')
+        </if>
+        <if test="endDate != null and endDate != ''">
+            and tod.orderSubmitTime <![CDATA[ < ]]> DATE_FORMAT(DATE_ADD(#{endDate}, INTERVAL 1 DAY), '%Y-%m-%d %H:%i:%s')
+        </if>
+        GROUP BY tpi.productCategory,tod.documentNumber) list GROUP BY productCategory) orderTotal on tbear.productCategory = orderTotal.productCategory
+        LEFT JOIN (select count(*) noCom,productCategory from (select tod.documentNumber,tpi.productCategory as productCategory  from t_part_order tpo
+        LEFT JOIN t_product_information tpi on tpo.productModel=tpi.productModel
+        LEFT JOIN t_order_detail tod on tpo.documentNumber=tod.documentNumber
+        where 1=1 and tpo.state='0'
+        <if test="startDate != null and startDate != ''">
+            and tod.orderSubmitTime <![CDATA[ >= ]]> DATE_FORMAT(#{startDate}, '%Y-%m-%d %H:%i:%s')
+        </if>
+        <if test="endDate != null and endDate != ''">
+            and tod.orderSubmitTime <![CDATA[ < ]]> DATE_FORMAT(DATE_ADD(#{endDate}, INTERVAL 1 DAY), '%Y-%m-%d %H:%i:%s')
+        </if>
+        GROUP BY tpi.productCategory) list GROUP BY productCategory) noComplete on tbear.productCategory=noComplete.productCategory
+        LEFT JOIN (select count(1) noTime,productCategory from (SELECT tpi.productCategory,tod.documentNumber FROM t_receipt tr
+        LEFT JOIN t_receipt_detail trd ON tr.documentNumber = trd.documentNumber
+        LEFT JOIN t_order_detail tod ON trd.associatedOrderNumber = tod.documentNumber
+        LEFT JOIN t_part_order tpo on tpo.documentNumber=trd.associatedOrderNumber and tpo.partDrawingNo=trd.partDrawingNo
+        LEFT JOIN t_product_information tpi ON tpo.productModel = tpi.productModel
+        WHERE
+        (tr.appropriateInvestTime IS NOT NULL OR tr.goodTime IS NOT NULL) AND TimeStampDiff(DAY,tr.deliveryTime,
+        IF (IF (tr.appropriateInvestTime IS NULL OR tr.appropriateInvestTime = '','3022-12-12 00:00:00',tr.appropriateInvestTime) >
+        IF (tr.goodTime IS NULL OR tr.goodTime = '','3022-12-12 00:00:00',tr.goodTime),substring(tr.goodTime, 1, 10),substring(tr.appropriateInvestTime,1,10))) >= 2
+        <if test="startDate != null and startDate != ''">
+            and tod.orderSubmitTime <![CDATA[ >= ]]> DATE_FORMAT(#{startDate}, '%Y-%m-%d %H:%i:%s')
+        </if>
+        <if test="endDate != null and endDate != ''">
+            and tod.orderSubmitTime <![CDATA[ < ]]> DATE_FORMAT(DATE_ADD(#{endDate}, INTERVAL 1 DAY), '%Y-%m-%d %H:%i:%s')
+        </if>
+        GROUP BY tpi.productCategory,tod.documentNumber
+        UNION
+        select tpi.productCategory,tod.documentNumber from t_part_order tpo
+        LEFT JOIN t_product_information tpi on tpo.productModel=tpi.productModel
+        LEFT JOIN t_order_detail tod on tpo.documentNumber=tod.documentNumber
+        where 1=1 and tpo.state!='2' and tpo.isShipment='0'
+        <if test="startDate != null and startDate != ''">
+            and tod.orderSubmitTime <![CDATA[ >= ]]> DATE_FORMAT(#{startDate}, '%Y-%m-%d %H:%i:%s')
+        </if>
+        <if test="endDate != null and endDate != ''">
+            and tod.orderSubmitTime <![CDATA[ < ]]> DATE_FORMAT(DATE_ADD(#{endDate}, INTERVAL 1 DAY), '%Y-%m-%d %H:%i:%s')
+        </if>
+        GROUP BY tpi.productCategoryCode,tod.documentNumber) list GROUP BY productCategory) timeOut on tbear.productCategory=timeOut.productCategory
+        LEFT JOIN(select count(1) shipNumber,productCategory from (select tod.documentNumber,tpi.productCategory from t_part_order tpo
+        LEFT JOIN t_product_information tpi on tpo.productModel=tpi.productModel
+        LEFT JOIN t_order_detail tod on tpo.documentNumber=tod.documentNumber
+        where 1=1 and tpo.state!='2'
+        and tod.deadline <![CDATA[ < ]]> DATE_FORMAT(NOW(), '%Y-%m-%d')
+        <if test="startDate != null and startDate != ''">
+            and tod.orderSubmitTime <![CDATA[ >= ]]> DATE_FORMAT(#{startDate}, '%Y-%m-%d %H:%i:%s')
+        </if>
+        <if test="endDate != null and endDate != ''">
+            and tod.orderSubmitTime <![CDATA[ < ]]> DATE_FORMAT(DATE_ADD(#{endDate}, INTERVAL 1 DAY), '%Y-%m-%d %H:%i:%s')
+        </if>
+        GROUP BY tpi.productCategory,tod.documentNumber) list GROUP BY productCategory) ship on tbear.productCategory=ship.productCategory
+        LEFT JOIN (select count(*) isShipNu,productCategory from (select tpi.productCategory,tod.documentNumber from t_part_order tpo
+        LEFT JOIN t_product_information tpi on tpo.productModel=tpi.productModel
+        LEFT JOIN t_order_detail tod on tpo.documentNumber=tod.documentNumber
+        where 1=1 and tpo.state!='2' and tpo.isShipment='1'
+       and tod.deadline <![CDATA[ < ]]> DATE_FORMAT(NOW(), '%Y-%m-%d')
+        <if test="startDate != null and startDate != ''">
+            and tod.orderSubmitTime <![CDATA[ >= ]]> DATE_FORMAT(#{startDate}, '%Y-%m-%d %H:%i:%s')
+        </if>
+        <if test="endDate != null and endDate != ''">
+            and tod.orderSubmitTime <![CDATA[ < ]]> DATE_FORMAT(DATE_ADD(#{endDate}, INTERVAL 1 DAY), '%Y-%m-%d %H:%i:%s')
+        </if>
+        GROUP BY tpi.productCategory,tod.documentNumber) list GROUP BY productCategory) isShip on tbear.productCategory=isShip.productCategory
+        LEFT JOIN (select tpi.productCategory as productCategory,avg(TimeStampDiff(DAY,tod.orderSubmitTime,
+        IF (IF (tr.appropriateInvestTime IS NULL OR tr.appropriateInvestTime = '','3022-12-12 00:00:00',tr.appropriateInvestTime) >
+        IF (tr.goodTime IS NULL OR tr.goodTime = '','3022-12-12 00:00:00',tr.goodTime),substring(tr.goodTime, 1, 10),substring(tr.appropriateInvestTime,1,10)))) as comTime from t_order_detail tod
+        LEFT JOIN t_part_order tpo on tod.documentNumber=tpo.documentNumber
+        LEFT JOIN t_receipt_detail trd on tpo.documentNumber=trd.associatedOrderNumber and tpo.partDrawingNo=trd.partDrawingNo
+        LEFT JOIN t_receipt tr ON tr.documentNumber = trd.documentNumber
+        LEFT JOIN t_product_information tpi on tpo.productModel=tpi.productModel
+        where
+        tr.appropriateInvestTime IS NOT NULL OR tr.goodTime IS NOT NULL
+        <if test="startDate != null and startDate != ''">
+            and tod.orderSubmitTime <![CDATA[ >= ]]> DATE_FORMAT(#{startDate}, '%Y-%m-%d %H:%i:%s')
+        </if>
+        <if test="endDate != null and endDate != ''">
+            and tod.orderSubmitTime <![CDATA[ < ]]> DATE_FORMAT(DATE_ADD(#{endDate}, INTERVAL 1 DAY), '%Y-%m-%d %H:%i:%s')
+        </if>
+        GROUP BY tpi.productCategory) comTime on tbear.productCategory=comTime.productCategory
+        where 1=1
+        <if test="productCategory != null and productCategory.type != '' and productCategory.type != null and productCategory.type=='0'.toString()">
+            and tbear.productCategory = #{productCategory.value}
+        </if>
+        <if test="productCategory != null and productCategory.type != '' and productCategory.type != null and productCategory.type=='1'.toString()">
+            and tbear.productCategory like concat('%',#{productCategory.value},'%')
+        </if>
+        <if test="productCategory != null and productCategory.type != '' and productCategory.type != null and productCategory.type=='2'.toString()">
+            and tbear.productCategory != #{productCategory.value}
+        </if>
+
+        <if test="bear != null and bear.type != '' and bear.type != null and bear.type=='0'.toString()">
+            and tbear.bear = #{bear.value}
+        </if>
+        <if test="bear != null and bear.type != '' and bear.type != null and bear.type=='1'.toString()">
+            and tbear.bear like concat('%',#{bear.value},'%')
+        </if>
+        <if test="bear != null and bear.type != '' and bear.type != null and bear.type=='2'.toString()">
+            and tbear.bear != #{bear.value}
+        </if>
+
+        <if test="asOrder != null and asOrder.type != '' and asOrder.type != null">
+            and orderTotal.asOrder ${asOrder.type} #{asOrder.value}
+        </if>
+        <if test="noCom != null and noCom.type != '' and noCom.type != null">
+            and noComplete.noCom ${noCom.type} #{noCom.value}
+        </if>
+        <if test="noTime != null and noTime.type != '' and noTime.type != null">
+            and timeOut.noTime ${noTime.type} #{noTime.value}
+        </if>
+
+        <if test="ship != null and ship.type != '' and ship.type != null and ship.type=='0'.toString()">
+            and TRUNCATE(isShip.isShipNu/ship.shipNumber,2)*100 = #{ship.value}
+        </if>
+        <if test="ship != null and ship.type != '' and ship.type != null and ship.type=='1'.toString()">
+            and TRUNCATE(isShip.isShipNu/ship.shipNumber,2)*100 like concat('%',#{ship.value},'%')
+        </if>
+        <if test="ship != null and ship.type != '' and ship.type != null and ship.type=='2'.toString()">
+            and TRUNCATE(isShip.isShipNu/ship.shipNumber,2)*100 != #{ship.value}
+        </if>
+
+        <if test="comTime != null and comTime.type != '' and comTime.type != null">
+            and TRUNCATE(comTime.comTime,2) ${comTime.type} #{comTime.value}
+        </if>
+
+        <if test="asOrder != null and asOrder.sort != null and asOrder.sort != ''">
+            order by orderTotal.asOrder ${asOrder.sort}
+        </if>
+        <if test="noCom != null and noCom.sort != null and noCom.sort != ''">
+            order by noComplete.noCom ${noCom.sort}
+        </if>
+        <if test="noTime != null and noTime.sort != null and noTime.sort != ''">
+            order by timeOut.noTime ${noTime.sort}
+        </if>
+        <if test="ship != null and ship.sort != null and ship.sort != ''">
+            order by TRUNCATE(isShip.isShipNu/ship.shipNumber*100,2) ${ship.sort}
+        </if>
+        <if test="comTime != null and comTime.sort != null and comTime.sort != ''">
+            order by TRUNCATE(comTime.comTime,2) ${comTime.sort}
+        </if>
+        <if test="asOrder.sort == '' and noCom.sort == '' and noTime.sort == '' and ship.sort == ''
+            and comTime.sort == '' ">
+            order by orderTotal.asOrder desc
+        </if>
+    </select>
+
+    <select id="selectPartDrawingNoNeedNumberByDate" resultMap="partDrawingNoNeedNumberBOResultMap">
+		SELECT
+		t1.warehouseCode,
+        t2.partDrawingNo AS partDrawingNo,
+        sum(IFNULL(t2.orderNumber,0)) - (IFNULL(t3.cancelNumber,0)) AS needNumber
+        FROM (
+            SELECT documentNumber, warehouseCode
+            FROM t_order_detail
+            WHERE orderStartTime BETWEEN DATE_FORMAT(#{date}, '%Y-%m-%d %H:%i:%s') AND DATE_FORMAT(DATE_ADD(#{date}, INTERVAL 1 DAY), '%Y-%m-%d %H:%i:%s')
+        ) t1
+        JOIN t_part_order t2 ON t1.documentNumber = t2.documentNumber
+        LEFT JOIN (
+            SELECT
+            partDrawingNo,
+            sum(cancelNumber) AS cancelNumber,
+            documentNumber
+            FROM
+            t_cancel_service_order_detail
+            GROUP BY partDrawingNo
+        ) t3 ON t2.partDrawingNo = t3.partDrawingNo AND t2.documentNumber = t3.documentNumber
+		GROUP BY t2.partDrawingNo
+    </select>
+
+    <select id="getNotShipment" resultType="java.lang.Integer">
+        select count(*) from t_order_detail tod
+        LEFT JOIN t_part_order tpo on tod.documentNumber=tpo.documentNumber
+        where tpo.isShipment='0'
+        <if test="date != null and date != ''">
+            and substring(tod.orderSubmitTime,1,10) =  #{date}
+        </if>
+
+    </select>
+
+    <!--获取N+1出货的单数-->
+    <select id="getIsShipment" resultType="java.lang.Integer">
+        select count(*) from t_order_detail tod
+        LEFT JOIN t_part_order tpo on tod.documentNumber=tpo.documentNumber
+        where tpo.isShipment='1'
+        <if test="date != null and date != ''">
+            and substring(tod.orderSubmitTime,1,10) =  #{date}
+        </if>
+
+    </select>
+
+    <select id="selectServiceStoreOrderCount" resultMap="serviceStoreOrderCountBOResultMap">
+        SELECT
+        t2.partDrawingNo,
+        COUNT(*) AS count
+        FROM (
+            SELECT
+            documentNumber
+            FROM t_order_detail
+            WHERE documentDate BETWEEN DATE_FORMAT(#{date}, '%Y-%m-%d %H:%i:%s') AND DATE_FORMAT(DATE_ADD(#{date}, INTERVAL 1 DAY), '%Y-%m-%d %H:%i:%s')
+        ) t1
+        JOIN t_part_order t2 ON t1.documentNumber = t2.documentNumber
+        GROUP BY t2.partDrawingNo
+    </select>
+
+    <!-- 根据时间查询服务店异常订单量 -->
+    <select id="selectServiceStoreOrderAbnormalCount" resultType="utry.data.modular.partsManagement.bo.ServiceStoreOrderAbnormalCountBO">
+        SELECT
+        t1.documentNumber,
+        t1.warehouseCode,
+        t2.partDrawingNo,
+        COUNT(*) AS count
+        FROM (
+            SELECT
+            documentNumber,
+            warehouseCode
+            FROM t_order_detail
+            WHERE documentDate BETWEEN DATE_FORMAT(#{date}, '%Y-%m-%d %H:%i:%s') AND DATE_FORMAT(DATE_ADD(#{date}, INTERVAL 1 DAY), '%Y-%m-%d %H:%i:%s')
+        ) t1
+        JOIN t_part_order t2 ON t1.documentNumber = t2.documentNumber
+        WHERE isShipment = '0'
+        GROUP BY t2.partDrawingNo,t1.documentNumber
+    </select>
+
+    <select id="selectPartDrawingNoNeedNumberOrderStartTimeByDate" resultType="utry.data.modular.partsManagement.bo.PartDrawingNoNeedNumberOrderStartTimeBO">
+        SELECT
+		t1.warehouseCode,
+		t1.orderStartTime,
+		t2.partDrawingNo AS partDrawingNo,
+		sum(IFNULL(t2.orderNumber,0)) - (IFNULL(t3.cancelNumber,0)) AS needNumber
+		FROM (
+            SELECT documentNumber, warehouseCode, DATE_FORMAT(orderStartTime, '%Y-%m-%d') AS orderStartTime
+            FROM t_order_detail
+            WHERE orderStartTime BETWEEN DATE_FORMAT(#{startDate}, '%Y-%m-%d %H:%i:%s') AND DATE_FORMAT(#{endDate}, '%Y-%m-%d %H:%i:%s')
+		) t1
+		JOIN t_part_order t2 ON t1.documentNumber = t2.documentNumber
+		LEFT JOIN (
+            SELECT
+            partDrawingNo,
+            sum(cancelNumber) AS cancelNumber,
+            documentNumber
+            FROM
+            t_cancel_service_order_detail
+            GROUP BY partDrawingNo
+		) t3 ON t2.partDrawingNo = t3.partDrawingNo AND t2.documentNumber = t3.documentNumber
+        GROUP BY t2.partDrawingNo,t1.warehouseCode,DATE_FORMAT(t1.orderStartTime, '%Y-%m-%d')
+        ORDER BY orderStartTime
+    </select>
+
+    <!--根据条件查询获取已完成订单详细数据-->
+    <select id="getCompleteListDetail" resultType="utry.data.modular.partsManagement.vo.OrderDetailVo">
+        select documentNumber,documentNo,partDrawingNo,bear,factoryName,storeName,exceptCompletionTime,goodQuantity,
+        documentDate,packingTime,deliveryTime,logisticsSingleNumber,appropriateInvestTime,
+        orderAfter,logisticsTime,shipmentTime,isNds2Abnormal,isShipAbnormal,currentState from (select DISTINCT(CONCAT(tod.documentNumber,'(',tod.orderType,')')) documentNumber,tod.documentNumber documentNo,tpo.partDrawingNo,GROUP_CONCAT(distinct tha.RealName) AS bear,GROUP_CONCAT(distinct tfd.factoryName) factoryName,CONCAT(tod.storeName,'(',tod.storeNumber,')') as storeName,tod.exceptCompletionTime,tod.goodQuantity,
+        substring(tod.documentDate,1,10) documentDate,tpl.loadingDate packingTime,tr.deliveryTime,tpl.billsLadingNo as logisticsSingleNumber,tr.appropriateInvestTime,
+        ROUND(AVG(coalesce(TIMESTAMPDIFF(DAY,substring(tod.orderSubmitTime,1,10),substring(IF(tr.goodTime is null,tmsuo.documentDate,tr.goodTime),1,10)),0)),0) AS orderAfter,
+        CASE WHEN (TimeStampDiff(DAY,substring(tr.deliveryTime,1,10),IF(tr.appropriateInvestTime is null and tr.goodTime is null,curdate(),IF(IF(tr.appropriateInvestTime is null or tr.appropriateInvestTime='','3022-12-12',tr.appropriateInvestTime)>
+        IF(tr.goodTime is null or tr.goodTime='','3022-12-12',tr.goodTime), substring(tr.goodTime,1,10), substring(tr.appropriateInvestTime,1,10))))  >   2)  THEN '0' ELSE '1' END AS isNds2Abnormal,
+        CASE WHEN MIN(tpo.isShipment)='0' THEN '0' ELSE '1' END AS isShipAbnormal,
+        CASE WHEN ROUND(AVG(coalesce(TIMESTAMPDIFF(HOUR,CONCAT(DATE_ADD(substring(tr.deliveryTime,1,10),INTERVAL 1 DAY),' 00:00:00'),tr.appropriateInvestTime))),0)<![CDATA[ < ]]>0 Then 24 else
+        ROUND(AVG(coalesce(TIMESTAMPDIFF(HOUR,CONCAT(DATE_ADD(substring(tr.deliveryTime,1,10),INTERVAL 1 DAY),' 00:00:00'),tr.appropriateInvestTime))),0) END AS logisticsTime,
+        ROUND(AVG(coalesce(tpo.shipmentTime,0)),0) as shipmentTime,
+        '5' as currentState
+        from t_order_detail tod
+        LEFT JOIN t_part_order tpo on tod.documentNumber=tpo.documentNumber
+        LEFT JOIN t_product_information tpi on tpo.productModel=tpi.productModel
+        LEFT JOIN t_inventory_warning tiw on tpo.partDrawingNo=tiw.partDrawingNo
+        LEFT JOIN t_factory_data tfd on tfd.factoryName=tiw.factoryName
+        LEFT JOIN t_user_factory tuf on tuf.factoryId=tfd.factoryCode
+        LEFT JOIN hrm_db.t_hrm_accountinfo tha on tuf.userId=tha.AccountID
+        LEFT JOIN t_receipt_detail trd on trd.associatedOrderNumber=tod.documentNumber and trd.partDrawingNo=tpo.partDrawingNo
+        LEFT JOIN t_receipt tr on tr.documentNumber=trd.documentNumber
+        LEFT JOIN t_packing_list_detail tpld on tpld.associatedOrderNumber=tod.documentNumber and tpld.partDrawingNo=tpo.partDrawingNo
+        LEFT JOIN t_packing_list tpl on tpld.packingListNo=tpl.packingListNo
+        left join t_miss_stock_up_order tmsuo on tod.documentNumber=tmsuo.associatedOrderNumber and tmsuo.partDrawingNo=tpo.partDrawingNo
+        where 1=1 and substring(tiw.inventoryDate,1,10)=#{inventoryDate}
+        and tod.documentNumber in(select documentNumber from t_order_detail where state='1')
+        <if test="startDate != null and startDate != ''">
+            and substring(tod.documentDate,1,10) <![CDATA[ >= ]]> #{startDate}
+        </if>
+        <if test="endDate != null and endDate != ''">
+            and substring(tod.documentDate,1,10)  <![CDATA[ <= ]]> #{endDate}
+        </if>
+        <if test="orderType != null and orderType != ''">
+            and tod.orderType=#{orderType}
+        </if>
+        <if test="productCategoryCode != null and productCategoryCode != ''">
+            and tpi.productCategoryCode=#{productCategoryCode}
+        </if>
+        <if test="partDrawingNos != null and partDrawingNos.size >0 ">
+            and tpo.partDrawingNo in
+            <foreach collection="partDrawingNos" index="index" item="id" open="(" separator="," close=")">
+                #{id}
+            </foreach>
+        </if>
+        GROUP BY tod.documentNumber) list
+        where 1=1
+        <if test="isNds2Abnormal != null and isNds2Abnormal != ''">
+            and isNds2Abnormal=#{isNds2Abnormal}
+        </if>
+        <if test="isShipAbnormal != null and isShipAbnormal != ''">
+            and isShipAbnormal=#{isShipAbnormal}
+        </if>
+        <if test="documentNumber != null and documentNumber.type != '' and documentNumber.type != null and documentNumber.type=='0'.toString()">
+            and documentNo = #{documentNumber.value}
+        </if>
+        <if test="documentNumber != null and documentNumber.type != '' and documentNumber.type != null and documentNumber.type=='1'.toString()">
+            and documentNumber like concat('%',#{documentNumber.value},'%')
+        </if>
+        <if test="documentNumber != null and documentNumber.type != '' and documentNumber.type != null and documentNumber.type=='2'.toString()">
+            and documentNo != #{documentNumber.value}
+        </if>
+
+        <if test="bear != null and bear.type != '' and bear.type != null and bear.type=='0'.toString()">
+            and bear = #{bear.value}
+        </if>
+        <if test="bear != null and bear.type != '' and bear.type != null and bear.type=='1'.toString()">
+            and bear like concat('%',#{bear.value},'%')
+        </if>
+        <if test="bear != null and bear.type != '' and bear.type != null and bear.type=='2'.toString()">
+            and bear != #{bear.value}
+        </if>
+
+        <if test="factoryName != null and factoryName.type != '' and factoryName.type != null and factoryName.type=='0'.toString()">
+            and factoryName = #{factoryName.value}
+        </if>
+        <if test="factoryName != null and factoryName.type != '' and factoryName.type != null and factoryName.type=='1'.toString()">
+            and factoryName like concat('%',#{factoryName.value},'%')
+        </if>
+        <if test="factoryName != null and factoryName.type != '' and factoryName.type != null and factoryName.type=='2'.toString()">
+            and factoryName != #{factoryName.value}
+        </if>
+
+        <if test="storeName != null and storeName.type != '' and storeName.type != null and storeName.type=='0'.toString()">
+            and storeName = #{storeName.value}
+        </if>
+        <if test="storeName != null and storeName.type != '' and storeName.type != null and storeName.type=='1'.toString()">
+            and storeName like concat('%',#{storeName.value},'%')
+        </if>
+        <if test="storeName != null and storeName.type != '' and storeName.type != null and storeName.type=='2'.toString()">
+            and storeName != #{storeName.value}
+        </if>
+
+        <if test="exceptCompletionTime != null and exceptCompletionTime.type != '' and exceptCompletionTime.type != null and exceptCompletionTime.type=='0'.toString()">
+            and exceptCompletionTime <![CDATA[ >= ]]> #{exceptCompletionTime.startDate} and exceptCompletionTime <![CDATA[ <= ]]> #{exceptCompletionTime.endDate}
+        </if>
+        <if test="exceptCompletionTime != null and exceptCompletionTime.type != '' and exceptCompletionTime.type != null and exceptCompletionTime.type != null and exceptCompletionTime.type=='1'.toString()">
+            and exceptCompletionTime <![CDATA[ < ]]> #{exceptCompletionTime.startDate}
+        </if>
+        <if test="exceptCompletionTime != null and exceptCompletionTime.type != '' and exceptCompletionTime.type != null and exceptCompletionTime.type != null and exceptCompletionTime.type=='2'.toString()">
+            and exceptCompletionTime <![CDATA[ > ]]> #{exceptCompletionTime.startDate}
+        </if>
+        <if test="exceptCompletionTime != null and exceptCompletionTime.type != '' and exceptCompletionTime.type != null and exceptCompletionTime.type=='3'.toString()">
+            and exceptCompletionTime = #{exceptCompletionTime.startDate}
+        </if>
+
+        <if test="documentDate != null and documentDate.type != '' and documentDate.type != null and documentDate.type=='0'.toString()">
+            and substring(documentDate,1,10) <![CDATA[ >= ]]> #{documentDate.startDate} and substring(documentDate,1,10) <![CDATA[ <= ]]> #{documentDate.endDate}
+        </if>
+        <if test="documentDate != null and documentDate.type != '' and documentDate.type != null and documentDate.type != null and documentDate.type=='1'.toString()">
+            and substring(documentDate,1,10) <![CDATA[ < ]]> #{documentDate.startDate}
+        </if>
+        <if test="documentDate != null and documentDate.type != '' and documentDate.type != null and documentDate.type != null and documentDate.type=='2'.toString()">
+            and substring(documentDate,1,10) <![CDATA[ > ]]> #{documentDate.startDate}
+        </if>
+        <if test="documentDate != null and documentDate.type != '' and documentDate.type != null and documentDate.type=='3'.toString()">
+            and substring(documentDate,1,10) = #{documentDate.startDate}
+        </if>
+
+        <if test="goodQuantity != null and goodQuantity.type != '' and goodQuantity.type != null">
+            and goodQuantity ${goodQuantity.type} #{goodQuantity.value}+0
+        </if>
+
+        <if test="orderAfter != null and orderAfter.type != '' and orderAfter.type != null">
+            and orderAfter ${orderAfter.type} #{orderAfter.value}+0
+        </if>
+
+        <if test="logisticsTime != null and logisticsTime.type != '' and logisticsTime.type != null">
+            and logisticsTime ${logisticsTime.type} #{logisticsTime.value}+0
+        </if>
+
+        <if test="shipmentTime != null and shipmentTime.type != '' and shipmentTime.type != null">
+            and shipmentTime ${shipmentTime.type} #{shipmentTime.value}+0
+        </if>
+
+        <if test="exceptGoodTime != null and exceptGoodTime.type != '' and exceptGoodTime.type != null and exceptGoodTime.type=='0'.toString()">
+            and exceptGoodTime <![CDATA[ >= ]]> #{exceptGoodTime.startDate} and exceptGoodTime <![CDATA[ <= ]]> #{exceptGoodTime.endDate}
+        </if>
+        <if test="exceptGoodTime != null and exceptGoodTime.type != '' and exceptGoodTime.type != null and exceptGoodTime.type != null and exceptGoodTime.type=='1'.toString()">
+            and exceptGoodTime <![CDATA[ < ]]> #{exceptGoodTime.startDate}
+        </if>
+        <if test="exceptGoodTime != null and exceptGoodTime.type != '' and exceptGoodTime.type != null and exceptGoodTime.type != null and exceptGoodTime.type=='2'.toString()">
+            and exceptGoodTime <![CDATA[ > ]]> #{exceptGoodTime.startDate}
+        </if>
+        <if test="exceptGoodTime != null and exceptGoodTime.type != '' and exceptGoodTime.type != null and exceptGoodTime.type=='3'.toString()">
+            and exceptGoodTime = #{exceptGoodTime.startDate}
+        </if>
+
+        <if test="deliverySchedule != null and deliverySchedule.type != '' and deliverySchedule.type != null and deliverySchedule.type=='0'.toString()">
+            and deliverySchedule = #{deliverySchedule.value}
+        </if>
+        <if test="deliverySchedule != null and deliverySchedule.type != '' and deliverySchedule.type != null and deliverySchedule.type=='1'.toString()">
+            and deliverySchedule like concat('%',#{deliverySchedule.value},'%')
+        </if>
+        <if test="deliverySchedule != null and deliverySchedule.type != '' and deliverySchedule.type != null and deliverySchedule.type=='2'.toString()">
+            and deliverySchedule != #{deliverySchedule.value}
+        </if>
+
+        <if test="purchaseOrderNumber != null and purchaseOrderNumber.type != '' and purchaseOrderNumber.type != null">
+            and purchaseOrderNumber ${purchaseOrderNumber.type} #{purchaseOrderNumber.value}+0
+        </if>
+
+        <if test="packingTime != null and packingTime.type != '' and packingTime.type != null and packingTime.type=='0'.toString()">
+            and packingTime <![CDATA[ >= ]]> #{packingTime.startDate} and packingTime <![CDATA[ <= ]]> #{packingTime.endDate}
+        </if>
+        <if test="packingTime != null and packingTime.type != '' and packingTime.type != null and packingTime.type != null and packingTime.type=='1'.toString()">
+            and packingTime <![CDATA[ < ]]> #{packingTime.startDate}
+        </if>
+        <if test="packingTime != null and packingTime.type != '' and packingTime.type != null and packingTime.type != null and packingTime.type=='2'.toString()">
+            and packingTime <![CDATA[ > ]]> #{packingTime.startDate}
+        </if>
+        <if test="packingTime != null and packingTime.type != '' and packingTime.type != null and packingTime.type=='3'.toString()">
+            and packingTime = #{packingTime.startDate}
+        </if>
+
+        <if test="deliveryTime != null and deliveryTime.type != '' and deliveryTime.type != null and deliveryTime.type=='0'.toString()">
+            and deliveryTime <![CDATA[ >= ]]> #{deliveryTime.startDate} and deliveryTime <![CDATA[ <= ]]> #{deliveryTime.endDate}
+        </if>
+        <if test="deliveryTime != null and deliveryTime.type != '' and deliveryTime.type != null and deliveryTime.type != null and exceptGoodTime.type=='1'.toString()">
+            and deliveryTime <![CDATA[ < ]]> #{deliveryTime.startDate}
+        </if>
+        <if test="deliveryTime != null and deliveryTime.type != '' and deliveryTime.type != null and deliveryTime.type != null and exceptCompletionTime.type=='2'.toString()">
+            and deliveryTime <![CDATA[ > ]]> #{deliveryTime.startDate}
+        </if>
+        <if test="deliveryTime != null and deliveryTime.type != '' and deliveryTime.type != null and deliveryTime.type=='3'.toString()">
+            and deliveryTime = #{deliveryTime.startDate}
+        </if>
+
+        <if test="logisticsSingleNumber != null and logisticsSingleNumber.type != '' and logisticsSingleNumber.type != null and logisticsSingleNumber.type=='0'.toString()">
+            and logisticsSingleNumber = #{logisticsSingleNumber.value}
+        </if>
+        <if test="logisticsSingleNumber != null and logisticsSingleNumber.type != '' and logisticsSingleNumber.type != null and logisticsSingleNumber.type=='1'.toString()">
+            and logisticsSingleNumber like concat('%',#{logisticsSingleNumber.value},'%')
+        </if>
+        <if test="logisticsSingleNumber != null and logisticsSingleNumber.type != '' and logisticsSingleNumber.type != null and logisticsSingleNumber.type=='2'.toString()">
+            and logisticsSingleNumber != #{logisticsSingleNumber.value}
+        </if>
+
+        <if test="appropriateInvestTime != null and appropriateInvestTime.type != '' and appropriateInvestTime.type != null and appropriateInvestTime.type=='0'.toString()">
+            and appropriateInvestTime <![CDATA[ >= ]]> #{appropriateInvestTime.startDate} and appropriateInvestTime <![CDATA[ <= ]]> #{appropriateInvestTime.endDate}
+        </if>
+        <if test="appropriateInvestTime != null and appropriateInvestTime.type != '' and appropriateInvestTime.type != null and appropriateInvestTime.type != null and appropriateInvestTime.type=='1'.toString()">
+            and appropriateInvestTime <![CDATA[ < ]]> #{appropriateInvestTime.startDate}
+        </if>
+        <if test="appropriateInvestTime != null and appropriateInvestTime.type != '' and appropriateInvestTime.type != null and appropriateInvestTime.type != null and appropriateInvestTime.type=='2'.toString()">
+            and appropriateInvestTime <![CDATA[ > ]]> #{appropriateInvestTime.startDate}
+        </if>
+        <if test="appropriateInvestTime != null and appropriateInvestTime.type != '' and appropriateInvestTime.type != null and appropriateInvestTime.type=='3'.toString()">
+            and appropriateInvestTime = #{appropriateInvestTime.startDate}
+        </if>
+
+        <if test="exceptCompletionTime != null and exceptCompletionTime.sort != null and exceptCompletionTime.sort != ''">
+            order by exceptCompletionTime ${exceptCompletionTime.sort}
+        </if>
+        <if test="documentDate != null and documentDate.sort != null and documentDate.sort != ''">
+            order by documentDate ${documentDate.sort}
+        </if>
+        <if test="goodQuantity != null and goodQuantity.sort != null and goodQuantity.sort != ''">
+            order by goodQuantity ${goodQuantity.sort}
+        </if>
+        <if test="orderAfter != null and orderAfter.sort != null and orderAfter.sort != ''">
+            order by orderAfter ${orderAfter.sort}
+        </if>
+        <if test="logisticsTime != null and logisticsTime.sort != null and logisticsTime.sort != ''">
+            order by logisticsTime ${logisticsTime.sort}
+        </if>
+        <if test="shipmentTime != null and shipmentTime.sort != null and shipmentTime.sort != ''">
+            order by shipmentTime ${shipmentTime.sort}
+        </if>
+        <if test="exceptGoodTime != null and exceptGoodTime.sort != null and exceptGoodTime.sort != ''">
+            order by exceptGoodTime ${exceptGoodTime.sort}
+        </if>
+        <if test="purchaseOrderNumber != null and purchaseOrderNumber.sort != null and purchaseOrderNumber.sort != ''">
+            order by purchaseOrderNumber ${purchaseOrderNumber.sort}
+        </if>
+        <if test="packingTime != null and packingTime.sort != null and packingTime.sort != ''">
+            order by packingTime ${packingTime.sort}
+        </if>
+        <if test="deliveryTime != null and deliveryTime.sort != null and deliveryTime.sort != ''">
+            order by deliveryTime ${deliveryTime.sort}
+        </if>
+        <if test="appropriateInvestTime != null and appropriateInvestTime.sort != null and appropriateInvestTime.sort != ''">
+            order by appropriateInvestTime ${appropriateInvestTime.sort}
+        </if>
+        <if test="exceptCompletionTime.sort == '' and documentDate.sort == '' and goodQuantity.sort == '' and orderAfter.sort == ''
+           and exceptGoodTime.sort == '' and purchaseOrderNumber.sort == '' and packingTime.sort == ''
+          and logisticsTime.sort == '' and shipmentTime.sort == '' and deliveryTime.sort == '' and appropriateInvestTime.sort == ''">
+            order by documentDate desc
+        </if>
+    </select>
+
+    <select id="getScreenProcess" resultType="utry.data.modular.partsManagement.vo.JobOrderVo">
+        select documentNumber as jobOrderNumber,storeName as serviceShopName,documentDate as statusChangeTime,'待处理' as currentState
+        from t_order_detail
+        where orderType='作业订单' and  documentDate <![CDATA[ >= ]]> #{startDate} and  documentDate <![CDATA[ <= ]]> #{endDate}
+    </select>
+
+    <select id="getScreenMis" resultType="utry.data.modular.partsManagement.vo.JobOrderVo">
+        select tod.documentNumber as jobOrderNumber,tod.storeName as serviceShopName,tmsuo.documentDate as statusChangeTime,'缺件采购中' as currentState
+        from t_miss_stock_up_order tmsuo
+                 LEFT JOIN t_part_order tpo on tmsuo.associatedOrderNumber=tpo.documentNumber and tmsuo.partDrawingNo=tpo.partDrawingNo
+                 LEFT JOIN t_order_detail tod on tpo.documentNumber=tod.documentNumber
+        where tod.orderType='作业订单' and  tmsuo.documentDate <![CDATA[ >= ]]> #{startDate} and  tmsuo.documentDate <![CDATA[ <= ]]> #{endDate}
+    </select>
+
+    <select id="getScreenPackage" resultType="utry.data.modular.partsManagement.vo.JobOrderVo">
+        select tod.documentNumber as jobOrderNumber,tod.storeName as serviceShopName,tpl.loadingDate as statusChangeTime,'已装箱' as currentState
+        from t_packing_list tpl
+         LEFT JOIN t_packing_list_detail tpld on tpl.packingListNo=tpld.packingListNo
+         LEFT JOIN t_part_order tpo on tpld.associatedOrderNumber=tpo.documentNumber and tpld.partDrawingNo=tpo.partDrawingNo
+         LEFT JOIN t_order_detail tod on tpo.documentNumber=tod.documentNumber
+        where tod.orderType='作业订单' and  tpl.loadingDate <![CDATA[ >= ]]> #{startDate} and  tpl.loadingDate <![CDATA[ <= ]]> #{endDate}
+    </select>
+
+    <select id="getScreenApprove" resultType="utry.data.modular.partsManagement.vo.JobOrderVo">
+        select tod.documentNumber as jobOrderNumber,tod.storeName as serviceShopName,tr.appropriateInvestTime as statusChangeTime,'已妥投' as currentState
+        from t_receipt tr
+        LEFT JOIN t_receipt_detail trd on tr.documentNumber=trd.documentNumber
+        LEFT JOIN t_part_order tpo on trd.associatedOrderNumber=tpo.documentNumber and trd.partDrawingNo=tpo.partDrawingNo
+        LEFT JOIN t_order_detail tod on tpo.documentNumber=tod.documentNumber
+        where tod.orderType='作业订单' and tr.systemState='待收货' and tr.appropriateInvestTime is not null and tr.appropriateInvestTime!=''
+          and  tr.appropriateInvestTime  <![CDATA[ >= ]]> #{startDate} and  tr.appropriateInvestTime <![CDATA[ <= ]]> #{endDate}
+    </select>
+
+    <select id="getScreenGood" resultType="utry.data.modular.partsManagement.vo.JobOrderVo">
+        select tod.documentNumber as jobOrderNumber,tod.storeName as serviceShopName,tr.goodTime as statusChangeTime,'已收货' as currentState
+        from t_receipt tr
+        LEFT JOIN t_receipt_detail trd on tr.documentNumber=trd.documentNumber
+        LEFT JOIN t_part_order tpo on trd.associatedOrderNumber=tpo.documentNumber and trd.partDrawingNo=tpo.partDrawingNo
+        LEFT JOIN t_order_detail tod on tpo.documentNumber=tod.documentNumber
+        where tod.orderType='作业订单' and tr.systemState='已收货' and  tr.goodTime <![CDATA[ >= ]]> #{startDate} and tr.goodTime <![CDATA[ <= ]]> #{endDate}
+    </select>
+
+    <select id="getNoDeadlineOrderBo" resultType="utry.data.modular.partsManagement.bo.NoDeadlineOrderBo">
+        select documentNumber,orderSubmitTime,orderType from t_order_detail where deadline is null
+    </select>
+    <select id="getWorkOrderTimeOutLine" resultType="java.lang.Integer">
+        select count(*) from t_order_detail tod
+        left join t_part_order tpo on tod.documentNumber=tpo.documentNumber
+        where tod.state='0' and tod.deadline <![CDATA[ < ]]> DATE_FORMAT(CURRENT_DATE, '%Y-%m-%d')
+        and tpo.state='0' and tpo.isShipment='0'
+    </select>
+
+<!--    根据品类查询工厂别部品出货即纳率-->
+    <select id="getFactoryShipmentBySort" resultType="utry.data.modular.partsManagement.vo.FactoryShipmentVo">
+        select ROUND(isShip.isTotal/total.allTotal*100,2) shipment,total.factoryName from (
+        select tfd.factoryName,count(1) allTotal from t_part_order tpo
+        LEFT JOIN t_inventory_warning tiw on tpo.partDrawingNo=tiw.partDrawingNo
+        LEFT JOIN t_factory_data tfd on tfd.factoryName=tiw.factoryName
+        LEFT JOIN t_user_factory tuf on tuf.factoryId=tfd.factoryCode
+        LEFT JOIN t_order_detail tod on tpo.documentNumber=tod.documentNumber
+        where 1=1 and tpo.state!='2' and substring(tiw.inventoryDate,1,10)=#{inventoryDate}
+        and tod.deadline <![CDATA[ < ]]> DATE_FORMAT(NOW(), '%Y-%m-%d')
+        <if test="startDate != null and startDate != ''">
+            and tod.orderSubmitTime <![CDATA[ >= ]]> DATE_FORMAT(#{startDate}, '%Y-%m-%d %H:%i:%s')
+        </if>
+        <if test="endDate != null and endDate != ''">
+            and tod.orderSubmitTime <![CDATA[ < ]]> DATE_FORMAT(DATE_ADD(#{endDate}, INTERVAL 1 DAY), '%Y-%m-%d %H:%i:%s')
+        </if>
+        GROUP BY tfd.factoryName) total LEFT JOIN (
+        select tfd.factoryName,count(1) isTotal from t_part_order tpo
+        LEFT JOIN t_inventory_warning tiw on tpo.partDrawingNo=tiw.partDrawingNo
+        LEFT JOIN t_factory_data tfd on tfd.factoryName=tiw.factoryName
+        LEFT JOIN t_user_factory tuf on tuf.factoryId=tfd.factoryCode
+        LEFT JOIN t_order_detail tod on tpo.documentNumber=tod.documentNumber
+        where 1=1 and tpo.state!='2' and tpo.isShipment='1' and substring(tiw.inventoryDate,1,10)=#{inventoryDate}
+        and tod.deadline <![CDATA[ < ]]> DATE_FORMAT(NOW(), '%Y-%m-%d')
+        <if test="startDate != null and startDate != ''">
+            and tod.orderSubmitTime <![CDATA[ >= ]]> DATE_FORMAT(#{startDate}, '%Y-%m-%d %H:%i:%s')
+        </if>
+        <if test="endDate != null and endDate != ''">
+            and tod.orderSubmitTime <![CDATA[ < ]]> DATE_FORMAT(DATE_ADD(#{endDate}, INTERVAL 1 DAY), '%Y-%m-%d %H:%i:%s')
+        </if>
+        GROUP BY tfd.factoryName) isShip on total.factoryName=isShip.factoryName where total.factoryName is not null and total.allTotal!=0
+        <if test="sort != null and sort != '' and sort=='0'.toString() ">
+            order by shipment asc
+        </if>
+        <if test="sort != null and sort != '' and sort=='1'.toString() ">
+            order by shipment desc
+        </if>
+    </select>
+
+    <!--部品出货即纳率曲线-->
+    <select id="shipmentCurve" resultType="utry.data.modular.partsManagement.vo.PhoneShipmentVo">
+        select ROUND(b.total/a.total*100,2) as shipment,a.date from (
+        select count(1) total,SUBSTRING(tod.orderSubmitTime,1,10) date from t_part_order tpo
+        LEFT JOIN t_inventory_warning tiw on tpo.partDrawingNo=tiw.partDrawingNo
+        LEFT JOIN t_factory_data tfd on tfd.factoryName=tiw.factoryName
+        LEFT JOIN t_user_factory tuf on tuf.factoryId=tfd.factoryCode
+        LEFT JOIN t_order_detail tod on tpo.documentNumber=tod.documentNumber
+        where  tpo.state!='2' and substring(tiw.inventoryDate,1,10)=#{inventoryDate}
+        and tod.deadline  <![CDATA[ < ]]>  DATE_FORMAT(NOW(), '%Y-%m-%d')
+        <if test="startDate != null and startDate != ''">
+            and tod.orderSubmitTime <![CDATA[ >= ]]> DATE_FORMAT(#{startDate}, '%Y-%m-%d %H:%i:%s')
+        </if>
+        <if test="endDate != null and endDate != ''">
+            and tod.orderSubmitTime <![CDATA[ < ]]> DATE_FORMAT(DATE_ADD(#{endDate}, INTERVAL 1 DAY), '%Y-%m-%d %H:%i:%s')
+        </if>
+        GROUP BY SUBSTRING(tod.orderSubmitTime,1,10)) a LEFT JOIN (
+        select count(1) total,SUBSTRING(tod.orderSubmitTime,1,10) date from t_part_order tpo
+        LEFT JOIN t_inventory_warning tiw on tpo.partDrawingNo=tiw.partDrawingNo
+        LEFT JOIN t_factory_data tfd on tfd.factoryName=tiw.factoryName
+        LEFT JOIN t_user_factory tuf on tuf.factoryId=tfd.factoryCode
+        LEFT JOIN t_order_detail tod on tpo.documentNumber=tod.documentNumber
+        where  tpo.state!='2' and tpo.isShipment='1'  and substring(tiw.inventoryDate,1,10)=#{inventoryDate}
+        and tod.deadline <![CDATA[ < ]]> DATE_FORMAT(NOW(), '%Y-%m-%d')
+        <if test="startDate != null and startDate != ''">
+            and tod.orderSubmitTime <![CDATA[ >= ]]> DATE_FORMAT(#{startDate}, '%Y-%m-%d %H:%i:%s')
+        </if>
+        <if test="endDate != null and endDate != ''">
+            and tod.orderSubmitTime <![CDATA[ < ]]> DATE_FORMAT(DATE_ADD(#{endDate}, INTERVAL 1 DAY), '%Y-%m-%d %H:%i:%s')
+        </if>
+        GROUP BY SUBSTRING(tod.orderSubmitTime,1,10)) b on a.date=b.date
+    </select>
+
+    <!--nds2曲线-->
+    <select id="nds2Curve" resultType="utry.data.modular.partsManagement.vo.Nds2CurveVo">
+        select ROUND(b.total/a.total*100,2) nds2,a.date from (
+        select count(*) total,substring(tr.deliveryTime,1,10) date from t_receipt tr
+        LEFT JOIN t_receipt_detail trd on tr.documentNumber=trd.documentNumber
+        LEFT JOIN t_inventory_warning tiw on trd.partDrawingNo=tiw.partDrawingNo
+        LEFT JOIN t_factory_data tfd on tfd.factoryName=tiw.factoryName
+        LEFT JOIN t_user_factory tuf on tuf.factoryId=tfd.factoryCode
+        where 1=1 and substring(tiw.inventoryDate,1,10)=#{inventoryDate}
+        and tr.documentNumber  not in (select documentNumber  from t_receipt
+        where appropriateInvestTime is null and goodTime is null
+        and substring(deliveryTime ,1,10) <![CDATA[ >= ]]> DATE_SUB(DATE_FORMAT(NOW(),'%Y-%m-%d'),INTERVAL 1 DAY)
+        and substring(deliveryTime ,1,10) <![CDATA[ <= ]]> DATE_FORMAT(NOW(),'%Y-%m-%d'))
+        <if test="startDate != null and startDate != ''">
+            and substring(tr.deliveryTime,1,10) <![CDATA[ >= ]]> #{startDate}
+        </if>
+        <if test="endDate != null and endDate != ''">
+            and substring(tr.deliveryTime,1,10) <![CDATA[ <= ]]> #{endDate}
+        </if>
+        GROUP BY substring(tr.deliveryTime,1,10)) a LEFT JOIN (
+        select count(*) total,substring(tr.deliveryTime,1,10) date from t_receipt tr
+        LEFT JOIN t_receipt_detail trd on tr.documentNumber=trd.documentNumber
+        LEFT JOIN t_inventory_warning tiw on trd.partDrawingNo=tiw.partDrawingNo
+        LEFT JOIN t_factory_data tfd on tfd.factoryName=tiw.factoryName
+        LEFT JOIN t_user_factory tuf on tuf.factoryId=tfd.factoryCode
+        where 1=1 and substring(tiw.inventoryDate,1,10)=#{inventoryDate}
+        <if test="startDate != null and startDate != ''">
+            and substring(tr.deliveryTime,1,10) <![CDATA[ >= ]]> #{startDate}
+        </if>
+        <if test="endDate != null and endDate != ''">
+            and substring(tr.deliveryTime,1,10) <![CDATA[ <= ]]> #{endDate}
+        </if>
+        and (tr.appropriateInvestTime is not null or tr.goodTime is not null)
+        and TimeStampDiff(DAY,tr.deliveryTime,IF(IF(tr.appropriateInvestTime is null or tr.appropriateInvestTime='','3022-12-12 00:00:00',tr.appropriateInvestTime)>
+        IF(tr.goodTime is null or tr.goodTime='','3022-12-12 00:00:00',tr.goodTime), substring(tr.goodTime,1,10), substring(tr.appropriateInvestTime,1,10)))  <![CDATA[ <= ]]>  2
+        GROUP BY substring(tr.deliveryTime,1,10)) b on a.date=b.date
+    </select>
+
+</mapper>

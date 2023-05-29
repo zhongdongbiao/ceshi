@@ -1,0 +1,319 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="utry.data.modular.partsManagement.dao.PartDrawingStockDao">
+    <!-- 开启二级缓存 -->
+    <cache eviction="LRU" flushInterval="300000" readOnly="true" size="1024"></cache>
+
+    <resultMap id="bearAmountBOResultMap" type="utry.data.modular.partsManagement.bo.BearAmountBO">
+        <result property="userId" column="userId" jdbcType="VARCHAR"/>
+        <result property="total" column="total" jdbcType="DECIMAL"/>
+    </resultMap>
+
+    <resultMap id="factoryBearAmountBOResultMap" type="utry.data.modular.partsManagement.bo.FactoryBearAmountBO">
+        <result property="total" column="total" jdbcType="DECIMAL"/>
+        <result property="factoryName" column="factory_name" jdbcType="VARCHAR"/>
+        <result property="factoryCode" column="factory_code" jdbcType="VARCHAR"/>
+    </resultMap>
+
+    <resultMap id="factoryUserIdAmountBOResultMap" type="utry.data.modular.partsManagement.bo.FactoryUserIdAmountBO">
+        <result property="factoryCode" column="factory_code" jdbcType="VARCHAR"/>
+        <result property="factoryName" column="factory_name" jdbcType="VARCHAR"/>
+        <result property="userId" column="user_id" jdbcType="VARCHAR"/>
+        <result property="factoryAmount" column="factory_amount" jdbcType="DECIMAL"/>
+    </resultMap>
+
+    <resultMap id="partDrawingCostPriceBOResultMap" type="utry.data.modular.partsManagement.bo.PartDrawingCostPriceBO">
+        <result property="warehouseCode" column="warehouse_code" jdbcType="VARCHAR"/>
+        <result property="factoryCode" column="factory_code" jdbcType="VARCHAR"/>
+        <result property="partDrawingNumber" column="part_drawing_number" jdbcType="VARCHAR"/>
+        <result property="partDrawingNo" column="part_drawing_no" jdbcType="VARCHAR"/>
+        <result property="costPrice" column="cost_price" jdbcType="DECIMAL"/>
+    </resultMap>
+
+    <resultMap id="factoryCountBOResultMap" type="utry.data.modular.partsManagement.bo.FactoryCountBO">
+        <result property="factoryCode" column="factory_code" jdbcType="VARCHAR"/>
+        <result property="factoryName" column="factory_name" jdbcType="VARCHAR"/>
+        <result property="realityNumber" column="reality_number" jdbcType="INTEGER"/>
+    </resultMap>
+
+    <resultMap id="factoryUserIdCountBOResultMap" type="utry.data.modular.partsManagement.bo.FactoryUserIdCountBO">
+        <result property="factoryCode" column="factory_code" jdbcType="VARCHAR"/>
+        <result property="factoryName" column="factory_name" jdbcType="VARCHAR"/>
+        <result property="userId" column="user_id" jdbcType="VARCHAR"/>
+        <result property="factoryCount" column="factory_count" jdbcType="INTEGER"/>
+    </resultMap>
+
+    <resultMap id="partDrawingNoAmountBOResultMap" type="utry.data.modular.partsManagement.bo.PartDrawingNoAmountBO">
+        <result property="partDrawingNo" column="part_drawing_no" jdbcType="VARCHAR"/>
+        <result property="amount" column="amount" jdbcType="DECIMAL"/>
+    </resultMap>
+
+    <resultMap id="partDrawingNoCountBOResultMap" type="utry.data.modular.partsManagement.bo.PartDrawingNoCountBO">
+        <result property="partDrawingNo" column="part_drawing_no" jdbcType="VARCHAR"/>
+        <result property="describedDrawingNo" column="described_drawing_no" jdbcType="VARCHAR"/>
+        <result property="partDrawingCount" column="part_drawing_count" jdbcType="INTEGER"/>
+    </resultMap>
+
+    <resultMap id="partDrawingCostPriceRangeTimeBOResultMap" type="utry.data.modular.partsManagement.bo.PartDrawingCostPriceRangeTimeBO">
+        <result property="warehouseCode" column="warehouse_code" jdbcType="VARCHAR"/>
+        <result property="partDrawingNumber" column="part_drawing_number" jdbcType="VARCHAR"/>
+        <result property="partDrawingNo" column="part_drawing_no" jdbcType="VARCHAR"/>
+        <result property="costPrice" column="cost_price" jdbcType="DECIMAL"/>
+    </resultMap>
+
+    <!-- 批量插入部品库存 -->
+    <insert id="insertBatch">
+        INSERT INTO t_part_drawing_stock
+        (id,
+        warehouse_code,
+        part_drawing_number,
+        location_number,
+        described_drawing_no,
+        open_number,
+        current_reception,
+        current_provide,
+        current_adjust,
+        reality_number,
+        distribution_number,
+        stockout_number,
+        cost_price,
+        cost_amount,
+        factory_code,
+        factory_name,
+        part_drawing_no,
+        create_time,
+        update_time)
+        VALUES
+        <foreach collection="partDrawingStockList" item="item" separator=",">
+            (#{item.id,jdbcType=CHAR},
+            #{item.warehouseCode,jdbcType=VARCHAR},
+            #{item.partDrawingNumber,jdbcType=VARCHAR},
+            #{item.locationNumber,jdbcType=VARCHAR},
+            #{item.describedDrawingNo,jdbcType=VARCHAR},
+            #{item.openNumber,jdbcType=INTEGER},
+            #{item.currentReception,jdbcType=INTEGER},
+            #{item.currentProvide,jdbcType=INTEGER},
+            #{item.currentAdjust,jdbcType=INTEGER},
+            #{item.realityNumber,jdbcType=INTEGER},
+            #{item.distributionNumber,jdbcType=INTEGER},
+            #{item.stockoutNumber,jdbcType=INTEGER},
+            #{item.costPrice,jdbcType=DECIMAL},
+            #{item.costAmount,jdbcType=DECIMAL},
+            #{item.factoryCode,jdbcType=VARCHAR},
+            #{item.factoryName,jdbcType=VARCHAR},
+            #{item.partDrawingNo,jdbcType=VARCHAR},
+            #{item.createTime},
+            #{item.updateTime}
+            )
+        </foreach>
+    </insert>
+
+    <!-- 查询担当别在库金额（仟元） -->
+    <select id="selectBearAmount" resultMap="bearAmountBOResultMap">
+        SELECT
+        sum(t1.cost_amount)/1000 AS total,
+        t2.userId AS userId
+        FROM t_part_drawing_stock t1
+        JOIN t_user_factory t2 ON t1.factory_code = t2.factoryId
+        WHERE t1.create_time BETWEEN #{startDate} AND #{endDate}
+        GROUP BY t2.userId
+    </select>
+
+    <!-- 根据查询条件查指定担当管理的各工厂在库金额（仟元） -->
+    <select id="selectFactoryBearAmountByQueryDTO" resultMap="factoryBearAmountBOResultMap">
+        SELECT
+        t1.cost_amount/1000 AS total,
+        t1.factory_name,
+        t1.factory_code
+        FROM t_part_drawing_stock t1
+        LEFT JOIN t_user_factory t2 ON t1.factory_code = t2.factoryId
+        <where>
+            t2.userId = #{factoryBearAmountQueryDTO.userId}
+            AND t1.create_time BETWEEN #{startDate} AND #{endDate}
+            <if test="factoryBearAmountQueryDTO.factoryName.value != null and factoryBearAmountQueryDTO.factoryName.value != ''">
+                <if test="factoryBearAmountQueryDTO.factoryName.type != null and factoryBearAmountQueryDTO.factoryName.type != ''">
+                    <if test="factoryBearAmountQueryDTO.factoryName.type == '0'.toString()">
+                        AND t1.factory_name = #{factoryBearAmountQueryDTO.factoryName.value}
+                    </if>
+                    <if test="factoryBearAmountQueryDTO.factoryName.type == '1'.toString()">
+                        AND t1.factory_name LIKE CONCAT(#{factoryBearAmountQueryDTO.factoryName.value}, '%')
+                    </if>
+                    <if test="factoryBearAmountQueryDTO.factoryName.type == '2'.toString()">
+                        AND t1.factory_name != #{factoryBearAmountQueryDTO.factoryName.value}
+                    </if>
+                </if>
+            </if>
+        </where>
+    </select>
+
+    <!-- 根据时间查询工厂-用户id-在库金额 -->
+    <select id="selectFactoryAmountByDate" resultMap="factoryUserIdAmountBOResultMap">
+        SELECT
+        t1.factory_code,
+        t1.factory_name,
+        t2.userId AS user_id,
+        sum(t1.cost_amount)/1000 AS factory_amount
+        FROM t_part_drawing_stock t1
+        JOIN t_user_factory t2 ON t1.factory_code = t2.factoryId
+        WHERE t1.create_time BETWEEN #{startDate} AND #{endDate}
+        GROUP BY factory_code
+    </select>
+
+    <!-- 查成本单价 part_drawing_no相同情况下，warehouse_code不同，单价也会不同 -->
+    <select id="selectCostPrice" resultMap="partDrawingCostPriceBOResultMap">
+        SELECT
+        warehouse_code,
+        factory_code,
+        part_drawing_number,
+        part_drawing_no,
+        cost_price
+        FROM t_part_drawing_stock
+        <where>
+            create_time BETWEEN #{startDate} AND #{endDate}
+            <if test="factoryCode != null and factoryCode != ''">
+                AND factory_code = #{factoryCode}
+            </if>
+        </where>
+        GROUP BY part_drawing_no, warehouse_code
+    </select>
+
+    <!-- 根据时间查询工厂别实际数量 -->
+    <select id="selectFactoryCountByDate" resultMap="factoryCountBOResultMap">
+        SELECT
+        factory_code,
+        factory_name,
+        sum(reality_number) AS reality_number
+        FROM t_part_drawing_stock
+        WHERE create_time BETWEEN #{startDate} AND #{endDate}
+        GROUP BY factory_code
+    </select>
+
+    <!-- 根据工厂名称、时间查询工厂-用户id-在库金额 -->
+    <select id="selectFactoryAmountByDateFactoryName" resultMap="factoryUserIdAmountBOResultMap">
+        SELECT
+        t1.factory_code,
+        t1.factory_name,
+        t2.userId AS user_id,
+        sum(t1.cost_amount)/1000 AS factory_amount
+        FROM t_part_drawing_stock t1
+        JOIN t_user_factory t2 ON t1.factory_code = t2.factoryId
+        <where>
+            t1.create_time BETWEEN #{startDate} AND #{endDate}
+            <if test="factoryNameCondition.value != null and factoryNameCondition.value != ''">
+                <if test="factoryNameCondition.type!= null and factoryNameCondition.type != ''">
+                    <if test="factoryNameCondition.type == '0'.toString()">
+                        AND t1.factory_name = #{factoryNameCondition.value}
+                    </if>
+                    <if test="factoryNameCondition.type == '1'.toString()">
+                        AND t1.factory_name LIKE CONCAT(#{factoryNameCondition.value}, '%')
+                    </if>
+                    <if test="factoryNameCondition.type == '2'.toString()">
+                        AND t1.factory_name != #{factoryNameCondition.value}
+                    </if>
+                </if>
+            </if>
+        </where>
+        GROUP BY factory_code
+    </select>
+
+    <!-- 根据工厂名称、时间查询工厂-用户id-在库数量 -->
+    <select id="selectFactoryCountByDateFactoryName" resultMap="factoryUserIdCountBOResultMap">
+        SELECT
+        t1.factory_code,
+        t1.factory_name,
+        t2.userId AS user_id,
+        sum(reality_number) AS factory_count
+        FROM t_part_drawing_stock t1
+        JOIN t_user_factory t2 ON t1.factory_code = t2.factoryId
+        <where>
+            t1.create_time BETWEEN #{startDate} AND #{endDate}
+            <if test="factoryNameCondition.value != null and factoryNameCondition.value != ''">
+                <if test="factoryNameCondition.type!= null and factoryNameCondition.type != ''">
+                    <if test="factoryNameCondition.type == '0'.toString()">
+                        AND t1.factory_name = #{factoryNameCondition.value}
+                    </if>
+                    <if test="factoryNameCondition.type == '1'.toString()">
+                        AND t1.factory_name LIKE CONCAT(#{factoryNameCondition.value}, '%')
+                    </if>
+                    <if test="factoryNameCondition.type == '2'.toString()">
+                        AND t1.factory_name != #{factoryNameCondition.value}
+                    </if>
+                </if>
+            </if>
+        </where>
+        GROUP BY factory_code
+    </select>
+
+    <!-- 根据部件图号、时间查询部件图号-在库金额（仟元） -->
+    <select id="selectPartDrawingNoAmountByDatePartDrawingNo" resultMap="partDrawingNoAmountBOResultMap">
+        SELECT
+        part_drawing_no,
+        sum(cost_amount)/1000 AS amount
+        FROM t_part_drawing_stock
+        <where>
+            create_time BETWEEN #{startDate} AND #{endDate}
+            AND factory_code = #{factoryCode}
+            <if test="partDrawingNoCondition.value != null and partDrawingNoCondition.value != ''">
+                <if test="partDrawingNoCondition.type!= null and partDrawingNoCondition.type != ''">
+                    <if test="partDrawingNoCondition.type == '0'.toString()">
+                        AND part_drawing_no = #{partDrawingNoCondition.value}
+                    </if>
+                    <if test="partDrawingNoCondition.type == '1'.toString()">
+                        AND part_drawing_no LIKE CONCAT(#{partDrawingNoCondition.value}, '%')
+                    </if>
+                    <if test="partDrawingNoCondition.type == '2'.toString()">
+                        AND part_drawing_no != #{partDrawingNoCondition.value}
+                    </if>
+                </if>
+            </if>
+        </where>
+        GROUP BY part_drawing_no
+    </select>
+
+    <!-- 根据部件图号、时间查询部件图号-图号描述-在库数量 -->
+    <select id="selectPartDrawingNoCountByDatePartDrawingNo" resultMap="partDrawingNoCountBOResultMap">
+        SELECT
+        part_drawing_no,
+        described_drawing_no,
+        sum(reality_number) AS part_drawing_count
+        FROM t_part_drawing_stock
+        <where>
+            create_time BETWEEN #{startDate} AND #{endDate}
+            AND factory_code = #{factoryCode}
+            <if test="partDrawingNoCondition.value != null and partDrawingNoCondition.value != ''">
+                <if test="partDrawingNoCondition.type!= null and partDrawingNoCondition.type != ''">
+                    <if test="partDrawingNoCondition.type == '0'.toString()">
+                        AND part_drawing_no = #{partDrawingNoCondition.value}
+                    </if>
+                    <if test="partDrawingNoCondition.type == '1'.toString()">
+                        AND part_drawing_no LIKE CONCAT(#{partDrawingNoCondition.value}, '%')
+                    </if>
+                    <if test="partDrawingNoCondition.type == '2'.toString()">
+                        AND part_drawing_no != #{partDrawingNoCondition.value}
+                    </if>
+                </if>
+            </if>
+        </where>
+        GROUP BY part_drawing_no
+    </select>
+
+    <!-- 查一天的单价 -->
+    <select id="selectPartDrawingCostPriceRangeTime" resultMap="partDrawingCostPriceRangeTimeBOResultMap">
+        SELECT
+        warehouse_code,
+        part_drawing_number,
+        part_drawing_no,
+        cost_price
+        FROM t_part_drawing_stock
+        WHERE create_time BETWEEN #{startDate} AND #{endDate}
+        GROUP BY part_drawing_no, warehouse_code
+    </select>
+
+    <!-- 查数量 -->
+    <select id="selectCountByDate" resultType="java.lang.Long">
+        SELECT sum(reality_number)
+        FROM t_part_drawing_stock
+        WHERE create_time BETWEEN #{startDate} AND #{endDate}
+    </select>
+</mapper>

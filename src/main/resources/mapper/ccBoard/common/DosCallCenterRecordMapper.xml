@@ -1,0 +1,1293 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//ibatis.apache.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="utry.data.modular.ccBoard.common.dao.DosCallCenterRecordDao">
+
+
+    <resultMap id="tenSecondRateTableVoResultMap" type="utry.data.modular.ccBoard.hotLineAgent.vo.TenSecondRateTableVo">
+        <result property="queueId" column="queue_id"/>
+        <result property="queueName" column="queue_name"/>
+        <result property="currentQueueNumber" column="current_queue_number"/>
+        <result property="accessNumber" column="access_number"/>
+        <result property="connectNumber" column="connect_number"/>
+        <result property="connectionRate" column="connection_rate"/>
+        <result property="tenSecondRate" column="ten_second_rate"/>
+        <result property="avgQueueAgent" column="avg_queue_agent"/>
+        <result property="avgCallInDuration" column="avg_call_in_duration"/>
+        <result property="avgCallOutDuration" column="avg_call_out_duration"/>
+        <result property="manHourUtilizationRate" column="man_hour_utilization_rate"/>
+        <result property="callManHourUtilizationRate" column="call_man_hour_utilization_rate"/>
+        <result property="checkInAgentNumber" column="check_in_agent_number"/>
+        <result property="freeAgentNumber" column="free_agent_number"/>
+        <result property="busyAgentNumber" column="busy_agent_number"/>
+    </resultMap>
+
+    <resultMap id="satisfactionVoResultMap" type="utry.data.modular.ccBoard.hotLineAgent.vo.SatisfactionVo">
+        <result property="dailySatisfaction" column="daily_satisfaction"/>
+        <result property="weeklySatisfaction" column="weekly_satisfaction"/>
+        <result property="monthlySatisfaction" column="monthly_satisfaction"/>
+    </resultMap>
+
+    <resultMap id="humanDataChartBoResultMap" type="utry.data.modular.ccBoard.hotLineAgent.bo.HumanDataChartBo">
+        <result property="time" column="time"/>
+        <result property="checkInAgentNumber" column="check_in_agent_number"/>
+        <result property="tenSecondRate" column="ten_second_rate"/>
+        <result property="accessNumber" column="access_number"/>
+    </resultMap>
+
+    <resultMap id="timeSlotOnlineWorkingHourTableVoResultMap" type="utry.data.modular.ccBoard.hotLineAgent.vo.TimeSlotOnlineWorkingHourTableVo">
+        <result property="agentName" column="agent_name"/>
+        <result property="agentId" column="agent_id"/>
+        <result property="accessNumber" column="access_number"/>
+        <result property="hourlyAccessNumber" column="hourly_access_number"/>
+        <result property="manHourUtilizationRate" column="man_hour_utilization_rate"/>
+    </resultMap>
+
+    <resultMap id="incomeStatisticChartBoResultMap" type="utry.data.modular.ccBoard.hotLineAgent.bo.IncomeStatisticChartBo">
+        <result property="time" column="time"/>
+        <result property="accessNumber" column="access_number"/>
+        <result property="connectNumber" column="connect_number"/>
+        <result property="connectionRate" column="connection_rate"/>
+    </resultMap>
+
+    <resultMap id="magnitudeDataChartBoResultMap" type="utry.data.modular.ccBoard.hotLineAgent.bo.MagnitudeDataChartBo">
+        <result property="time" column="time"/>
+        <result property="connectNumber" column="connect_number"/>
+        <result property="accessNumber" column="access_number"/>
+        <result property="tenSecondRate" column="ten_second_rate"/>
+    </resultMap>
+
+    <resultMap id="intervalCallDurationRingTimeHourlyCallNumberBoResultMap" type="utry.data.modular.ccBoard.hotLineAgent.bo.IntervalCallDurationRingTimeHourlyCallNumberBo">
+        <result property="time" column="time"/>
+        <result property="callDuration" column="call_duration"/>
+        <result property="ringTime" column="ring_time"/>
+        <result property="hourlyCallNumber" column="hourly_call_number"/>
+    </resultMap>
+
+    <resultMap id="agentManHourUtilizationRateTotalVoResultMap" type="utry.data.modular.ccBoard.hotLineAgent.vo.AgentManHourUtilizationRateTotalVo">
+        <result property="totalCPH" column="total_cph"/>
+        <result property="totalManHourUtilizationRate" column="total_man_hour_utilization_rate"/>
+    </resultMap>
+
+    <resultMap id="agentStateTableVoResultMap" type="utry.data.modular.ccBoard.hotLineAgent.vo.AgentStateTableVo">
+        <result property="agentName" column="agent_name"/>
+        <result property="agentId" column="agent_id"/>
+        <result property="connectNumber" column="connect_number"/>
+        <result property="hourlyConnectNumber" column="hourly_connect_number"/>
+        <result property="manHourUtilizationRate" column="man_hour_utilization_rate"/>
+        <result property="currentState" column="current_state"/>
+        <result property="currentStateStay" column="current_state_stay"/>
+        <result property="leisureCumulativeDuration" column="leisure_cumulative_duration"/>
+        <result property="restCumulativeDuration" column="rest_cumulative_duration"/>
+        <result property="afterCallCumulativeDuration" column="after_call_cumulative_duration"/>
+        <result property="busyCumulativeDuration" column="busy_cumulative_duration"/>
+    </resultMap>
+
+    <resultMap id="agentCallLogTableVoResultMap" type="utry.data.modular.ccBoard.common.vo.AgentCallLogTableVo">
+        <result property="id" column="id"/>
+        <result property="tenSecondRateFlag" column="ten_second_rate_flag"/>
+        <result property="queueId" column="queue_id"/>
+        <result property="queueName" column="queue_name"/>
+        <result property="agentName" column="agent_name"/>
+        <result property="agentId" column="agent_id"/>
+        <result property="source" column="source"/>
+        <result property="callType" column="call_type"/>
+        <result property="callState" column="call_state"/>
+        <result property="ringDuration" column="ring_duration"/>
+        <result property="callDuration" column="call_duration"/>
+        <result property="hangUpParty" column="hang_up_party"/>
+        <result property="callDateTime" column="call_date_time"/>
+        <result property="satisfaction" column="satisfaction"/>
+    </resultMap>
+
+    <resultMap id="agentIntervalCallDurationBoResultMap" type="utry.data.modular.ccBoard.hotLineAgent.bo.AgentIntervalCallDurationBo">
+        <result property="agentId" column="agent_id"/>
+        <result property="time" column="time"/>
+        <result property="callDuration" column="call_duration"/>
+    </resultMap>
+
+    <resultMap id="serviceOrderDetailAxisBoResultMap" type="utry.data.modular.ccBoard.hotLineAgent.bo.ServiceOrderDetailAxisBo">
+        <result property="callTime" column="call_time"/>
+        <result property="firstQueueStartTime" column="first_queue_start_time"/>
+        <result property="ringTime" column="ring_time"/>
+        <result property="answerTime" column="answer_time"/>
+        <result property="billingSeconds" column="billing_seconds"/>
+        <result property="agentHangupTime" column="agent_hangup_time"/>
+    </resultMap>
+
+    <resultMap id="dateValueChartVoResultMap" type="utry.data.modular.ccBoard.hotLineAgent.vo.DateValueChartVo">
+        <result property="date" column="date"/>
+        <result property="value" column="value"/>
+    </resultMap>
+
+    <resultMap id="HumanDataTableBoResultMap" type="utry.data.modular.ccBoard.hotLineAgent.bo.HumanDataTableBo">
+        <result property="time" column="time"/>
+        <result property="accessNumber" column="access_number"/>
+        <result property="connectionNumber" column="connection_number"/>
+        <result property="connectionRate" column="connection_rate"/>
+        <result property="tenSecondRate" column="ten_second_rate"/>
+    </resultMap>
+
+    <!-- 查询接入量 -->
+    <select id="selectAccessNumber" resultType="java.lang.Integer">
+        SELECT COUNT(*)
+        FROM dos_callcenter_record
+        <where>
+            <if test="startDate != null and startDate != '' and endDate != null and endDate != ''">
+                AND first_queue_start_time BETWEEN #{startDate} AND CONCAT(#{endDate}, ' 23:59:59')
+            </if>
+            <if test="queueId != null and queueId.size() > 0">
+                AND agent_from_queue IN
+                <foreach collection="queueId" open="(" close=")" item="qId" separator=",">
+                    #{qId}
+                </foreach>
+            </if>
+            AND call_type = 'in'
+        </where>
+    </select>
+
+    <!-- 查询坐席接起量 -->
+    <select id="selectConnectionNumber" resultType="java.lang.Integer">
+        SELECT COUNT(*)
+        FROM dos_callcenter_record
+        <where>
+            <if test="startDate != null and startDate != '' and endDate != null and endDate != ''">
+                AND first_queue_start_time BETWEEN #{startDate} AND CONCAT(#{endDate}, ' 23:59:59')
+            </if>
+            <if test="queueId != null and queueId.size() > 0">
+                AND agent_from_queue IN
+                <foreach collection="queueId" open="(" close=")" item="qId" separator=",">
+                    #{qId}
+                </foreach>
+            </if>
+            AND call_status = 1 AND call_type = 'in'
+        </where>
+    </select>
+
+    <!--获取电话呼出量-->
+    <select id="getCallOutNumber" resultType="java.lang.Integer">
+        SELECT count(*) FROM `dos_callcenter_record` where call_type='out'
+        <if test="dateDurationQueueIdDto.startDate != null and dateDurationQueueIdDto.startDate != ''">
+            and substring(call_time,1,10) <![CDATA[ >= ]]> #{dateDurationQueueIdDto.startDate}
+        </if>
+        <if test="dateDurationQueueIdDto.endDate != null and dateDurationQueueIdDto.endDate != ''">
+            and substring(call_time,1,10)  <![CDATA[ <= ]]> #{dateDurationQueueIdDto.endDate}
+        </if>
+        <if test="callStatus != null and callStatus != ''">
+            and call_status = #{callStatus}
+        </if>
+        <if test="dateDurationQueueIdDto.queueId != null and dateDurationQueueIdDto.queueId.size >0 ">
+            and agent_from_queue  in
+            <foreach collection="dateDurationQueueIdDto.queueId" item="model" open="(" close=")" separator=",">
+                #{model}
+            </foreach>
+        </if>
+    </select>
+
+    <!--通话记录数据-->
+    <select id="getCallRecordDetail" resultType="utry.data.modular.ccBoard.visit.vo.CallRecordDetail">
+        SELECT record_file as recordFileName,account_code as accountCode,agent_number as number,date_format(call_time,'%Y-%m-%d %H:%i:%s') callTime,
+        CASE WHEN comment = '-1' THEN '客户未输入'
+        WHEN comment = '1' THEN '满意'
+        WHEN comment = '2' THEN '基本满意'
+        WHEN comment = '3' THEN '客服人员服务态度不满意'
+        WHEN comment = '4' THEN '解决方案不满意'
+        WHEN comment = '5' THEN '产品品质不满意'
+        ELSE '未转满意度评价'
+        END as customerEvaluation
+        FROM `dos_callcenter_record` where 1=1
+        <if test="dateDurationQueueIdDto.startDate != null and dateDurationQueueIdDto.startDate != ''">
+            and call_time <![CDATA[ >= ]]> #{dateDurationQueueIdDto.startDate}
+        </if>
+        <if test="dateDurationQueueIdDto.endDate != null and dateDurationQueueIdDto.endDate != ''">
+            and call_time  <![CDATA[ <= ]]> #{dateDurationQueueIdDto.endDate}
+        </if>
+        <if test="dateDurationQueueIdDto.queueId != null and dateDurationQueueIdDto.queueId.size >0 ">
+            and agent_from_queue  in
+            <foreach collection="dateDurationQueueIdDto.queueId" item="model" open="(" close=")" separator=",">
+                #{model}
+            </foreach>
+        </if>
+    </select>
+    <!-- 查询10s内坐席接起量（接通，呼入） -->
+    <select id="selectTenSecondConnectionNumber" resultType="java.lang.Integer">
+        SELECT COUNT(*)
+        FROM dos_callcenter_record
+        <where>
+            first_queue_start_time BETWEEN #{startDate} AND CONCAT(#{endDate}, ' 23:59:59')
+            <if test="queueId != null and queueId.size() > 0">
+                AND agent_from_queue IN
+                <foreach collection="queueId" open="(" close=")" item="qId" separator=",">
+                    #{qId}
+                </foreach>
+            </if>
+            AND call_status = 1 AND call_type = 'in'
+            AND request_agent_wait_time &lt;= 10
+        </where>
+    </select>
+
+    <!-- 查询ACD排队时间（呼入但不一定接通） -->
+    <select id="selectAcdQueueTime" resultType="java.lang.Integer">
+        SELECT SUM(request_agent_wait_time)
+        FROM dos_callcenter_record
+        <where>
+            first_queue_start_time BETWEEN #{startDate} AND CONCAT(#{endDate}, ' 23:59:59')
+            <if test="queueId != null and queueId.size() > 0">
+                AND agent_from_queue IN
+                <foreach collection="queueId" open="(" close=")" item="qId" separator=",">
+                    #{qId}
+                </foreach>
+            </if>
+            AND call_type = 'in'
+        </where>
+    </select>
+
+    <!-- 查询通话时间（接通，呼入） -->
+    <select id="selectTalkTime" resultType="java.lang.Integer">
+        SELECT SUM(billing_seconds)
+        FROM dos_callcenter_record
+        <where>
+            first_queue_start_time BETWEEN #{startDate} AND CONCAT(#{endDate}, ' 23:59:59')
+            <if test="queueId != null and queueId.size() > 0">
+                AND agent_from_queue IN
+                <foreach collection="queueId" open="(" close=")" item="qId" separator=",">
+                    #{qId}
+                </foreach>
+            </if>
+            AND call_status = 1 AND call_type = 'in'
+        </where>
+    </select>
+
+    <!-- 查询10s接通率表格 -->
+    <select id="selectTenSecondRateTable" resultMap="tenSecondRateTableVoResultMap">
+        SELECT
+            queue_id,
+            IFNULL(current_queue_number, 0) AS current_queue_number,
+            IFNULL(access_number, 0) AS access_number,
+            IFNULL(connect_number, 0) AS connect_number,
+            IFNULL(ROUND((IFNULL(connect_number, 0) / IFNULL(access_number, 0)) * 100, 2), 0) AS connection_rate,
+            IFNULL(ROUND((IFNULL(ten_second_connection_number, 0) / IFNULL(access_number, 0)) * 100, 2), 0) AS ten_second_rate,
+            avg_queue_agent,
+            IFNULL(ROUND((IFNULL(call_in_duration, 0) / IFNULL(connect_number, 0)), 0), 0) AS avg_call_in_duration,
+            IFNULL(ROUND(((IFNULL(call_in_duration, 0) + IFNULL(ring_in_time, 0) + IFNULL(call_out_duration, 0) + IFNULL(ring_out_time, 0) + IFNULL(working_duration, 0)) / IFNULL(login_duration, 0)) * 100, 2), 0) AS man_hour_utilization_rate,
+            IFNULL(ROUND(((IFNULL(call_in_duration, 0) + IFNULL(call_out_duration, 0)) / IFNULL(login_duration, 0)) * 100, 2), 0) AS call_man_hour_utilization_rate,
+            IFNULL(check_in_agent_number, 0) AS check_in_agent_number,
+            IFNULL(free_agent_number, 0) AS free_agent_number,
+            IFNULL(busy_agent_number, 0) AS busy_agent_number
+        FROM (
+            SELECT
+                t1.queue_id,
+                current_queue_number,
+                access_number,
+                connect_number,
+                ten_second_connection_number,
+                avg_queue_agent,
+                call_in_duration,
+                ring_in_time,
+                call_out_duration,
+                ring_out_time,
+                check_in_agent_number,
+                free_agent_number,
+                busy_agent_number,
+                working_duration,
+                login_duration
+            FROM (
+                SELECT
+                    queue AS queue_id,
+                    SUM(CASE WHEN duration IS NULL THEN TIMESTAMPDIFF(SECOND, start_time, NOW()) ELSE duration END) AS login_duration,
+                    CASE
+                    WHEN queue IN (4000,4100,4200,4300) THEN IFNULL(ROUND((IFNULL(SUM(duration), 0) / 3600 / 14), 2), '0.00')
+                    WHEN queue IN (4500,4600,4700,4800) THEN IFNULL(ROUND((IFNULL(SUM(duration), 0) / 3600 / 12), 2), '0.00')
+                    END AS avg_queue_agent
+                FROM dos_callcenter_check_stats
+                WHERE start_time BETWEEN #{dto.startDate} AND CONCAT(#{dto.endDate}, ' 23:59:59')
+                AND queue IN
+                <foreach collection="dto.queueId" open="(" close=")" item="qId" separator=",">
+                    #{qId}
+                </foreach>
+                GROUP BY queue
+            ) t1
+            LEFT JOIN (
+                SELECT
+                    agent_from_queue AS queue_id,
+                    COUNT(*) AS access_number,
+                    SUM(
+                    CASE WHEN call_status = 1
+                    THEN 1 ELSE 0
+                    END
+                    ) AS connect_number,
+                    SUM(
+                    CASE WHEN request_agent_wait_time &lt;= 10 AND call_type = 'in'
+                    THEN 1 ELSE 0
+                    END
+                    ) AS ten_second_connection_number,
+                    SUM(billing_seconds) AS call_in_duration,
+                    SUM(ring_time) AS ring_in_time
+                FROM dos_callcenter_record
+                WHERE first_queue_start_time BETWEEN #{dto.startDate} AND CONCAT(#{dto.endDate}, ' 23:59:59') AND call_type = 'in'
+                AND agent_from_queue IN
+                <foreach collection="dto.queueId" open="(" close=")" item="qId" separator=",">
+                    #{qId}
+                </foreach>
+                GROUP BY agent_from_queue
+            ) t2 ON t1.queue_id = t2.queue_id
+            LEFT JOIN (
+                SELECT
+                    queue AS queue_id,
+                    SUM(CASE WHEN operation_type IN
+                    <foreach collection="statusList" open="(" close=")" item="status" separator=",">
+                        #{status}
+                    </foreach>
+                    THEN duration ELSE 0 END) AS working_duration
+                FROM dos_callcenter_dnd_stats
+                WHERE start_time BETWEEN #{dto.startDate} AND CONCAT(#{dto.endDate}, ' 23:59:59')
+                AND queue IN
+                <foreach collection="dto.queueId" open="(" close=")" item="qId" separator=",">
+                    #{qId}
+                </foreach>
+                GROUP BY queue
+            ) t3 ON t1.queue_id = t3.queue_id
+            LEFT JOIN (
+                SELECT
+                    queue_number AS queue_id,
+                    current_wait_number AS current_queue_number,
+                    check_in_agents AS check_in_agent_number,
+                    free_agents AS free_agent_number,
+                    busy_agents AS busy_agent_number
+                FROM dos_callcenter_queue_monitor
+                WHERE `time` = (SELECT MAX(`time`) FROM dos_callcenter_queue_monitor)
+                AND queue_number IN
+                <foreach collection="dto.queueId" open="(" close=")" item="qId" separator=",">
+                    #{qId}
+                </foreach>
+            ) t4 ON t1.queue_id = t4.queue_id
+            LEFT JOIN (
+                SELECT
+                    agent_from_queue AS queue_id,
+                    SUM(billing_seconds) AS call_out_duration,
+                    SUM(ring_time) AS ring_out_time
+                FROM dos_callcenter_record
+                WHERE call_time BETWEEN #{dto.startDate} AND CONCAT(#{dto.endDate}, ' 23:59:59') AND call_type = 'out'
+                AND agent_from_queue IN
+                <foreach collection="dto.queueId" open="(" close=")" item="qId" separator=",">
+                    #{qId}
+                </foreach>
+                GROUP BY agent_from_queue
+            ) t5 ON t1.queue_id = t5.queue_id
+        ) tb
+        ORDER BY queue_id
+    </select>
+
+    <!-- 呼入查询日周月满意度百分比 -->
+    <select id="selectCallInDailyWeeklyMonthlySatisfaction" resultMap="satisfactionVoResultMap">
+        SELECT
+            IFNULL(ROUND((IFNULL(daily_satisfaction_count, 0) / IFNULL(daily_evaluation_count, 0)) * 100, 2), 0) AS daily_satisfaction,
+            IFNULL(ROUND((IFNULL(weekly_satisfaction_count, 0) / IFNULL(weekly_evaluation_count, 0)) * 100, 2), 0) AS weekly_satisfaction,
+            IFNULL(ROUND((IFNULL(monthly_satisfaction_count, 0) / IFNULL(monthly_evaluation_count, 0)) * 100, 2), 0) AS monthly_satisfaction
+        FROM (
+            SELECT
+                COUNT(
+                    CASE
+                    WHEN first_queue_start_time BETWEEN #{date} AND CONCAT(#{date}, ' 23:59:59') AND `comment` IN (1,2)
+                    THEN 1 ELSE NULL END
+                ) AS daily_satisfaction_count,
+                COUNT(
+                    CASE
+                    WHEN first_queue_start_time BETWEEN #{date} AND CONCAT(#{date}, ' 23:59:59') AND `comment` IN (1,2,3,4,5)
+                    THEN 1 ELSE NULL END
+                ) AS daily_evaluation_count,
+                COUNT(
+                    CASE
+                    WHEN first_queue_start_time BETWEEN DATE_SUB(#{date}, INTERVAL WEEKDAY(#{date}) DAY) AND CONCAT(DATE_SUB(#{date}, INTERVAL WEEKDAY(#{date}) - 6 DAY), ' 23:59:59') AND `comment` IN (1,2)
+                    THEN 1 ELSE NULL END
+                ) AS weekly_satisfaction_count,
+                COUNT(
+                    CASE
+                    WHEN first_queue_start_time BETWEEN DATE_SUB(#{date}, INTERVAL WEEKDAY(#{date}) DAY) AND CONCAT(DATE_SUB(#{date}, INTERVAL WEEKDAY(#{date}) - 6 DAY), ' 23:59:59') AND `comment` IN (1,2,3,4,5)
+                    THEN 1 ELSE NULL END
+                ) AS weekly_evaluation_count,
+                COUNT(
+                    CASE
+                    WHEN first_queue_start_time BETWEEN DATE_SUB(#{date}, INTERVAL (DAYOFMONTH(#{date}) - 1) DAY) AND CONCAT(LAST_DAY(#{date}), ' 23:59:59') AND `comment` IN (1,2)
+                    THEN 1 ELSE NULL END
+                ) AS monthly_satisfaction_count,
+                COUNT(
+                    CASE
+                    WHEN first_queue_start_time BETWEEN DATE_SUB(#{date}, INTERVAL (DAYOFMONTH(#{date}) - 1) DAY) AND CONCAT(LAST_DAY(#{date}), ' 23:59:59') AND `comment` IN (1,2,3,4,5)
+                    THEN 1 ELSE NULL END
+                ) AS monthly_evaluation_count
+            FROM dos_callcenter_record
+            WHERE agent_from_queue IN
+            <foreach collection="queueId" open="(" close=")" item="qId" separator=",">
+                #{qId}
+            </foreach>
+        ) t1
+    </select>
+
+    <!-- 查询呼出日周月满意度百分比 -->
+    <select id="selectCallOutDailyWeeklyMonthlySatisfaction" resultMap="satisfactionVoResultMap">
+        SELECT
+            IFNULL(ROUND((IFNULL(daily_satisfaction_count, 0) / IFNULL(daily_evaluation_count, 0)) * 100, 2), 0) AS daily_satisfaction,
+            IFNULL(ROUND((IFNULL(weekly_satisfaction_count, 0) / IFNULL(weekly_evaluation_count, 0)) * 100, 2), 0) AS weekly_satisfaction,
+            IFNULL(ROUND((IFNULL(monthly_satisfaction_count, 0) / IFNULL(monthly_evaluation_count, 0)) * 100, 2), 0) AS monthly_satisfaction
+        FROM (
+            SELECT
+                COUNT(
+                    CASE
+                    WHEN answer_time BETWEEN #{date} AND CONCAT(#{date}, ' 23:59:59') AND `comment` IN (1,2)
+                    THEN 1 ELSE NULL END
+                ) AS daily_satisfaction_count,
+                COUNT(
+                    CASE
+                    WHEN answer_time BETWEEN #{date} AND CONCAT(#{date}, ' 23:59:59') AND `comment` IN (1,2,3,4,5)
+                    THEN 1 ELSE NULL END
+                ) AS daily_evaluation_count,
+                COUNT(
+                    CASE
+                    WHEN answer_time BETWEEN DATE_SUB(#{date}, INTERVAL WEEKDAY(#{date}) DAY) AND CONCAT(DATE_SUB(#{date}, INTERVAL WEEKDAY(#{date}) - 6 DAY), ' 23:59:59') AND `comment` IN (1,2)
+                    THEN 1 ELSE NULL END
+                ) AS weekly_satisfaction_count,
+                COUNT(
+                    CASE
+                    WHEN answer_time BETWEEN DATE_SUB(#{date}, INTERVAL WEEKDAY(#{date}) DAY) AND CONCAT(DATE_SUB(#{date}, INTERVAL WEEKDAY(#{date}) - 6 DAY), ' 23:59:59') AND `comment` IN (1,2,3,4,5)
+                    THEN 1 ELSE NULL END
+                ) AS weekly_evaluation_count,
+                COUNT(
+                    CASE
+                    WHEN answer_time BETWEEN DATE_SUB(#{date}, INTERVAL (DAYOFMONTH(#{date}) - 1) DAY) AND CONCAT(LAST_DAY(#{date}), ' 23:59:59') AND `comment` IN (1,2)
+                    THEN 1 ELSE NULL END
+                ) AS monthly_satisfaction_count,
+                COUNT(
+                    CASE
+                    WHEN answer_time BETWEEN DATE_SUB(#{date}, INTERVAL (DAYOFMONTH(#{date}) - 1) DAY) AND CONCAT(LAST_DAY(#{date}), ' 23:59:59') AND `comment` IN (1,2,3,4,5)
+                    THEN 1 ELSE NULL END
+                ) AS monthly_evaluation_count
+            FROM dos_callcenter_record
+            WHERE agent_from_queue IN
+            <foreach collection="queueId" open="(" close=")" item="qId" separator=",">
+                #{qId}
+            </foreach>
+        ) t1
+    </select>
+
+    <!-- 查人力数据图表（除了在线坐席量） -->
+    <select id="selectHumanDataChartBo" resultMap="humanDataChartBoResultMap">
+        SELECT
+            t1.`time`,
+            t1.access_number,
+            IFNULL(ROUND((IFNULL(t2.ten_second_connection_number, 0) / IFNULL(t1.access_number, 0)) * 100, 2), 0) AS ten_second_rate
+        FROM (
+            SELECT
+                DATE_FORMAT(  DATE_FORMAT( concat( date( first_queue_start_time ), ' ', HOUR ( first_queue_start_time ), ':',( floor(( MINUTE ( first_queue_start_time ) / 30 )) * 30 )),'%Y-%m-%d %H:%i' ),
+                '%Y-%m-%d %H:%i:%s'
+                ) AS `time`,
+                COUNT(*) AS access_number
+            FROM dos_callcenter_record
+            WHERE first_queue_start_time BETWEEN #{startDate} AND CONCAT(#{endDate}, ' 23:59:59')
+            AND agent_from_queue IN
+            <foreach collection="queueId" open="(" close=")" item="qId" separator=",">
+                #{qId}
+            </foreach>
+            AND call_type = 'in'
+            GROUP BY `time`
+        ) t1
+        LEFT JOIN (
+            SELECT
+                DATE_FORMAT(  DATE_FORMAT( concat( date( first_queue_start_time ), ' ', HOUR ( first_queue_start_time ), ':',( floor(( MINUTE ( first_queue_start_time ) / 30 )) * 30 )),'%Y-%m-%d %H:%i' ),
+                '%Y-%m-%d %H:%i:%s'
+                ) AS `time`,
+                COUNT(*) AS ten_second_connection_number
+            FROM dos_callcenter_record
+            WHERE first_queue_start_time BETWEEN #{startDate} AND CONCAT(#{endDate}, ' 23:59:59')
+            AND agent_from_queue IN
+            <foreach collection="queueId" open="(" close=")" item="qId" separator=",">
+                #{qId}
+            </foreach>
+            AND call_type = 'in'
+            AND request_agent_wait_time &lt;= 10
+            GROUP BY `time`
+        ) t2 ON t1.`time` = t2.`time`
+    </select>
+
+    <!-- 查时段在线工时表格 -->
+    <select id="selectTimeSlotOnlineWorkingHourTable" resultMap="timeSlotOnlineWorkingHourTableVoResultMap">
+        SELECT
+            t1.real_name AS agent_name,
+            t1.extension AS agent_id,
+            IFNULL(t2.access_number, 0) AS access_number,
+            IFNULL(ROUND((IFNULL(t2.access_number, 0) / (IFNULL(t3.service_duration, 0) + IFNULL(t2.call_in_duration, 0) + IFNULL(t2.ring_in_time, 0)) * 3600), 0), 0) AS hourly_access_number,
+            IFNULL(ROUND(((IFNULL(t2.call_in_duration, 0) + IFNULL(t2.ring_in_time, 0) + IFNULL(t4.call_out_duration, 0) + IFNULL(t4.ring_out_time, 0) + IFNULL(t3.working_duration, 0)) / IFNULL(t1.login_duration, 0)) * 100, 2), 0) AS man_hour_utilization_rate
+        FROM (
+            SELECT
+                extension,
+                real_name,
+                SUM(CASE WHEN duration IS NULL THEN TIMESTAMPDIFF(SECOND, start_time, NOW()) ELSE duration END) AS login_duration
+            FROM dos_callcenter_check_stats
+            WHERE start_time BETWEEN #{dto.startDate} AND CONCAT(#{dto.endDate}, ' 23:59:59')
+            AND queue IN
+            <foreach collection="dto.queueId" open="(" close=")" item="qId" separator=",">
+                #{qId}
+            </foreach>
+            GROUP BY extension,real_name
+        ) t1
+        LEFT JOIN (
+            SELECT
+                destination,
+                COUNT(*) AS access_number,
+                SUM(billable_seconds) AS call_in_duration,
+                SUM(ring_time) AS ring_in_time
+            FROM dos_callcenter_callrecord
+            WHERE queue_start_time BETWEEN #{dto.startDate} AND CONCAT(#{dto.endDate}, ' 23:59:59')
+            AND agent_from_queue IN
+            <foreach collection="dto.queueId" open="(" close=")" item="qId" separator=",">
+                #{qId}
+            </foreach>
+            AND call_type = 'in'
+            GROUP BY destination
+        ) t2 ON t1.extension = t2.destination
+        LEFT JOIN (
+            SELECT
+                extension,
+                SUM(
+                    CASE
+                    WHEN operation_type IN
+                    <foreach collection="serviceStatusList" open="(" close=")" item="status" separator=",">
+                        #{status}
+                    </foreach>
+                    AND end_time IS NULL THEN TIMESTAMPDIFF(SECOND, start_time, NOW())
+                    WHEN operation_type IN
+                    <foreach collection="serviceStatusList" open="(" close=")" item="status" separator=",">
+                        #{status}
+                    </foreach>
+                    THEN duration
+                    ELSE 0 END
+                ) AS service_duration,
+                SUM(
+                    CASE
+                    WHEN operation_type IN
+                    <foreach collection="statusList" open="(" close=")" item="status" separator=",">
+                        #{status}
+                    </foreach>
+                    AND end_time IS NULL THEN TIMESTAMPDIFF(SECOND, start_time, NOW())
+                    WHEN operation_type IN
+                    <foreach collection="statusList" open="(" close=")" item="status" separator=",">
+                        #{status}
+                    </foreach>
+                    THEN duration
+                    ELSE 0 END
+                ) AS working_duration
+            FROM dos_callcenter_dnd_stats
+            WHERE start_time BETWEEN #{dto.startDate} AND CONCAT(#{dto.endDate}, ' 23:59:59')
+            AND queue IN
+            <foreach collection="dto.queueId" open="(" close=")" item="qId" separator=",">
+                #{qId}
+            </foreach>
+            GROUP BY extension
+        ) t3 ON t1.extension = t3.extension
+        LEFT JOIN (
+            SELECT
+                source,
+                SUM(billable_seconds) AS call_out_duration,
+                SUM(ring_time) AS ring_out_time
+            FROM dos_callcenter_callrecord
+            WHERE call_time BETWEEN #{dto.startDate} AND CONCAT(#{dto.endDate}, ' 23:59:59')
+            AND agent_from_queue IN
+            <foreach collection="dto.queueId" open="(" close=")" item="qId" separator=",">
+                #{qId}
+            </foreach>
+            AND call_type = 'out'
+            GROUP BY source
+        ) t4 ON t1.extension = t4.source
+    </select>
+
+    <!-- 查询进线统计图表 -->
+    <select id="selectIncomeStatisticChart" resultMap="incomeStatisticChartBoResultMap">
+        SELECT
+            `time`,
+            access_number,
+            connect_number,
+            IFNULL(ROUND((IFNULL(connect_number, 0) / IFNULL(access_number, 0)) * 100, 2), 0) AS connection_rate
+        FROM (
+            SELECT
+                DATE_FORMAT( DATE_FORMAT( concat( date( first_queue_start_time ), ' ', HOUR ( first_queue_start_time ), ':',( floor(( MINUTE ( first_queue_start_time ) / 30 )) * 30 )),'%Y-%m-%d %H:%i' ),
+                '%Y-%m-%d %H:%i:%s'
+                ) AS `time`,
+                COUNT(*) AS access_number,
+                COUNT(CASE WHEN call_status = 1 THEN 1 ELSE NULL END) AS connect_number
+            FROM dos_callcenter_record
+            WHERE first_queue_start_time BETWEEN #{startDate} AND CONCAT(#{endDate}, ' 23:59:59')
+            AND agent_from_queue IN
+            <foreach collection="queueId" open="(" close=")" item="qId" separator=",">
+                #{qId}
+            </foreach>
+            AND call_type = 'in'
+            GROUP BY `time`
+        ) t1
+    </select>
+
+    <!-- 查量级数据图表（除一线人力、理论接起量） -->
+    <select id="selectMagnitudeDataChart" resultMap="magnitudeDataChartBoResultMap">
+        SELECT
+        `time`,
+        access_number,
+        connect_number,
+        IFNULL(ROUND((IFNULL(ten_second_connection_number, 0) / IFNULL(access_number, 0)) * 100, 2), 0) AS ten_second_rate
+        FROM (
+            SELECT
+                DATE_FORMAT(DATE_FORMAT( concat( date( first_queue_start_time ), ' ', HOUR ( first_queue_start_time ), ':',( floor(( MINUTE ( first_queue_start_time ) / 30 )) * 30 )),'%Y-%m-%d %H:%i' ),
+                '%Y-%m-%d %H:%i:%s'
+                ) AS `time`,
+                COUNT(*) AS access_number,
+                COUNT(CASE WHEN call_status = 1 THEN 1 ELSE NULL END) AS connect_number,
+                SUM(CASE WHEN request_agent_wait_time &lt;= 10 THEN 1 ELSE 0 END) AS ten_second_connection_number
+            FROM dos_callcenter_record
+            WHERE first_queue_start_time BETWEEN #{startDate} AND CONCAT(#{endDate}, ' 23:59:59')
+            AND agent_from_queue IN
+            <foreach collection="queueId" open="(" close=")" item="qId" separator=",">
+                #{qId}
+            </foreach>
+            AND call_type = 'in'
+            GROUP BY `time`
+        ) t1
+        ORDER BY `time`
+    </select>
+
+    <!--获取回访呼出率-->
+    <select id="getBreatheRate" resultType="utry.data.modular.ccBoard.visit.bo.BreatheRate">
+        SELECT
+        t1.`time` as abscissa,
+        t1.breatheOut,
+        t2.callFlux,
+        TRUNCATE((IFNULL(t2.callFlux,0) / IFNULL(t1.breatheOut,0)) * 100, 2) AS breatheRate
+        FROM (
+        SELECT
+        DATE_FORMAT( DATE_FORMAT( concat( date( call_time ), ' ', HOUR ( call_time ), ':',( floor(( MINUTE ( call_time ) / 30 )) * 30 )),'%Y-%m-%d %H:%i' ),
+        '%Y-%m-%d %H:%i:%s'
+        ) AS `time`,
+        COUNT(*) AS breatheOut
+        FROM dos_callcenter_record
+        WHERE call_time BETWEEN #{startDate} AND CONCAT(#{endDate}, ' 23:59:59')
+        AND agent_from_queue IN
+        <foreach collection="queueId" open="(" close=")" item="qId" separator=",">
+            #{qId}
+        </foreach>
+        AND call_type = 'out'
+        GROUP BY `time`
+        ) t1
+        LEFT JOIN (
+        SELECT
+        DATE_FORMAT( DATE_FORMAT( concat( date( call_time ), ' ', HOUR ( call_time ), ':',( floor(( MINUTE ( call_time ) / 30 )) * 30 )),'%Y-%m-%d %H:%i' ),
+        '%Y-%m-%d %H:%i:%s'
+        ) AS `time`,
+        COUNT(*) AS callFlux
+        FROM dos_callcenter_record
+        WHERE call_time BETWEEN #{startDate} AND CONCAT(#{endDate}, ' 23:59:59')
+        AND agent_from_queue IN
+        <foreach collection="queueId" open="(" close=")" item="qId" separator=",">
+            #{qId}
+        </foreach>
+        AND call_type = 'out' AND call_status='1'
+        GROUP BY `time`
+        ) t2 ON t1.`time` = t2.`time`
+    </select>
+
+    <!--获取满意率-->
+    <select id="getSatisfactionRate" resultType="utry.data.modular.ccBoard.visit.bo.SatisfactionRate">
+        SELECT
+        t1.`time` as abscissa,
+        TRUNCATE((IFNULL(t1.satisfied,0) / IFNULL(t2.total,0)) * 100, 2) AS satisfactionRate
+        FROM (
+        SELECT
+        DATE_FORMAT(DATE_FORMAT( concat( date( call_time ), ' ', HOUR ( call_time ), ':',( floor(( MINUTE ( call_time ) / 30 )) * 30 )),'%Y-%m-%d %H:%i' ),
+        '%Y-%m-%d %H:%i:%s'
+        ) AS `time`,
+        COUNT(*) AS satisfied
+        FROM dos_callcenter_record
+        WHERE   call_time BETWEEN #{startDate} AND CONCAT(#{endDate}, ' 23:59:59')
+        AND comment IN ("1","2")
+        AND agent_from_queue IN
+        <foreach collection="queueId" open="(" close=")" item="qId" separator=",">
+            #{qId}
+        </foreach>
+        AND call_type = 'out'
+        GROUP BY `time`
+        ) t1
+        LEFT JOIN (
+        SELECT
+        DATE_FORMAT(DATE_FORMAT( concat( date( call_time ), ' ', HOUR ( call_time ), ':',( floor(( MINUTE ( call_time ) / 30 )) * 30 )),'%Y-%m-%d %H:%i' ),
+        '%Y-%m-%d %H:%i:%s'
+        ) AS `time`,
+        COUNT(*) AS total
+        FROM dos_callcenter_record
+        WHERE call_time BETWEEN #{startDate} AND CONCAT(#{endDate}, ' 23:59:59')
+        AND comment IN ("1","2","3","4","5")
+        AND agent_from_queue IN
+        <foreach collection="queueId" open="(" close=")" item="qId" separator=",">
+            #{qId}
+        </foreach>
+        AND call_type = 'out'
+        GROUP BY `time`
+        ) t2 ON t1.`time` = t2.`time`
+    </select>
+
+    <!-- 查询各时段单位小时接入量/单位小时完成量 -->
+    <select id="selectIntervalCallDurationRingTimeBo" resultMap="intervalCallDurationRingTimeHourlyCallNumberBoResultMap">
+        SELECT
+            <if test="callType == 'in'.toString()">
+                DATE_FORMAT(DATE_FORMAT( concat( date( first_queue_start_time ), ' ', HOUR ( first_queue_start_time ), ':',( floor(( MINUTE ( first_queue_start_time ) / 30 )) * 30 )),'%Y-%m-%d %H:%i' ),
+                '%Y-%m-%d %H:%i:%s'
+                ) AS `time`,
+            </if>
+            <if test="callType == 'out'.toString()">
+                DATE_FORMAT(DATE_FORMAT( concat( date( call_time ), ' ', HOUR ( call_time ), ':',( floor(( MINUTE ( call_time ) / 30 )) * 30 )),'%Y-%m-%d %H:%i' ),
+                '%Y-%m-%d %H:%i:%s'
+                ) AS `time`,
+            </if>
+            COUNT(*) * 2 AS hourly_call_number
+        FROM dos_callcenter_record
+        <where>
+            <if test="callType == 'in'.toString()">
+                first_queue_start_time BETWEEN #{dto.startDate} AND CONCAT(#{dto.endDate}, ' 23:59:59')
+            </if>
+            <if test="callType == 'out'.toString()">
+                call_time BETWEEN #{dto.startDate} AND CONCAT(#{dto.endDate}, ' 23:59:59')
+            </if>
+            AND agent_from_queue IN
+            <foreach collection="dto.queueId" open="(" close=")" item="qId" separator=",">
+                #{qId}
+            </foreach>
+            AND call_type = #{callType}
+        </where>
+        GROUP BY `time`
+    </select>
+
+    <!-- 坐席工时利用率图表-总体CPH/总体工时利用率 -->
+    <select id="selectAgentManHourUtilizationRateTotal" resultMap="agentManHourUtilizationRateTotalVoResultMap">
+        SELECT
+            <if test="callType == 'in'.toString()">
+                IFNULL(ROUND((IFNULL(t1.connection_in_number, 0) / (IFNULL(work_in_duration, 0) + IFNULL(t1.call_in_duration, 0) + IFNULL(t1.ring_in_time, 0)) * 3600), 2), 0) AS total_cph,
+            </if>
+            <if test="callType == 'out'.toString()">
+                IFNULL(ROUND((IFNULL(t4.connection_out_number, 0) / (IFNULL(work_out_duration, 0) + IFNULL(t4.call_out_duration, 0) + IFNULL(t4.ring_out_time, 0)) * 3600), 2), 0) AS total_cph,
+            </if>
+            IFNULL(ROUND(((IFNULL(t1.call_in_duration, 0) + IFNULL(t1.ring_in_time, 0) + IFNULL(t4.call_out_duration, 0) + IFNULL(t4.ring_out_time, 0) + IFNULL(t2.working_duration, 0)) / IFNULL(t3.login_duration, 0)) * 100, 2), 0) AS total_man_hour_utilization_rate
+        FROM (
+            SELECT
+                COUNT(CASE WHEN call_status = 1 THEN 1 ELSE NULL END) AS connection_in_number,
+                SUM(billing_seconds) AS call_in_duration,
+                SUM(ring_time) AS ring_in_time
+            FROM dos_callcenter_record
+            <where>
+                call_time BETWEEN #{dto.startDate} AND CONCAT(#{dto.endDate}, ' 23:59:59')
+                AND agent_from_queue IN
+                <foreach collection="dto.queueId" open="(" close=")" item="qId" separator=",">
+                    #{qId}
+                </foreach>
+                AND call_type = 'in'
+            </where>
+        ) t1,
+        (
+            SELECT
+                SUM(
+                    CASE
+                    WHEN operation_type IN
+                    <foreach collection="inCphStatusList" open="(" close=")" item="status" separator=",">
+                        #{status}
+                    </foreach>
+                    AND duration IS NULL THEN TIMESTAMPDIFF(SECOND, start_time, NOW())
+                    WHEN operation_type IN
+                    <foreach collection="inCphStatusList" open="(" close=")" item="status" separator=",">
+                        #{status}
+                    </foreach>
+                    THEN duration
+                    ELSE 0 END
+                ) AS work_in_duration,
+                SUM(
+                    CASE
+                    WHEN operation_type IN
+                    <foreach collection="outCphStatusList" open="(" close=")" item="status" separator=",">
+                        #{status}
+                    </foreach>
+                    AND duration IS NULL THEN TIMESTAMPDIFF(SECOND, start_time, NOW())
+                    WHEN operation_type IN
+                    <foreach collection="outCphStatusList" open="(" close=")" item="status" separator=",">
+                        #{status}
+                    </foreach>
+                    THEN duration
+                    ELSE 0 END
+                ) AS work_out_duration,
+                SUM(
+                    CASE
+                    WHEN operation_type IN
+                    <foreach collection="statusList" open="(" close=")" item="status" separator=",">
+                        #{status}
+                    </foreach>
+                    AND duration IS NULL THEN TIMESTAMPDIFF(SECOND, start_time, NOW())
+                    WHEN operation_type IN
+                    <foreach collection="statusList" open="(" close=")" item="status" separator=",">
+                        #{status}
+                    </foreach>
+                    THEN duration
+                    ELSE 0 END
+                ) AS working_duration
+            FROM dos_callcenter_dnd_stats
+            WHERE start_time BETWEEN #{dto.startDate} AND CONCAT(#{dto.endDate}, ' 23:59:59')
+            AND queue IN
+            <foreach collection="dto.queueId" open="(" close=")" item="qId" separator=",">
+                #{qId}
+            </foreach>
+        ) t2,
+        (
+            SELECT
+                SUM(CASE WHEN duration IS NULL THEN TIMESTAMPDIFF(SECOND, start_time, NOW()) ELSE duration END) AS login_duration
+            FROM dos_callcenter_check_stats
+            WHERE start_time BETWEEN #{dto.startDate} AND CONCAT(#{dto.endDate}, ' 23:59:59')
+            AND queue IN
+            <foreach collection="dto.queueId" open="(" close=")" item="qId" separator=",">
+                #{qId}
+            </foreach>
+        ) t3,
+        (
+            SELECT
+                COUNT(CASE WHEN call_status = 1 THEN 1 ELSE NULL END) AS connection_out_number,
+                SUM(billing_seconds) AS call_out_duration,
+                SUM(ring_time) AS ring_out_time
+            FROM dos_callcenter_record
+            <where>
+                call_time BETWEEN #{dto.startDate} AND CONCAT(#{dto.endDate}, ' 23:59:59')
+                AND agent_from_queue IN
+                <foreach collection="dto.queueId" open="(" close=")" item="qId" separator=",">
+                    #{qId}
+                </foreach>
+                AND call_type = 'out'
+            </where>
+        ) t4
+    </select>
+
+    <!-- 在线坐席-坐席状态表格 -->
+    <select id="selectAgentStateTable" resultMap="agentStateTableVoResultMap">
+        SELECT
+            t1.agent_name,
+            t1.agent_id,
+            (IFNULL(t2.connect_in_number, 0) + IFNULL(t6.connect_out_number, 0)) AS connect_number,
+            IFNULL(ROUND(((IFNULL(t2.connect_in_number, 0) + IFNULL(t6.connect_out_number, 0)) / (IFNULL(t3.service_duration, 0) + IFNULL(t2.call_in_duration, 0) + IFNULL(t2.ring_in_time, 0) + IFNULL(t6.call_out_duration, 0) + IFNULL(t6.ring_out_time, 0)) * 3600), 0) ,0) AS hourly_connect_number,
+            IFNULL(ROUND(((IFNULL(t2.call_in_duration, 0) + IFNULL(t2.ring_in_time, 0) + IFNULL(t6.call_out_duration, 0) + IFNULL(t6.ring_out_time, 0) + IFNULL(t3.working_duration, 0)) / IFNULL(t5.login_duration, 0)) * 100, 2) ,0) AS man_hour_utilization_rate,
+            t4.current_state,
+            IFNULL(t4.current_state_stay, '00:00:00') AS current_state_stay,
+            IFNULL(t3.leisure_cumulative_duration, '0') AS leisure_cumulative_duration,
+            IFNULL(t3.rest_cumulative_duration, '0') AS rest_cumulative_duration,
+            IFNULL(t3.after_call_cumulative_duration, '0') AS after_call_cumulative_duration,
+            IFNULL(t3.busy_cumulative_duration, '0') AS busy_cumulative_duration
+        FROM (
+            SELECT
+                extension AS agent_id,
+                real_name AS agent_name
+            FROM dos_callcenter_check_stats
+            <where>
+                start_time BETWEEN #{dto.startDate} AND CONCAT(#{dto.endDate}, ' 23:59:59')
+                AND queue IN
+                <foreach collection="dto.queueId" open="(" close=")" item="qId" separator=",">
+                    #{qId}
+                </foreach>
+            </where>
+            <if test="historyFlag != null and historyFlag == 0">
+                AND end_time IS NULL
+            </if>
+            GROUP BY extension,real_name
+        ) t1
+        LEFT JOIN (
+            SELECT
+                destination AS agent_id,
+                COUNT(CASE WHEN disposition = 'answered' THEN 1 ELSE NULL END) AS connect_in_number,
+                SUM(billable_seconds) AS call_in_duration,
+                SUM(ring_time) AS ring_in_time
+            FROM dos_callcenter_callrecord
+            <where>
+                queue_start_time BETWEEN #{dto.startDate} AND CONCAT(#{dto.endDate}, ' 23:59:59')
+                AND call_type = 'in'
+                AND agent_from_queue IN
+                <foreach collection="dto.queueId" open="(" close=")" item="qId" separator=",">
+                    #{qId}
+                </foreach>
+            </where>
+            GROUP BY destination
+        ) t2 ON t1.agent_id = t2.agent_id
+        LEFT JOIN (
+            SELECT
+                extension AS agent_id,
+                SUM(CASE
+                    WHEN operation_type IN
+                    <foreach collection="serviceStatusList" open="(" close=")" item="status" separator=",">
+                        #{status}
+                    </foreach>
+                    AND duration IS NULL THEN TIMESTAMPDIFF(SECOND, start_time, NOW())
+                    WHEN operation_type IN
+                    <foreach collection="serviceStatusList" open="(" close=")" item="status" separator=",">
+                        #{status}
+                    </foreach>
+                    AND duration IS NOT NULL THEN duration
+                    ELSE 0 END) AS service_duration,
+                SUM(CASE
+                    WHEN operation_type IN
+                    <foreach collection="statusList" open="(" close=")" item="status" separator=",">
+                        #{status}
+                    </foreach>
+                    AND duration IS NULL THEN TIMESTAMPDIFF(SECOND, start_time, NOW())
+                    WHEN operation_type IN
+                    <foreach collection="statusList" open="(" close=")" item="status" separator=",">
+                        #{status}
+                    </foreach>
+                    AND duration IS NOT NULL THEN duration
+                    ELSE 0 END) AS working_duration,
+                SUM(CASE
+                    WHEN operation_type = -1 AND duration IS NULL THEN TIMESTAMPDIFF(SECOND, start_time, NOW())
+                    WHEN operation_type = -1 AND duration IS NOT NULL THEN duration
+                    ELSE 0 END) AS leisure_cumulative_duration,
+                SUM(CASE
+                    WHEN operation_type IN (1,2,3,4,5) AND duration IS NULL THEN TIMESTAMPDIFF(SECOND, start_time, NOW())
+                    WHEN operation_type IN (1,2,3,4,5) AND duration IS NOT NULL THEN duration
+                    ELSE 0 END) AS rest_cumulative_duration,
+                SUM(CASE
+                    WHEN operation_type = 0 AND duration IS NULL THEN TIMESTAMPDIFF(SECOND, start_time, NOW())
+                    WHEN operation_type = 0 AND duration IS NOT NULL THEN duration
+                    ELSE 0 END) AS after_call_cumulative_duration,
+                SUM(CASE
+                    WHEN operation_type = 6 AND duration IS NULL THEN TIMESTAMPDIFF(SECOND, start_time, NOW())
+                    WHEN operation_type = 6 AND duration IS NOT NULL THEN duration
+                    ELSE 0 END) AS busy_cumulative_duration
+            FROM dos_callcenter_dnd_stats
+            <where>
+                start_time BETWEEN #{dto.startDate} AND CONCAT(#{dto.endDate}, ' 23:59:59')
+                AND queue IN
+                <foreach collection="dto.queueId" open="(" close=")" item="qId" separator=",">
+                    #{qId}
+                </foreach>
+            </where>
+            GROUP BY extension
+        ) t3 ON t1.agent_id = t3.agent_id
+        LEFT JOIN (
+            SELECT
+                extension AS agent_id,
+                current_state,
+                current_state_duration AS current_state_stay
+            FROM dos_callcenter_agent_monitor
+            WHERE `time` = (SELECT MAX(`time`) FROM dos_callcenter_agent_monitor)
+            AND agent_from_queue IN
+            <foreach collection="dto.queueId" open="(" close=")" item="qId" separator=",">
+                #{qId}
+            </foreach>
+        ) t4 ON t1.agent_id = t4.agent_id
+        LEFT JOIN (
+            SELECT
+            extension AS agent_id,
+            SUM(CASE WHEN duration IS NULL THEN TIMESTAMPDIFF(SECOND, start_time, NOW()) ELSE duration END) AS login_duration
+            FROM dos_callcenter_check_stats
+            <where>
+                start_time BETWEEN #{dto.startDate} AND CONCAT(#{dto.endDate}, ' 23:59:59')
+                AND queue IN
+                <foreach collection="dto.queueId" open="(" close=")" item="qId" separator=",">
+                    #{qId}
+                </foreach>
+            </where>
+            GROUP BY extension
+        ) t5 ON t1.agent_id = t5.agent_id
+        LEFT JOIN (
+            SELECT
+                source AS agent_id,
+                COUNT(CASE WHEN disposition = 'answered' THEN 1 ELSE NULL END) AS connect_out_number,
+                SUM(billable_seconds) AS call_out_duration,
+                SUM(ring_time) AS ring_out_time
+            FROM dos_callcenter_callrecord
+            <where>
+                call_time BETWEEN #{dto.startDate} AND CONCAT(#{dto.endDate}, ' 23:59:59')
+                AND call_type = 'out'
+                AND agent_from_queue IN
+                <foreach collection="dto.queueId" open="(" close=")" item="qId" separator=",">
+                    #{qId}
+                </foreach>
+            </where>
+            GROUP BY source
+        ) t6 ON t1.agent_id = t6.agent_id
+        <where>
+            <if test="dto.state != null and dto.state != ''">
+                current_state LIKE CONCAT(#{dto.state}, '%')
+            </if>
+        </where>
+    </select>
+
+    <!-- 呼入通话记录表格 -->
+    <select id="selectCallInAgentCallLogTable" resultMap="agentCallLogTableVoResultMap">
+        SELECT
+            id,
+            IF(request_agent_wait_time &lt;= 10, 1, 0) AS ten_second_rate_flag,
+            agent_from_queue AS queue_id,
+            destination_real_name AS agent_name,
+            destination AS agent_id,
+            `source`,
+            call_type,
+            CASE
+            WHEN disposition = 'answered' THEN '已接通'
+            WHEN disposition = 'no_answer' THEN '未接通'
+            ELSE NULL END AS call_state,
+            ring_time AS ring_duration,
+            billable_seconds AS call_duration,
+            CASE
+            WHEN hangup = 'customer' THEN '主叫号码'
+            WHEN hangup = 'agent' THEN '被叫号码'
+            ELSE NULL END AS hang_up_party,
+            DATE_FORMAT(call_time, '%Y-%m-%d %H:%i:%s') AS call_date_time,
+            `comment` AS satisfaction
+        FROM dos_callcenter_callrecord
+        WHERE queue_start_time BETWEEN #{startDate} AND CONCAT(#{endDate}, ' 23:59:59')
+        AND call_type = 'in'
+        AND destination = #{agentId}
+        <if test="queueId != null and queueId.size() > 0">
+            AND agent_from_queue IN
+            <foreach collection="queueId" open="(" close=")" item="qId" separator=",">
+                #{qId}
+            </foreach>
+        </if>
+    </select>
+
+    <!-- 呼出通话记录表格 -->
+    <select id="selectCallOutAgentCallLogTable" resultMap="agentCallLogTableVoResultMap">
+        SELECT
+            id,
+            IF(request_agent_wait_time &lt;= 10, 1, 0) AS ten_second_rate_flag,
+            agent_from_queue AS queue_id,
+            source_real_name AS agent_name,
+            `source` AS agent_id,
+            destination,
+            call_type,
+            CASE
+            WHEN disposition = 'answered' THEN '已接通'
+            WHEN disposition = 'no_answer' THEN '未接通'
+            ELSE NULL END AS call_state,
+            IFNULL(ring_time, 0) AS ring_duration,
+            IFNULL(duration, 0) AS call_duration,
+            CASE
+            WHEN hangup = 'agent' THEN '主叫号码'
+            WHEN hangup = 'customer' THEN '被叫号码'
+            ELSE NULL END AS hang_up_party,
+            DATE_FORMAT(call_time, '%Y-%m-%d %H:%i:%s') AS call_date_time,
+            `comment` AS satisfaction
+        FROM dos_callcenter_callrecord
+        WHERE call_time BETWEEN #{startDate} AND CONCAT(#{endDate}, ' 23:59:59')
+        AND call_type = 'out'
+        AND `source` = #{agentId}
+        <if test="queueId != null and queueId.size() > 0">
+            AND agent_from_queue IN
+            <foreach collection="queueId" open="(" close=")" item="qId" separator=",">
+                #{qId}
+            </foreach>
+        </if>
+    </select>
+
+    <!-- 查询坐席间隔半小时的通话时长 -->
+    <select id="selectAgentIntervalDuration" resultMap="agentIntervalCallDurationBoResultMap">
+        SELECT
+            destination AS agent_id,
+            DATE_FORMAT(DATE_FORMAT( concat( date( queue_start_time ), ' ', HOUR ( queue_start_time ), ':',( floor(( MINUTE ( queue_start_time ) / 30 )) * 30 )),'%Y-%m-%d %H:%i' ),
+            '%Y-%m-%d %H:%i:%s'
+            ) AS `time`,
+            SUM(billable_seconds) AS call_duration
+        FROM dos_callcenter_callrecord
+        WHERE queue_start_time BETWEEN #{startDate} AND CONCAT(#{endDate}, ' 23:59:59')
+        AND agent_from_queue IN
+        <foreach collection="queueId" open="(" close=")" item="qId" separator=",">
+            #{qId}
+        </foreach>
+        GROUP BY destination,`time`
+    </select>
+
+    <!-- 热线服务单轴 -->
+    <select id="selectServiceOrderDetailAxis" resultMap="serviceOrderDetailAxisBoResultMap">
+        SELECT
+            DATE_FORMAT(call_time, '%Y-%m-%d %H:%i:%s') AS call_time,
+            DATE_FORMAT(first_queue_start_time, '%Y-%m-%d %H:%i:%s') AS first_queue_start_time,
+            ring_time,
+            DATE_FORMAT(answer_time, '%Y-%m-%d %H:%i:%s') AS answer_time,
+            billing_seconds,
+            DATE_FORMAT(agent_hangup_time, '%Y-%m-%d %H:%i:%s') AS agent_hangup_time
+        FROM dos_callcenter_record
+        WHERE record_file = #{soundRecordFileName}
+    </select>
+
+    <!-- 根据日期聚合查询接入量 -->
+    <select id="selectAccessNumberGroupByDate" resultMap="dateValueChartVoResultMap">
+        SELECT
+            DATE_FORMAT(first_queue_start_time, '%Y-%m-%d') AS `date`,
+            COUNT(*) AS `value`
+        FROM dos_callcenter_record
+        WHERE first_queue_start_time BETWEEN #{startDate} AND CONCAT(#{endDate}, ' 23:59:59')
+        AND agent_from_queue IN
+        <foreach collection="queueId" open="(" close=")" item="qId" separator=",">
+            #{qId}
+        </foreach>
+        AND call_type = 'in'
+        GROUP BY `date`
+    </select>
+
+    <!-- 根据日期聚合查询接通率 -->
+    <select id="selectConnectionRateGroupByDate" resultMap="dateValueChartVoResultMap">
+        SELECT
+            DATE_FORMAT(first_queue_start_time, '%Y-%m-%d') AS `date`,
+            IFNULL(ROUND((COUNT(CASE WHEN call_status = 1 THEN 1 ELSE NULL END) / COUNT(*)) * 100, 2), 0) AS `value`
+        FROM dos_callcenter_record
+        WHERE first_queue_start_time BETWEEN #{startDate} AND CONCAT(#{endDate}, ' 23:59:59')
+        AND agent_from_queue IN
+        <foreach collection="queueId" open="(" close=")" item="qId" separator=",">
+            #{qId}
+        </foreach>
+        AND call_type = 'in'
+        GROUP BY `date`
+    </select>
+
+    <!-- 根据日期聚合查询10s接通率 -->
+    <select id="selecttenSecondRateGroupByDate" resultMap="dateValueChartVoResultMap">
+        SELECT
+            DATE_FORMAT(first_queue_start_time, '%Y-%m-%d') AS `date`,
+            IFNULL(ROUND((COUNT(CASE WHEN call_status = 1 AND request_agent_wait_time &lt;= 10 THEN 1 ELSE NULL END) / COUNT(*)) * 100, 2), 0) AS `value`
+        FROM dos_callcenter_record
+        WHERE first_queue_start_time BETWEEN #{startDate} AND CONCAT(#{endDate}, ' 23:59:59')
+        AND agent_from_queue IN
+        <foreach collection="queueId" open="(" close=")" item="qId" separator=",">
+            #{qId}
+        </foreach>
+        AND call_type = 'in'
+        GROUP BY `date`
+    </select>
+
+    <!-- 根据日期聚合查询平均排队时间 -->
+    <select id="selectAvgQueueDurationGroupByDate" resultMap="dateValueChartVoResultMap">
+        SELECT
+            DATE_FORMAT(first_queue_start_time, '%Y-%m-%d') AS `date`,
+            IFNULL(ROUND((IFNULL(SUM(request_agent_wait_time), 0) / COUNT(*)), 0), 0) AS `value`
+        FROM dos_callcenter_record
+        WHERE first_queue_start_time BETWEEN #{startDate} AND CONCAT(#{endDate}, ' 23:59:59')
+        AND agent_from_queue IN
+        <foreach collection="queueId" open="(" close=")" item="qId" separator=",">
+            #{qId}
+        </foreach>
+        AND call_type = 'in'
+        GROUP BY `date`
+    </select>
+
+    <!-- 根据日期聚合查询平均通话时长 -->
+    <select id="selectAvgCallInDurationGroupByDate" resultMap="dateValueChartVoResultMap">
+        SELECT
+            DATE_FORMAT(first_queue_start_time, '%Y-%m-%d') AS `date`,
+            IFNULL(ROUND((IFNULL(SUM(billing_seconds), 0) / COUNT(*)), 0), 0) AS `value`
+        FROM dos_callcenter_record
+        WHERE first_queue_start_time BETWEEN #{startDate} AND CONCAT(#{endDate}, ' 23:59:59')
+        AND agent_from_queue IN
+        <foreach collection="queueId" open="(" close=")" item="qId" separator=",">
+            #{qId}
+        </foreach>
+        AND call_status = 1 AND call_type = 'in'
+        GROUP BY `date`
+    </select>
+
+    <!--获取回访呼出量-->
+    <select id="getBreatheNumber" resultType="utry.data.modular.ccBoard.visit.bo.VisitCompleteNumber">
+        SELECT
+        t1.`time` as abscissa,
+        t1.breatheOut as complete
+        FROM (
+        SELECT
+        DATE_FORMAT( DATE_FORMAT( concat( date( call_time ), ' ', HOUR ( call_time ), ':',( floor(( MINUTE ( call_time ) / 30 )) * 30 )),'%Y-%m-%d %H:%i' ),
+        '%Y-%m-%d %H:%i:%s'
+        ) AS `time`,
+        COUNT(*) AS breatheOut
+        FROM dos_callcenter_record
+        WHERE call_time BETWEEN #{startDate} AND CONCAT(#{endDate}, ' 23:59:59')
+        AND agent_from_queue IN
+        <foreach collection="queueId" open="(" close=")" item="qId" separator=",">
+            #{qId}
+        </foreach>
+        AND call_type = 'out'
+        GROUP BY `time`
+        ) t1
+    </select>
+
+    <!-- 查询接入客户数 -->
+    <select id="selectCallInCustomerNumber" resultType="java.lang.Integer">
+        SELECT COUNT(DISTINCT customer_number)
+        FROM dos_callcenter_record
+        <where>
+            call_time BETWEEN #{startDate} AND CONCAT(#{endDate}, ' 23:59:59')
+            <if test="queueId != null and queueId.size() > 0">
+                AND agent_from_queue IN
+                <foreach collection="queueId" open="(" close=")" item="qId" separator=",">
+                    #{qId}
+                </foreach>
+            </if>
+            AND call_type = 'in'
+        </where>
+    </select>
+
+    <!-- 查询接起客户数 -->
+    <select id="selectConnectCustomerNumber" resultType="java.lang.Integer">
+        SELECT COUNT(DISTINCT customer_number)
+        FROM dos_callcenter_record
+        <where>
+            call_time BETWEEN #{startDate} AND CONCAT(#{endDate}, ' 23:59:59')
+            <if test="queueId != null and queueId.size() > 0">
+                AND agent_from_queue IN
+                <foreach collection="queueId" open="(" close=")" item="qId" separator=",">
+                    #{qId}
+                </foreach>
+            </if>
+            AND call_status = 1 AND call_type = 'in'
+        </where>
+    </select>
+
+    <!-- 查人力数据表格 -->
+    <select id="selectHumanDataTable" resultMap="HumanDataTableBoResultMap">
+        SELECT
+            t1.`time`,
+            t1.access_number,
+            t1.connection_number,
+            IFNULL(ROUND((IFNULL(t1.connection_number, 0) / IFNULL(t1.access_number, 0)) * 100, 2), 0) AS connection_rate,
+            IFNULL(ROUND((IFNULL(t2.ten_second_connection_number, 0) / IFNULL(t1.access_number, 0)) * 100, 2), 0) AS ten_second_rate
+        FROM (
+            SELECT
+                DATE_FORMAT(  DATE_FORMAT( concat( date( first_queue_start_time ), ' ', HOUR ( first_queue_start_time ), ':',( floor(( MINUTE ( first_queue_start_time ) / 30 )) * 30 )),'%Y-%m-%d %H:%i' ),
+                '%Y-%m-%d %H:%i:%s'
+                ) AS `time`,
+                COUNT(*) AS access_number,
+                SUM(CASE WHEN call_status = 1 THEN 1 ELSE 0 END) AS connection_number
+            FROM dos_callcenter_record
+            <where>
+                first_queue_start_time BETWEEN #{startDate} AND CONCAT(#{endDate}, ' 23:59:59')
+                <if test="queueId != null and queueId.size() > 0">
+                    AND agent_from_queue IN
+                    <foreach collection="queueId" open="(" close=")" item="qId" separator=",">
+                        #{qId}
+                    </foreach>
+                </if>
+                AND call_type = 'in'
+            </where>
+            GROUP BY `time`
+        ) t1
+        LEFT JOIN (
+            SELECT
+                DATE_FORMAT(  DATE_FORMAT( concat( date( first_queue_start_time ), ' ', HOUR ( first_queue_start_time ), ':',( floor(( MINUTE ( first_queue_start_time ) / 30 )) * 30 )),'%Y-%m-%d %H:%i' ),
+                '%Y-%m-%d %H:%i:%s'
+                ) AS `time`,
+                COUNT(*) AS ten_second_connection_number
+            FROM dos_callcenter_record
+            <where>
+                first_queue_start_time BETWEEN #{startDate} AND CONCAT(#{endDate}, ' 23:59:59')
+                <if test="queueId != null and queueId.size() > 0">
+                    AND agent_from_queue IN
+                    <foreach collection="queueId" open="(" close=")" item="qId" separator=",">
+                        #{qId}
+                    </foreach>
+                </if>
+                AND call_type = 'in'
+                AND request_agent_wait_time &lt;= 10
+            </where>
+            GROUP BY `time`
+        ) t2 ON t1.`time` = t2.`time`
+    </select>
+</mapper>

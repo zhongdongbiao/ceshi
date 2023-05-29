@@ -1,0 +1,87 @@
+package utry.data.modular.partsManagement.model;
+
+
+import java.io.Serializable;
+import java.util.Date;
+import lombok.Data;
+
+/**
+ * 服务店备货取消单明细
+ * 
+ * @author zhongdongbiao
+ * @date 2022-04-07 13:23:25
+ */
+@Data
+public class CancelServiceOrderDetail implements Serializable {
+	private static final long serialVersionUID = 1L;
+
+	/**
+	 * 单据号
+	 */
+	private String receiptNumber;
+	/**
+	 * 部件图号
+	 */
+	private String partDrawingNo;
+	/**
+	 * 产品型号
+	 */
+	private String productModel;
+	/**
+	 * 部件代码
+	 */
+	private String partCode;
+	/**
+	 * 部件名称
+	 */
+	private String partDrawingName;
+	/**
+	 * 来源单号
+	 */
+	private String documentNumber;
+	/**
+	 * 来源单行号
+	 */
+	private String sourceLineNumber;
+	/**
+	 * 订单类型
+	 */
+	private String orderType;
+	/**
+	 * 订单日期
+	 */
+	private String orderTime;
+	/**
+	 * 申请数量
+	 */
+	private String applyNumber;
+	/**
+	 * 分配数量
+	 */
+	private String distributionNumber;
+	/**
+	 * 出库数量
+	 */
+	private String outNumber;
+	/**
+	 * 取消数量
+	 */
+	private String cancelNumber;
+	/**
+	 * 单价
+	 */
+	private String unitPrice;
+	/**
+	 * 金额
+	 */
+	private String money;
+	/**
+	 * 费用类型
+	 */
+	private String costType;
+	/**
+	 * 更新时间
+	 */
+	private Date updateTime;
+
+}

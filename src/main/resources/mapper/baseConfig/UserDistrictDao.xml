@@ -1,0 +1,77 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="utry.data.modular.baseConfig.dao.UserDistrictDao">
+
+    <select id="selectDistrict" resultType="utry.data.modular.baseConfig.dto.UserDistrictDTO">
+        SELECT
+            GROUP_CONCAT(h.account) AS account,
+            GROUP_CONCAT(h.AccountID) AS accountId,
+            a.systemState,
+            a.area,
+            a.areaCode AS districtId,
+            DATE_FORMAT(a.createTime, '%Y-%m-%d %H:%i:%s') AS createTime,
+            DATE_FORMAT(MAX(t.updateTime),'%Y-%m-%d %H:%i:%s') AS updateTime,
+            t.id,
+            a.reduceArea,
+            a.adminName
+        FROM
+            t_district_accounting a
+                LEFT JOIN t_user_district t ON a.areaCode = t.districtId
+                LEFT JOIN hrm_db.t_hrm_accountinfo h ON t.userId = h.AccountID
+        WHERE a.systemState = "已启用"
+        GROUP BY a.areaCode
+        ORDER BY
+            DATE_FORMAT(a.updateTime, '%Y-%m-%d %H:%i:%s') DESC
+    </select>
+
+    <update id="editDistrictConfig" parameterType="utry.data.modular.baseConfig.model.UserDistrict">
+        UPDATE t_user_district
+        SET userId = #{accountId},updateTime = NOW()
+        WHERE
+            id = #{id}
+    </update>
+
+    <select id="ifExist" parameterType="java.lang.String" resultType="java.lang.String">
+        SELECT
+        u.id
+        FROM
+        t_user_district u
+        WHERE u.districtId != #{districtId} AND u.userId IN
+        <foreach collection="list" open="(" close=")" separator="," item="userId">
+            #{userId}
+        </foreach>
+        LIMIT 1
+    </select>
+
+    <select id="select" resultType="utry.data.modular.baseConfig.dto.UserDistrictDTO">
+        SELECT
+            a.area,a.id,a.areaCode as districtId
+        FROM
+            t_district_accounting a
+                LEFT JOIN t_user_district u ON u.districtId = a.areaCode
+        WHERE u.id IS NULL AND a.systemState = "已启用"
+    </select>
+
+    <select id="ifExistDistrict" parameterType="java.lang.String" resultType="java.lang.String">
+        SELECT
+            u.id
+        FROM
+            t_user_district u
+        WHERE u.userId != #{accountId} AND u.districtId IN
+        <foreach collection="list" open="(" close=")" separator="," item="userId">
+            #{userId}
+        </foreach>
+        LIMIT 1
+    </select>
+
+    <insert id="addDistrictConfig" parameterType="utry.data.modular.baseConfig.model.UserDistrict">
+        INSERT INTO t_user_district (id, userId, districtId,updateTime)
+        VALUES  (REPLACE(UUID(), _utf8'-', _utf8''),#{accountId},#{districtId},NOW())
+    </insert>
+
+    <delete id="deleteDistrictConfig" parameterType="java.lang.String">
+        delete from t_user_district where districtId = #{districtId}
+    </delete>
+
+</mapper>

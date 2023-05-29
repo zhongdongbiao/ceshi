@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="utry.data.modular.partsManagement.dao.LocationInformationDao">
+    <!-- 开启二级缓存 -->
+    <cache eviction="LRU" flushInterval="300000" readOnly="true" size="1024"></cache>
+
+    <insert id="batchLocationInformationData" parameterType="java.util.List">
+        insert into t_location_Information (id,systemState,locationNumber,warehouseCode,warehouseName,partDrawingNo,warehouseKeeper)
+        values
+        <foreach collection="list" item="item" separator=",">
+            (REPLACE(UUID(), _utf8'-', _utf8''),#{item.systemState},#{item.locationNumber},#{item.warehouseCode},#{item.warehouseName},#{item.partDrawingNo},#{item.warehouseKeeper})
+        </foreach>
+    </insert>
+
+    <delete id="batchDelete">
+        delete from t_location_Information
+    </delete>
+
+    <!--获取所有库位资料-->
+    <select id="getAllLocationInformation" resultType="java.util.Map">
+        SELECT warehouse_code AS warehouseCode,t2.warehouseName
+        FROM t_part_drawing_stock t1
+        JOIN (
+            SELECT warehouseCode,warehouseName FROM t_location_information GROUP BY warehouseCode
+        ) t2 on t1.warehouse_code = t2.warehouseCode
+        WHERE t1.create_time BETWEEN #{startDate} AND #{endDate}
+        GROUP BY t1.warehouse_code
+    </select>
+</mapper>

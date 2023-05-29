@@ -1,0 +1,399 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="utry.data.modular.settleManagement.dao.MissSettleManagementDao">
+
+    <!-- 开启二级缓存 -->
+    <cache eviction="LRU" flushInterval="100000" readOnly="true" size="1024"></cache>
+    <!--  将新增的数据插入到未结表  -->
+    <insert id="insertMissSettleData">
+        insert into t_miss_cost_settle (businessId,createDate,province,provinceCode,businessSource,dispatchingOrder,productCategory,productCategoryCode,productType,productTypeCode,productModel,
+        serviceUnit,doorCost,artificialCost,remoteCost,excessiveCost,repairCost,authenticateCost,subsidyCost,dismountCost,deliveryCost,
+        recallCost,logisticCost,rewardCost,compensateCost,adjustCost,settleMoney,settleObjectType,settleObjectName,accountAreaCode,accountArea,
+        factoryAuditFlag,factoryAuditResult,costType,costSubType,serviceType,serviceSubType,buySystemState,maintainMode)
+        values
+        <foreach collection="list" item="item" separator=",">
+            (#{item.businessId},#{item.createDate},#{item.province},#{item.provinceCode},#{item.businessSource},#{item.dispatchingOrder},#{item.productCategory},#{item.productCategoryCode},#{item.productType},#{item.productTypeCode},#{item.productModel},
+            #{item.serviceUnit},#{item.doorCost},#{item.artificialCost},#{item.remoteCost},#{item.excessiveCost},#{item.repairCost},#{item.authenticateCost},#{item.subsidyCost},#{item.dismountCost},#{item.deliveryCost},
+            #{item.recallCost},#{item.logisticCost},#{item.rewardCost},#{item.compensateCost},#{item.adjustCost},#{item.settleMoney},#{item.settleObjectType},#{item.settleObjectName},#{item.accountAreaCode},#{item.accountArea},
+            #{item.factoryAuditFlag},#{item.factoryAuditResult},#{item.costType},#{item.costSubType},#{item.serviceType},#{item.serviceSubType},#{item.buySystemState},#{item.maintainMode})
+        </foreach>
+    </insert>
+
+    <!--  更新未结算表中的数据  -->
+    <update id="updateMissSettleData">
+        <foreach collection="list" item="item" open="" close="" separator=";">
+            update t_miss_cost_settle
+            <set>
+                <if test="item.createDate != null and item.createDate != ''">
+                    createDate=#{item.createDate},
+                </if>
+                <if test="item.province != null and item.province != ''">
+                    province=#{item.province},
+                </if>
+                <if test="item.provinceCode != null and item.provinceCode != ''">
+                    provinceCode=#{item.provinceCode},
+                </if>
+                <if test="item.dispatchingOrder != null and item.dispatchingOrder != ''">
+                    dispatchingOrder=#{item.dispatchingOrder},
+                </if>
+                <if test="item.productCategory != null and item.productCategory != ''">
+                    productCategory=#{item.productCategory},
+                </if>
+                <if test="item.productCategoryCode != null and item.productCategoryCode != ''">
+                    productCategoryCode=#{item.productCategoryCode},
+                </if>
+                <if test="item.productType != null and item.productType != ''">
+                    productType=#{item.productType},
+                </if>
+                <if test="item.productTypeCode != null and item.productTypeCode != ''">
+                    productTypeCode=#{item.productTypeCode},
+                </if>
+                <if test="item.productModel != null and item.productModel != ''">
+                    productModel=#{item.productModel},
+                </if>
+                <if test="item.serviceUnit != null and item.serviceUnit != ''">
+                    serviceUnit=#{item.serviceUnit},
+                </if>
+                <if test="item.doorCost != null and item.doorCost != ''">
+                    doorCost=#{item.doorCost},
+                </if>
+                <if test="item.artificialCost != null and item.artificialCost != ''">
+                    artificialCost=#{item.artificialCost},
+                </if>
+                <if test="item.remoteCost != null and item.remoteCost != ''">
+                    remoteCost=#{item.remoteCost},
+                </if>
+                <if test="item.excessiveCost != null and item.excessiveCost != ''">
+                    excessiveCost=#{item.excessiveCost},
+                </if>
+                <if test="item.repairCost != null and item.repairCost != ''">
+                    repairCost=#{item.repairCost},
+                </if>
+                <if test="item.authenticateCost != null and item.authenticateCost != ''">
+                    authenticateCost=#{item.authenticateCost},
+                </if>
+                <if test="item.subsidyCost != null and item.subsidyCost != ''">
+                    subsidyCost=#{item.subsidyCost},
+                </if>
+                <if test="item.dismountCost != null and item.dismountCost != ''">
+                    dismountCost=#{item.dismountCost},
+                </if>
+                <if test="item.deliveryCost != null and item.deliveryCost != ''">
+                    deliveryCost=#{item.deliveryCost},
+                </if>
+                <if test="item.recallCost != null and item.recallCost != ''">
+                    recallCost=#{item.recallCost},
+                </if>
+                <if test="item.logisticCost != null and item.logisticCost != ''">
+                    logisticCost=#{item.logisticCost},
+                </if>
+                <if test="item.rewardCost != null and item.rewardCost != ''">
+                    rewardCost=#{item.rewardCost},
+                </if>
+                <if test="item.compensateCost != null and item.compensateCost != ''">
+                    compensateCost=#{item.compensateCost},
+                </if>
+                <if test="item.adjustCost != null and item.adjustCost != ''">
+                    adjustCost=#{item.adjustCost},
+                </if>
+                <if test="item.settleMoney != null and item.settleMoney != ''">
+                    settleMoney=#{item.settleMoney},
+                </if>
+                <if test="item.settleObjectName != null and item.settleObjectName != ''">
+                    settleObjectName=#{item.settleObjectName},
+                </if>
+                <if test="item.accountAreaCode != null and item.accountAreaCode != ''">
+                    accountAreaCode=#{item.accountAreaCode},
+                </if>
+                <if test="item.accountArea != null and item.accountArea != ''">
+                    accountArea=#{item.accountArea},
+                </if>
+                <if test="item.factoryAuditFlag != null and item.factoryAuditFlag != ''">
+                    factoryAuditFlag=#{item.factoryAuditFlag},
+                </if>
+                <if test="item.factoryAuditResult != null and item.factoryAuditResult != ''">
+                    factoryAuditResult=#{item.factoryAuditResult},
+                </if>
+                <if test="item.costType != null and item.costType != ''">
+                    costType=#{item.costType},
+                </if>
+                <if test="item.costSubType != null and item.costSubType != ''">
+                    costSubType=#{item.costSubType},
+                </if>
+                <if test="item.serviceType != null and item.serviceType != ''">
+                    serviceType=#{item.serviceType},
+                </if>
+                <if test="item.buySystemState != null and item.buySystemState != ''">
+                    buySystemState=#{item.buySystemState},
+                </if>
+                <if test="item.maintainMode != null and item.maintainMode != ''">
+                    maintainMode=#{item.maintainMode}
+                </if>
+            </set>
+            where businessId=#{item.businessId}
+            and businessSource=#{item.businessSource}
+            and settleObjectType=#{item.settleObjectType}
+            and serviceSubType=#{item.serviceSubType}
+        </foreach>
+    </update>
+
+    <update id="updateMissSettleState">
+        update t_region_dispatching_detail
+        <trim prefix="set" suffixOverrides=",">
+            <trim prefix="calculationState =case" suffix="end,">
+                <foreach collection="list" item="item" index="index">
+                    when serviceNumber=#{item.businessId}
+                    then '已结算'
+                </foreach>
+            </trim>
+            <trim prefix="settledTime =case" suffix="end,">
+                <foreach collection="list" item="item" index="index">
+                    <if test="item.settleDate != null and item.settleDate != ''">
+                        when serviceNumber=#{item.businessId}
+                        then #{item.settleDate}
+                    </if>
+                </foreach>
+            </trim>
+        </trim>
+        where serviceNumber in
+        <foreach collection="list" item="item" index="index" separator="," open="(" close=")">
+            #{item.businessId}
+        </foreach>
+    </update>
+
+    <!--  删除未结算表中的数据  -->
+    <delete id="deleteMissSettleData">
+        delete from t_miss_cost_settle where
+        <foreach collection="list" item="item" separator=" or " index="index">
+            (businessId=#{item.businessId} and businessSource=#{item.businessSource}
+                 and settleObjectType=#{item.settleObjectType} and serviceSubType=#{item.serviceSubType})
+        </foreach>
+    </delete>
+
+    <!--  汇总查询的数据  -->
+    <sql id="missBusinessCostQueryColumn">
+        round(sum(if(businessSource='维修服务单',settleMoney,0)),2) as maintain,
+        round(sum(if(businessSource='安装服务单',settleMoney,0)),2) as install,
+        round(sum(if(businessSource='非上门服务单',settleMoney,0)),2) as noDoor,
+        round(sum(if(businessSource='鉴定服务单',settleMoney,0)),2) as identify,
+        round(sum(if(businessSource='现金补偿服务单',settleMoney,0)),2) as cash,
+        round(sum(if(businessSource='换机作业单',settleMoney,0)),2) as replacement,
+        round(sum(if(businessSource='商损鉴定单' or businessSource='G库维修服务单' or businessSource='G库开机检查单' or
+            businessSource='商损维修单' or businessSource='C库检查明细导入' or businessSource='L库换包装服务单' or
+            businessSource='开机检查单',settleMoney,0)),2)
+            as businessLoss,
+        round(sum(if(businessSource='召回服务单',settleMoney,0)),2) as recall,
+        round(sum(if(businessSource='P板维修服务单',settleMoney,0)),2) as boardMaintain
+    </sql>
+
+    <sql id="missBusinessUnitQueryColumn">
+        sum(if(businessSource='维修服务单',serviceUnit,0)) as maintain,
+        sum(if(businessSource='安装服务单',serviceUnit,0)) as install,
+        sum(if(businessSource='非上门服务单',serviceUnit,0)) as noDoor,
+        sum(if(businessSource='鉴定服务单',serviceUnit,0)) as identify,
+        sum(if(businessSource='现金补偿服务单',serviceUnit,0)) as cash,
+        sum(if(businessSource='换机作业单',serviceUnit,0)) as replacement,
+        sum(if(businessSource='商损鉴定单' or businessSource='G库维修服务单' or businessSource='G库开机检查单' or
+            businessSource='商损维修单' or businessSource='C库检查明细导入' or businessSource='L库换包装服务单' or
+            businessSource='开机检查单',serviceUnit,0))
+            as businessLoss,
+        sum(if(businessSource='召回服务单',serviceUnit,0)) as recall,
+        sum(if(businessSource='P板维修服务单',serviceUnit,0)) as boardMaintain
+    </sql>
+
+    <!--  未结算的条件  -->
+    <sql id="missSettleSummaryCondition">
+        <if test="dto.polymerizeWay == 2">
+            <if test="dto.beginDate != null and dto.beginDate != ''">
+                and cast(createDate as date) &gt;= #{dto.beginDate}
+            </if>
+            <if test="dto.endDate != null and dto.endDate != ''">
+                and cast(createDate as date) &lt;= #{dto.endDate}
+            </if>
+            <if test="dto.selectDay != null and dto.selectDay != ''">
+                and cast(createDate as date) = #{dto.selectDay}
+            </if>
+        </if>
+        <if test="dto.productTypeCodeList != null and dto.productTypeCodeList.size > 0">
+            and productTypeCode in
+            <foreach collection="dto.productTypeCodeList" open="(" close=")" separator="," item="productTypeCode">
+                #{productTypeCode}
+            </foreach>
+        </if>
+    </sql>
+
+    <!--  查询未结算费用数据  -->
+    <select id="selectMissSettleSummary" resultType="java.util.Map">
+        select
+            <if test="dto.polymerizeWay == 1">
+                date_format(Now(),'%Y-%m') settleDate,
+            </if>
+            <if test="dto.polymerizeWay == 2">
+                cast(createDate as date) settleDate,
+            </if>
+            <if test="dto.showDimension == 1">
+                <include refid="missBusinessCostQueryColumn"></include>
+            </if>
+            <if test="dto.showDimension == 2">
+                <include refid="missBusinessUnitQueryColumn"></include>
+            </if>
+        from t_miss_cost_settle
+        <where>
+            <include refid="missSettleSummaryCondition"></include>
+        </where>
+        <if test="dto.polymerizeWay == 2">
+            group by cast(createDate as date)
+        </if>
+    </select>
+
+    <!--  查询未结算服务数据  -->
+    <select id="selectMissServiceType" resultType="java.util.Map">
+        select
+        <if test="dto.classifyDimension == 1">
+            b.adminName adminName,
+        </if>
+        <if test="dto.classifyDimension == 2">
+            a.province province,
+        </if>
+        <if test="dto.showDimension == 1">
+            <include refid="missBusinessCostQueryColumn"></include>
+        </if>
+        <if test="dto.showDimension == 2">
+            <include refid="missBusinessUnitQueryColumn"></include>
+        </if>
+        from t_miss_cost_settle a
+        left join t_district_accounting b on a.accountAreaCode = b.areaCode
+        <where>
+            <include refid="missSettleSummaryCondition"></include>
+            <if test="dto.classifyDimension == 1">
+                and length(trim(b.adminName) > 0)
+            </if>
+            <if test="dto.classifyDimension == 2">
+                and length(trim(a.provinceCode) > 0)
+            </if>
+        </where>
+        <if test="dto.classifyDimension == 1">
+            group by b.adminName
+        </if>
+        <if test="dto.classifyDimension == 2">
+            group by a.provinceCode
+        </if>
+        order by maintain desc
+<!--        <if test="dto.screenQuery != null and dto.screenQuery.size > 0">-->
+<!--            <trim prefix="having" suffixOverrides="and">-->
+<!--                <foreach collection="dto.screenQuery" item="item" index="index" separator="">-->
+<!--                    ${item} and-->
+<!--                </foreach>-->
+<!--            </trim>-->
+<!--        </if>-->
+<!--        <if test="dto.orderQuery != null and dto.orderQuery != ''">-->
+<!--            order by ${dto.orderQuery}-->
+<!--        </if>-->
+    </select>
+
+    <!--  查询未结算的费用分析  -->
+    <select id="selectMissCostAnalysis" resultType="java.util.Map">
+        select
+            <if test="dto.classifyDimension == 1">
+                b.adminName adminName,
+            </if>
+            <if test="dto.classifyDimension == 2">
+                a.province province,
+            </if>
+            round(sum(doorCost),2) doorCost,
+            round(sum(artificialCost),2) artificialCost,
+            round(sum(remoteCost),2) remoteCost,
+            round(sum(excessiveCost),2) excessiveCost,
+            round(sum(repairCost),2) repairCost,
+            round(sum(authenticateCost),2) authenticateCost,
+            round(sum(subsidyCost),2) subsidyCost,
+            round(sum(dismountCost),2) dismountCost,
+            round(sum(deliveryCost),2) deliveryCost,
+            round(sum(recallCost),2) recallCost,
+            round(sum(logisticCost),2) logisticCost,
+            round(sum(rewardCost),2) rewardCost,
+            round(sum(compensateCost),2) compensateCost,
+            round(sum(adjustCost),2) adjustCost
+        from t_miss_cost_settle a
+        left join t_district_accounting b on a.accountAreaCode = b.areaCode
+        <where>
+            <include refid="missSettleSummaryCondition"></include>
+            <if test="dto.settleObject != null and dto.settleObject != ''">
+                <if test="dto.settleObject == 'CS中心' or dto.settleObject == '营业' ">
+                    and settleObjectType =#{dto.settleObject}
+                </if>
+                <if test="dto.settleObject != 'CS中心' and dto.settleObject != '营业' ">
+                    and settleObjectName =#{dto.settleObject}
+                </if>
+            </if>
+            <if test="dto.classifyDimension == 1">
+                and length(trim(b.adminName) > 0)
+            </if>
+            <if test="dto.classifyDimension == 2">
+                and length(trim(a.provinceCode) > 0)
+            </if>
+        </where>
+        <if test="dto.classifyDimension == 1">
+            group by b.adminName
+        </if>
+        <if test="dto.classifyDimension == 2">
+            group by a.provinceCode
+        </if>
+        order by doorCost desc
+    </select>
+
+    <!--  查询出未结算的工厂/营业费用分析数据  -->
+    <select id="selectMissIndustrialBusiness" resultType="java.util.Map">
+        select
+        if(settleObjectType = '工厂',if(settleObjectName = '',if(productCategory = '洗衣机','杭州松下家用电器有限公司（洗衣机）',''),settleObjectName),settleObjectType) settleObjectName,
+        <if test="dto.showDimension == 1">
+            <include refid="missBusinessCostQueryColumn"></include>
+        </if>
+        <if test="dto.showDimension == 2">
+            <include refid="missBusinessUnitQueryColumn"></include>
+        </if>
+        from t_miss_cost_settle
+        <where>
+            and settleObjectName != '杭州松下家用电器有限公司（洗衣机）'
+            <include refid="missSettleSummaryCondition"></include>
+        </where>
+        group by if(settleObjectType = '工厂',if(settleObjectName = '',if(productCategory = '洗衣机','杭州松下家用电器有限公司（洗衣机）',''),settleObjectName),settleObjectType)
+        having length(trim(settleObjectName)) > 0
+        order by maintain desc
+    </select>
+
+    <sql id="missBreachCostQueryColumn">
+        round(sum(excessiveCost),2) excessive,
+        round(sum(case when factoryAuditFlag = 'Y' and factoryAuditResult = '违约' then settleMoney else 0 end),2) serviceBreach,
+        round(sum(case when maintainMode = '以换代修' then settleMoney else 0 end),2) changeRepair
+    </sql>
+
+    <sql id="missBreachUnitQueryColumn">
+        sum(case when excessiveCost>0 then serviceUnit else 0 end) excessive,
+        sum(case when factoryAuditFlag = 'Y' and factoryAuditResult = '违约' then serviceUnit else 0 end) serviceBreach,
+        sum(case when buySystemState = '已驳回' or buySystemState = '已作废' then serviceUnit else 0 end) purchaseReject,
+        sum(case when maintainMode = '以换代修' then serviceUnit else 0 end) changeRepair
+    </sql>
+
+    <!--  查询出未结算的工厂别服务违约数据  -->
+    <select id="selectMissFactoryServiceBreach" resultType="java.util.Map">
+        select
+        if(settleObjectType = '工厂',if(settleObjectName = '',if(productCategory = '洗衣机','杭州松下家用电器有限公司（洗衣机）',''),settleObjectName),settleObjectType) settleObjectName,
+        <if test="dto.showDimension == 1">
+            <include refid="missBreachCostQueryColumn"></include>
+        </if>
+        <if test="dto.showDimension == 2">
+            <include refid="missBreachUnitQueryColumn"></include>
+        </if>
+        from t_miss_cost_settle
+        <where>
+            and settleObjectName != '杭州松下家用电器有限公司（洗衣机）'
+            <include refid="missSettleSummaryCondition"></include>
+        </where>
+        group by if(settleObjectType = '工厂',if(settleObjectName = '',if(productCategory = '洗衣机','杭州松下家用电器有限公司（洗衣机）',''),settleObjectName),settleObjectType)
+        having length(trim(settleObjectName)) > 0
+        order by excessive desc
+    </select>
+
+</mapper>

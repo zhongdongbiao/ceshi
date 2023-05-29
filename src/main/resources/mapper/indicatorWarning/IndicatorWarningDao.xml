@@ -1,0 +1,502 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="utry.data.modular.indicatorWarning.dao.IndicatorWarningDao">
+
+    <!--  获取站内信待处理的信息  -->
+    <select id="getStationLetter" parameterType="java.lang.String" resultType="utry.data.modular.indicatorWarning.dto.MailDto">
+        SELECT complaintNumber, systemState, complaintStartTime, complaintEndTime
+        FROM t_complaint_handling
+        WHERE complaintNumber = #{complaintNumber}
+    </select>
+
+    <!--查询指定指标信息-->
+    <select id="selectTargetByIndicatorCode" resultType="utry.data.modular.baseConfig.dto.IndicatorDTO">
+        SELECT
+        ic.id,ic.indicatorCode,ic.indicatorName,ic.indicatorValue
+        FROM t_target t
+        LEFT JOIN t_indicator_configuration ic ON ic.targetId  = t.id
+        WHERE t.ifTarget = '1'
+          <if test="businessCode != null and businessCode != ''">
+            AND t.businessCode = #{businessCode}
+          </if>
+          <if test="month != null and month != ''">
+            AND t.targetMonth = #{month}
+          </if>
+          <if test="indicatorCode != null and indicatorCode != ''">
+            AND ic.indicatorCode=#{indicatorCode}
+          </if>
+    </select>
+
+    <!--获取零件管理的所有的用户担当-->
+    <select id="getPartsManagementAllAssume" resultType="utry.data.modular.indicatorWarning.dto.AssumeUserDto">
+        SELECT uf.userId as userId,
+               ha.Account as account,
+               ha.RealName as realName
+        FROM t_user_factory uf
+            LEFT JOIN hrm_db.t_hrm_accountinfo ha ON uf.userId = ha.AccountID
+        GROUP BY uf.userId
+        ORDER BY DATE_FORMAT(uf.updateTime, '%Y-%m-%d %H:%i:%s') DESC
+    </select>
+
+    <!--获取技术品质的所有的用户担当-->
+    <select id="getTechnicalQualityAllAssume" resultType="utry.data.modular.indicatorWarning.dto.AssumeUserDto">
+        SELECT ut.userId as userId,
+               ha.Account as account,
+               ha.RealName as realName
+        FROM t_user_type ut
+            LEFT JOIN hrm_db.t_hrm_accountinfo ha ON ut.userId = ha.AccountID
+        GROUP BY ut.userId
+        ORDER BY DATE_FORMAT(ut.updateTime, '%Y-%m-%d %H:%i:%s') DESC
+    </select>
+
+    <!--获取大区服务管理的所有用户担当-->
+    <select id="getDistrictAllAssume" resultType="utry.data.modular.indicatorWarning.dto.AssumeUserDto">
+        SELECT ud.userId as userId,
+               ha.Account as account,
+               ha.RealName as realName
+        FROM t_user_district ud
+            LEFT JOIN hrm_db.t_hrm_accountinfo ha ON ud.userId = ha.AccountID
+        GROUP BY ud.userId
+    </select>
+
+    <!--获取投诉直辖部分的所有用户担当-->
+    <select id="getComplaintAllAssume" parameterType="java.util.Map" resultType="utry.data.modular.indicatorWarning.dto.AssumeUserDto">
+        SELECT userId,
+               account,
+               realName
+        FROM t_user_complaint
+        ORDER BY updateTime desc
+    </select>
+
+    <!--获取担当用户-->
+    <select id="getResponsibilityAssume" parameterType="java.util.Map" resultType="utry.data.modular.indicatorWarning.dto.AssumeUserDto">
+        SELECT ha.AccountID AS userId,
+               ha.Account AS Account,
+               ha.RealName AS realName,
+               ic.indicatorValue AS indicatorValue
+        FROM t_target t
+        LEFT JOIN t_indicator_configuration ic ON t.id = ic.targetId
+        LEFT JOIN hrm_db.t_hrm_accountinfo ha ON ic.indicatorUserId = ha.AccountID
+        WHERE t.ifTarget = '0'
+            AND ic.indicatorUserId IS NOT NULL
+            AND ic.indicatorUserId != ''
+        <if test="businessCode != null and businessCode != ''">
+            AND t.businessCode = #{businessCode}
+        </if>
+        <if test="month != null and month != ''">
+            AND t.targetMonth = #{month}
+        </if>
+        <if test="indicatorCode != null and indicatorCode != ''">
+            AND ic.indicatorCode = #{indicatorCode}
+        </if>
+        GROUP BY ha.AccountID
+    </select>
+    
+    <!--  获取在途天数超过三天的收货单  -->
+    <select id="getTransitPassThreeDays" resultType="utry.data.modular.indicatorWarning.dto.IndicatorAnomalyWarningDto">
+        SELECT r.documentNumber,
+               ROUND(TIMESTAMPDIFF(SECOND, r.deliveryTime, DATE_FORMAT(NOW(), '%Y-%m-%d %H:%i:%S'))/(24*60*60), 2) transitDays
+        FROM t_receipt r
+        LEFT JOIN t_receipt_detail rd ON r.documentNumber = rd.documentNumber
+        LEFT JOIN t_inventory_warning iw ON rd.partDrawingNo = iw.partDrawingNo
+        LEFT JOIN t_factory_data fd ON iw.factoryName = fd.factoryName
+        LEFT JOIN t_user_factory uf ON fd.factoryCode = uf.factoryId
+        WHERE r.systemState = '待收货'
+            AND TIMESTAMPDIFF(SECOND, r.deliveryTime, DATE_FORMAT(NOW(), '%Y-%m-%d %H:%i:%S')) > 3*24*60*60
+            AND substring(iw.inventoryDate,1,10)=#{inventoryDate}
+        <if test="userId != null and userId != ''">
+            AND uf.userId = #{userId}
+        </if>
+        GROUP BY r.documentNumber
+        ORDER BY r.createTime desc
+    </select>
+
+    <!--  获取流转超过三天的作业订单  -->
+    <select id="getCirculationPassThreeDays" resultType="utry.data.modular.indicatorWarning.dto.IndicatorAnomalyWarningDto">
+        SELECT od.documentNumber AS documentNumber,
+               ROUND(TIMESTAMPDIFF(SECOND, od.orderSubmitTime, DATE_FORMAT(NOW(), '%Y-%m-%d %H:%i:%S'))/(24*60*60), 2) AS circulationDays
+        FROM t_order_detail od
+        LEFT JOIN t_cancel_service_order_detail csod ON od.documentNumber = csod.documentNumber
+        WHERE od.`state` = 0
+          AND TIMESTAMPDIFF(SECOND, od.orderSubmitTime, DATE_FORMAT(NOW(), '%Y-%m-%d %H:%i:%S')) > 3*24*60*60
+          AND od.orderType = #{orderType}
+        GROUP BY od.documentNumber
+        HAVING SUM(CONVERT(IFNULL(csod.cancelNumber, 0), SIGNED)) &lt; AVG(CONVERT(od.goodQuantity, SIGNED))
+        ORDER BY orderSubmitTime desc
+    </select>
+
+    <!--获取部品低于最小安全在库-->
+    <select id="getInventoryWarning" resultType="utry.data.modular.indicatorWarning.dto.IndicatorAnomalyWarningDto" parameterType="java.lang.String">
+        SELECT tiw.partDrawingNumber AS partDrawingNumber,
+               tiw.describedDrawingNo AS describedDrawingNo,
+               tiw.currentInventory AS currentInventory,
+               ROUND(t.purchaseTime - TIMESTAMPDIFF(DAY, t.documentDate, DATE_FORMAT(NOW(), '%Y-%m-%d %H:%i:%S'))) AS arrivalDays
+        FROM t_inventory_warning tiw
+        LEFT JOIN t_factory_data fd ON tiw.factoryName = fd.factoryName
+        LEFT JOIN t_user_factory uf ON fd.factoryCode = uf.factoryId
+        LEFT JOIN (SELECT tpod.partDrawingNo,tpo.documentDate,tpo.purchaseTime
+                    FROM t_purchase_order_detail tpod
+                    LEFT JOIN t_purchase_order tpo on tpo.documentNo=tpod.documentNo
+                    LEFT JOIN t_cancel_purchase_order_detail tcpod on tpod.partDrawingNo = tcpod.partDrawingNo and tpod.documentNo = tcpod.purchaseOrderNo
+                    WHERE tpo.systemState='已提交'
+                      AND (CONVERT(tcpod.orderNumber, SIGNED) > CONVERT(tcpod.cancelNumber, SIGNED) OR tcpod.purchaseOrderNo is null)
+                    GROUP BY partDrawingNo) t ON tiw.partDrawingNo = t.partDrawingNo
+        WHERE CONVERT(tiw.minSafetyStock, SIGNED) > CONVERT(tiw.currentInventory, SIGNED)
+        <if test="userId != null and userId != ''">
+            AND uf.userId = #{userId}
+        </if>
+
+    </select>
+
+    <!--计算30分钟预约及时率-->
+    <select id="timely" resultType="java.util.Map">
+        SELECT t.timelyEligible AS eligible,
+               t.timelyTotal AS total,
+               CAST(0+CAST(ROUND(IFNULL( t.timelyEligible/t.timelyTotal,0)*100,1) AS CHAR) AS CHAR)AS rate
+        FROM(SELECT SUM(rdd.timelyEligible) AS timelyEligible,
+                    COUNT(1) AS timelyTotal
+            FROM t_region_dispatching_detail rdd
+            LEFT JOIN t_region_service_store rss ON rss.storeNumber = rdd.storeNumber AND rss.accountingCenterCode = rdd.accountingCenterCode
+            LEFT JOIN t_user_district tud ON rdd.accountingAreaCode = tud.districtId
+            WHERE rdd.systemState NOT IN ('已作废','已关闭','申请作废')
+              AND (rdd.serviceType IN ('安装','维修') OR (rdd.serviceType = '鉴定' AND rdd.firstServiceType IN ('安装','维修')))
+              AND rdd.dispatchingSource NOT IN ('自接','营销中心','前置渠道')
+              <if test="startTime != null and startTime != '' ">
+                  AND  rdd.dispatchingTime &gt;= #{startTime}
+              </if>
+              <if test="endTime != null and endTime != '' ">
+                  AND  rdd.dispatchingTime &lt;= #{endTime}
+              </if>
+              <if test="userId != null and userId !=''">
+                  AND tud.userId = #{userId}
+              </if>
+        )t
+    </select>
+
+    <!--计算首次预约准时上门率-->
+    <select id="firstPunctuality" resultType="java.util.Map">
+        SELECT t.firstPunctualityEligible AS eligible,
+               t.firstPunctualityTotal AS total,
+               CAST(0+CAST(IFNULL(ROUND(t.firstPunctualityEligible / t.firstPunctualityTotal*100,1 ),0) AS CHAR)AS CHAR) AS rate
+        FROM(SELECT SUM(rdd.firstPunctualityEligible) AS firstPunctualityEligible,
+                    COUNT(1) AS firstPunctualityTotal
+            FROM t_region_dispatching_detail rdd
+            LEFT JOIN t_region_service_store rss ON rss.storeNumber = rdd.storeNumber AND rss.accountingCenterCode = rdd.accountingCenterCode
+            LEFT JOIN t_user_district tud ON rdd.accountingAreaCode = tud.districtId
+            WHERE rdd.systemState NOT IN ('已作废','已关闭','申请作废')
+              AND rdd.dispatchingSource NOT IN ('自接','营销中心','前置渠道')
+              AND (rdd.serviceType IN ('安装','维修') OR (rdd.serviceType = '鉴定' AND rdd.firstServiceType IN ('安装','维修')))
+              <if test="startTime != null and startTime != '' ">
+                  AND  rdd.dispatchingTime &gt;= #{startTime}
+              </if>
+              <if test="endTime != null and endTime != '' ">
+                  AND  rdd.dispatchingTime &lt;= #{endTime}
+              </if>
+              <if test="userId != null and userId != ''">
+                  AND tud.userId = #{userId}
+              </if>
+        )t
+    </select>
+
+    <!--非首次预约准时上门率-->
+    <select id="punctuality" resultType="java.util.Map">
+        SELECT t.punctualityEligible AS eligible,
+               t.punctualityTotal AS total,
+               CAST(0+CAST(ROUND(IFNULL(t.punctualityEligible / t.punctualityTotal,0)*100,1 ) AS CHAR)AS CHAR) AS rate
+        FROM(SELECT SUM(rdd.punctualityEligible) AS punctualityEligible,
+                    COUNT(1) AS punctualityTotal
+            FROM t_region_dispatching_detail rdd
+            LEFT JOIN t_region_service_store rss ON rss.storeNumber = rdd.storeNumber AND rss.accountingCenterCode = rdd.accountingCenterCode
+            LEFT JOIN t_user_district tud ON rdd.accountingAreaCode = tud.districtId
+            WHERE rdd.systemState NOT IN ('已作废','已关闭','申请作废')
+              AND rdd.dispatchingSource NOT IN ('自接','营销中心','前置渠道')
+              AND (rdd.serviceType IN ('安装','维修') OR (rdd.serviceType = '鉴定' AND rdd.firstServiceType IN ('安装','维修')))
+            <if test="startTime != null and startTime != '' ">
+                AND  rdd.dispatchingTime &gt;= #{startTime}
+            </if>
+            <if test="endTime != null and endTime != '' ">
+                AND  rdd.dispatchingTime &lt;= #{endTime}
+            </if>
+            <if test="userId != null and userId != ''">
+                AND tud.userId = #{userId}
+            </if>
+        ) t
+    </select>
+
+    <!--TAT平均服务完成时长-->
+    <select id="average" resultType="java.util.Map">
+
+        SELECT ROUND(AVG(IFNULL(rdd.average, 0))/3600) AS ave
+        FROM t_region_dispatching_detail rdd
+        LEFT JOIN t_region_service_store rss ON rss.storeNumber = rdd.storeNumber AND rss.accountingCenterCode = rdd.accountingCenterCode
+        LEFT JOIN t_user_district tud ON rdd.accountingAreaCode = tud.districtId
+        WHERE rdd.systemState NOT IN ('已作废','已关闭','申请作废')
+        AND rdd.dispatchingSource NOT IN ('自接','营销中心','前置渠道')
+        AND (rdd.productTypeCode != 'LX0109' OR rdd.productCategoryCode IS NULL )
+        AND rdd.serviceType IN ('安装','维修','鉴定','非上门维修')
+        AND rdd.averageEligible IS NOT NULL
+        <if test="startTime != null and startTime != '' ">
+            AND rdd.TATFinishTime &gt;= #{startTime}
+        </if>
+        <if test="endTime != null and endTime != '' ">
+            AND rdd.TATFinishTime &lt;= #{endTime}
+        </if>
+        <if test="userId != null and userId != ''">
+            AND tud.userId = #{userId}
+        </if>
+    </select>
+
+    <!--投诉7天解决率-->
+    <select id="solve" resultType="java.util.Map">
+        SELECT t.solveEligible AS eligible,
+               t.solveTotal AS total,
+               CAST(0+CAST(IFNULL(ROUND(t.solveEligible / t.solveTotal*100,2 ),0) AS CHAR) AS CHAR) AS rate
+        FROM ( SELECT SUM(rdd.solveEligible)AS solveEligible,
+                      SUM(rdd.solveEligible IS NOT NULL) AS solveTotal
+            FROM t_region_dispatching_detail rdd
+            LEFT JOIN t_region_service_store rss ON rss.storeNumber = rdd.storeNumber AND rss.accountingCenterCode = rdd.accountingCenterCode
+            LEFT JOIN t_user_district tud ON rdd.accountingAreaCode = tud.districtId
+            WHERE rdd.systemState NOT IN ('已作废','已关闭','申请作废')
+            AND rdd.serviceType IN ('安装','维修','鉴定','非上门维修')
+            <if test="startTime != null and startTime != '' ">
+                AND  rdd.dispatchingTime &gt;= #{startTime}
+            </if>
+            <if test="endTime != null and endTime != '' ">
+                AND  rdd.dispatchingTime &lt;= #{endTime}
+            </if>
+            <if test="userId != null and userId != ''">
+                AND tud.userId = #{userId}
+            </if>
+        ) t
+    </select>
+
+    <!--一次修复率-->
+    <select id="repair" resultType="java.util.Map">
+        SELECT t.repairEligible AS eligible,
+               t.repairTotal AS total,
+                CAST(0+CAST(IFNULL(ROUND(t.repairEligible / t.repairTotal*100,1 ),0) AS CHAR)AS CHAR) AS rate
+        FROM(SELECT SUM(rdd.repairEligible) AS repairEligible,
+                    SUM(rdd.repairEligible IS NOT NULL) AS repairTotal
+            FROM t_region_dispatching_detail rdd
+            LEFT JOIN t_region_service_store rss ON rss.storeNumber = rdd.storeNumber AND rss.accountingCenterCode = rdd.accountingCenterCode
+            LEFT JOIN t_user_district tud ON rdd.accountingAreaCode = tud.districtId
+            WHERE rdd.systemState NOT IN ('已作废','已关闭','申请作废')
+              AND rdd.serviceType IN ('维修','非上门维修')
+              AND rdd.dispatchingSource NOT IN ('自接','营销中心','前置渠道')
+              <if test="startTime != null and startTime != '' ">
+                  AND  rdd.dispatchingTime &gt;= #{startTime}
+              </if>
+              <if test="endTime != null and endTime != '' ">
+                  AND  rdd.dispatchingTime &lt;= #{endTime}
+              </if>
+              <if test="userId != null and userId != ''">
+                  AND tud.userId = #{userId}
+              </if>
+        ) t
+    </select>
+
+    <!--N+1投诉解决方案提交率-->
+    <select id="scheme" resultType="java.util.Map">
+        SELECT t.schemeEligible AS eligible,
+               t.schemeTotal AS total,
+               CAST(0+CAST(IFNULL(ROUND(t.schemeEligible / t.schemeTotal*100,1  ),0) AS CHAR)AS CHAR) AS rate
+        FROM(SELECT SUM(rdd.schemeEligible) AS schemeEligible,
+                    SUM(rdd.schemeEligible IS NOT NULL) AS schemeTotal
+            FROM t_region_dispatching_detail rdd
+            LEFT JOIN t_region_service_store rss ON rss.storeNumber = rdd.storeNumber AND rss.accountingCenterCode = rdd.accountingCenterCode
+            LEFT JOIN t_user_district tud ON rdd.accountingAreaCode = tud.districtId
+            WHERE rdd.systemState NOT IN ('已作废','已关闭','申请作废')
+            AND rdd.serviceType IN ('安装','维修','鉴定','非上门维修')
+            <if test="startTime != null and startTime != '' ">
+                AND  rdd.dispatchingTime &gt;= #{startTime}
+            </if>
+            <if test="endTime != null and endTime != '' ">
+                AND  rdd.dispatchingTime &lt;= #{endTime}
+            </if>
+            <if test="userId != null and userId != ''">
+                AND tud.userId = #{userId}
+            </if>
+        )t
+    </select>
+    <!-- 获取投诉6天未结案的投诉单号   -->
+    <select id="sixDayNoOverCase" resultType="java.util.Map">
+        SELECT complaintNumber,
+               ROUND(TIMESTAMPDIFF(SECOND, complaintStartTime, DATE_FORMAT(NOW(), '%Y-%m-%d %H:%i:%S')) / (24*60*60), 0) AS overDays
+        FROM t_complaint_handling
+        WHERE (complaintEndTime is null OR complaintEndTime = '')
+          AND TIMESTAMPDIFF(SECOND, complaintStartTime, DATE_FORMAT(NOW(), '%Y-%m-%d %H:%i:%S')) &gt;= (6*24*60*60)
+    </select>
+
+    <!--  投诉大于一天未提交方案  -->
+    <select id="oneDayNoSolution" resultType="java.util.Map">
+        SELECT complaintNumber,
+               ROUND(TIMESTAMPDIFF(SECOND, complaintStartTime, DATE_FORMAT(NOW(), '%Y-%m-%d %H:%i:%S')) / (24*60*60), 0) as overtimeDay
+        FROM t_complaint_handling
+        WHERE TIMESTAMPDIFF(SECOND, complaintStartTime, DATE_FORMAT(NOW(), '%Y-%m-%d %H:%i:%S')) > (24*60*60)
+          AND (complaintEndTime is null OR complaintEndTime = '')
+          AND (solutionSubmissionTime is null OR solutionSubmissionTime = '')
+    </select>
+
+    <!--  技术品质 - 一次性修复率小于阈值  -->
+    <select id="calculateRepairRate" parameterType ="java.util.Map" resultType="java.util.Map">
+
+        SELECT
+        t.*, CAST(0+CAST(IFNULL(ROUND(t.eligible / t.total*100,2 ),0) AS CHAR)AS CHAR) AS repair
+        FROM
+        (
+            SELECT
+                COUNT(rdd.dispatchingOrder) AS total,
+                SUM(rdd.repairEligible) AS eligible
+            FROM t_region_dispatching_detail rdd force index(in_t)
+            WHERE rdd.serviceType IN ('非上门维修','维修')
+                AND rdd.repairEligible IS NOT NULL
+                AND rdd.systemState NOT IN ('已作废','已关闭','申请作废')
+                AND rdd.dispatchingSource NOT IN ('自接','营销中心','前置渠道')
+            <if test="productTypeCodeList != null and productTypeCodeList.size > 0">
+                AND rdd.productTypeCode IN
+                <foreach collection="productTypeCodeList" item="productTypeCode" open="(" separator="," close=")">
+                    #{productTypeCode}
+                </foreach>
+            </if>
+            <if test="startTime != '' and startTime != null">
+                AND rdd.dispatchingTime &gt;= #{startTime}
+            </if>
+            <if test="endTime != '' and endTime != null">
+                AND rdd.dispatchingTime &lt;= #{endTime}
+            </if>
+        ) t
+    </select>
+
+    <!--  技术品质 - 核心指标，品质单审核作业时长超过阈值  -->
+    <select id="calculateApprovalDuration" parameterType ="java.util.Map" resultType="java.util.Map">
+        SELECT CONCAT(IFNULL(ROUND((SUM(t.time) / count(*)) / 3600, 2),0),'') AS `time`
+        FROM ( SELECT TIMESTAMPDIFF(SECOND,qf.submitTime,IF(qf.systemState='已提交',NOW(),qf.auditFinishTime)) AS `time`
+                FROM t_quality_feedback qf
+            WHERE qf.submitTime IS NOT NULL
+              AND qf.submitTime != ''
+                <if test="productTypeCodeList != null and productTypeCodeList.size > 0">
+                    AND qf.productTypeCode IN
+                    <foreach collection="productTypeCodeList" item="productTypeCode" open="(" separator="," close=")">
+                        #{productTypeCode}
+                    </foreach>
+                </if>
+                <if test="startTime != '' and startTime != null">
+                    AND qf.documentDate &gt;= #{startTime}
+                </if>
+                <if test="endTime != '' and endTime != null">
+                    AND qf.documentDate &lt;= #{endTime}
+                </if>
+        ) t
+    </select>
+
+    <!--  技术品质 - 担当指标，品质单审核作业时长超过阈值  -->
+    <select id="calculateAssumeApprovalDuration" parameterType ="java.util.Map" resultType="java.util.Map">
+        SELECT CONCAT(IFNULL(ROUND((SUM(t.time) / count(*)) / 3600, 2),0),'') AS `time`,
+            t.manageNumber AS manageNumber
+        FROM ( SELECT TIMESTAMPDIFF(SECOND,qf.submitTime,IF(qf.systemState='已提交',NOW(),qf.auditFinishTime)) AS `time`,
+                qf.manageNumber AS manageNumber
+                FROM t_quality_feedback qf
+                WHERE qf.submitTime IS NOT NULL
+                AND qf.submitTime != ''
+            <if test="productTypeCodeList != null and productTypeCodeList.size > 0">
+                AND qf.productTypeCode IN
+                <foreach collection="productTypeCodeList" item="productTypeCode" open="(" separator="," close=")">
+                    #{productTypeCode}
+                </foreach>
+            </if>
+            <if test="startTime != '' and startTime != null">
+                AND qf.documentDate &gt;= #{startTime}
+            </if>
+            <if test="endTime != '' and endTime != null">
+                AND qf.documentDate &lt;= #{endTime}
+            </if>
+        ) t
+        group by t.manageNumber
+    </select>
+
+    <!--  技术品质 - 新品上市资料7天内完备率  -->
+    <select id="calculateCompletionRate" parameterType ="java.util.Map" resultType="java.util.Map">
+        SELECT
+        CONCAT(IFNULL(ROUND(
+        SUM(
+            IF (TIMESTAMPDIFF(DAY,SUBSTRING_INDEX(listingDate, ' ', 1),serviceManualTime) &lt;= 7
+                AND TIMESTAMPDIFF(DAY,SUBSTRING_INDEX(listingDate, ' ', 1),manualTime) &lt;= 7,
+            1,0)
+        ) / COUNT(*) * 100,2),0),'') AS rate
+        FROM t_product_information
+        WHERE systemState = '已启用'
+        AND listingDate IS NOT NULL AND listingDate != ''
+        <if test="productTypeCodeList != null and productTypeCodeList.size > 0">
+            AND productTypeCode IN
+            <foreach collection="productTypeCodeList" item="productTypeCode" open="(" separator="," close=")">
+                #{productTypeCode}
+            </foreach>
+        </if>
+        <if test="startTime != null and startTime != ''">
+            AND listingDate &gt;= #{startTime}
+        </if>
+        <if test="endTime != null and endTime != ''">
+            AND listingDate &lt;= #{endTime}
+        </if>
+    </select>
+
+    <!--技术品质 - 新品上市资料达到6天未上传-->
+    <select id="sixDaysDataNotUpload" parameterType ="java.util.Map" resultType="java.util.Map">
+        SELECT productModel,
+        ROUND(TIMESTAMPDIFF(SECOND,listingDate,DATE_FORMAT(NOW(), '%Y-%m-%d %H:%i:%S')) / (24*60*60), 0) AS overDay
+        FROM t_product_information
+        WHERE systemState = '已启用'
+        AND (listingDate IS NOT NULL AND listingDate != '')
+        AND (serviceManualTime IS NULL OR serviceManualTime = '')
+        AND (manualTime IS NULL OR manualTime = '')
+        AND TIMESTAMPDIFF(SECOND,listingDate,DATE_FORMAT(NOW(), '%Y-%m-%d %H:%i:%S')) &gt;= 6 * 24 * 60 * 60
+        <if test="productTypeCodeList != null and productTypeCodeList.size > 0">
+            AND productTypeCode IN
+            <foreach collection="productTypeCodeList" item="productTypeCode" open="(" separator="," close=")">
+                #{productTypeCode}
+            </foreach>
+        </if>
+        <if test="startTime != null and startTime != ''">
+            AND listingDate &gt;= #{startTime}
+        </if>
+        <if test="endTime != null and endTime != ''">
+            AND listingDate &lt;= #{endTime}
+        </if>
+    </select>
+
+    <!--根据用户账户id获取用户的信息-->
+    <select id="getUserInfoByAccountId" parameterType="java.util.List" resultType="utry.core.websocket.bo.UserInfo">
+        SELECT ha.CompanyID AS companyID,
+               oc.CompanyName AS companyName,
+               ha.Account AS account,
+               ha.RealName AS realName,
+               ha.AccountID AS accountID
+        FROM hrm_db.t_hrm_accountinfo ha
+            LEFT JOIN oam_db.t_oam_companyinfo oc ON ha.CompanyID = oc.CompanyID
+        WHERE 1 = 1
+        <if test="accountIdList != null and accountIdList.size > 0">
+            AND ha.AccountID IN
+            <foreach collection="accountIdList" item="accountId" open="(" separator="," close=")">
+                #{accountId}
+            </foreach>
+        </if>
+    </select>
+
+    <select id="selectRelationProject" resultType="java.lang.String">
+        SELECT relationProject
+        FROM t_department_station_letter
+        WHERE departmentNumber = #{departmentNumber}
+    </select>
+
+    <select id="getProductTypeCodeByUserId" resultType="java.lang.String" parameterType="java.lang.String">
+        SELECT typeId
+        FROM  t_user_type
+        where 1=1
+        <if test="userId != null and userId != ''">
+            and userId = #{userId}
+        </if>
+        GROUP BY typeId
+    </select>
+
+</mapper>

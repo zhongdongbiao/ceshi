@@ -1,0 +1,130 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="utry.data.modular.partsManagement.dao.PackingListDao">
+    <!-- 开启二级缓存 -->
+    <cache eviction="LRU" flushInterval="300000" readOnly="true" size="1024"></cache>
+
+    <insert id="insertPackingList">
+        <if test="detail != null and detail != '' and detail.size>0 ">
+            insert into t_packing_list_detail (packingListNo,associatedOrderNumber,productModel,partCode,partDrawingNo,sourceLineNumber,applyNumber,
+            goodNumber,outNumber,distributionSingleNo)
+            VALUES
+            <foreach collection="detail" item="model" separator=",">
+                (#{packingListNo},#{model.associatedOrderNumber},#{model.productModel},#{model.partCode},#{model.partDrawingNo},
+                #{model.sourceLineNumber},#{model.applyNumber},#{model.goodNumber},#{model.outNumber},#{model.distributionSingleNo})
+            </foreach>
+            ;
+        </if>
+        insert into t_packing_list (packingListNo,loadingDate,billsLadingNo,packingType,consignee,
+        consigneePhone,consigneeAddress,mailType,transportMethod,freightAmount,logisticsUnits,systemState) values (#{packingListNo},
+        #{loadingDate},#{billsLadingNo},#{packingType},#{consignee},#{consigneePhone},
+        #{consigneeAddress},#{mailType},#{transportMethod},#{freightAmount},#{logisticsUnits},#{systemState})
+    </insert>
+
+    <!--批量修改装箱单-->
+    <update id="updatePacking">
+        <foreach collection="packingValue" item="item" index="index" open="" close="" separator=";">
+            update t_packing_list set associatedOrderNumber = #{item.associatedOrderNumber}
+            where packingListNo=#{item.packingListNo}
+        </foreach>
+    </update>
+
+    <!--根据单据数据获取装箱单详情数据-->
+    <select id="getPackingListDetailByOrder"
+            resultType="utry.data.modular.partsManagement.model.PackingListDetail">
+        select distinct(associatedOrderNumber),packingListNo,associatedOrderNumber,partDrawingNo,sourceLineNumber,applyNumber,
+        goodNumber,outNumber,distributionSingleNo from t_packing_list_detail where associatedOrderNumber =#{documentNumber}
+    </select>
+
+    <!--根据单据号数据获取装箱单详情行数-->
+    <select id="getPackingListCountByOrder"
+            resultType="java.lang.Integer">
+        select count(1) from t_packing_list_detail where associatedOrderNumber =#{documentNumber}
+    </select>
+
+    <!--根据单据数据获取装箱单详情数据-->
+    <select id="getPackingListByPackingListDetail"
+            resultType="utry.data.modular.partsManagement.model.PackingList">
+        select distinct(packingListNo),loadingDate,billsLadingNo,packingType,consignee,
+        consigneePhone,consigneeAddress,mailType,transportMethod,freightAmount,logisticsUnits,systemState from t_packing_list
+        where packingListNo =#{packingListNo}
+    </select>
+
+    <!--获取配货单DTO数据-->
+    <select id="getPackingListDTO" resultType="utry.data.modular.partsManagement.dto.PackingListDTO">
+        select tpl.packingListNo,loadingDate,billsLadingNo,packingType,consignee,consigneePhone,consigneeAddress,mailType,
+        transportMethod,freightAmount,logisticsUnits,systemState from t_packing_list tpl
+        left join t_packing_list_detail tpld on tpld.packingListNo=tpl.packingListNo where tpld.associatedOrderNumber=#{associatedOrderNumber}
+        group by tpl.packingListNo order by loadingDate asc
+    </select>
+
+    <!--根据装箱单号获取装箱单详情-->
+    <select id="getPackingListDetail" resultType="utry.data.modular.partsManagement.model.PackingListDetail">
+        select packingListNo,associatedOrderNumber,partDrawingNo,sourceLineNumber,applyNumber,goodNumber,outNumber,
+        distributionSingleNo from t_packing_list_detail where packingListNo=#{packingListNo}
+    </select>
+
+    <!--获取实时的装箱单数量-->
+    <select id="getPackingListCount" resultType="java.lang.Integer">
+        select count(1) from (
+        select 1 from t_packing_list_detail where  associatedOrderNumber in(select documentNumber
+        from t_part_order where state='0' GROUP BY documentNumber) GROUP BY packingListNo) list
+    </select>
+
+    <!--根据时间段获取未走缺件处理单的配货单到装箱单的总时长-->
+    <select id="getAllTime" resultType="java.lang.Integer">
+        select IFNULL(sum(TIMESTAMPDIFF(HOUR,distributionDate,loadingDate)),0) from(
+        select tds.distributionDate,tpl.loadingDate from t_packing_list tpl
+        LEFT JOIN t_packing_list_detail tpld on tpld.packingListNo=tpl.packingListNo
+        LEFT JOIN t_distribution_subsidiary tdsd on tdsd.associatedOrderNumber=tpld.associatedOrderNumber and tdsd.partDrawingNo=tpld.partDrawingNo
+        LEFT JOIN (select distributionSingleNo,distributionDate from t_distribution_single GROUP BY distributionSingleNo) tds on tds.distributionSingleNo=tdsd.distributionSingleNo
+        where tpld.associatedOrderNumber not in (select associatedOrderNumber from t_miss_stock_up_order)
+        and substring(tpl.loadingDate,1,10) <![CDATA[ >= ]]> #{startDate}
+        and substring(tpl.loadingDate,1,10) <![CDATA[ <= ]]> #{endDate} GROUP BY tpl.packingListNo) list
+    </select>
+
+    <!--根据时间段获取生成了缺件处理单的配货单到装箱单的总时长-->
+    <select id="getAllMisTime" resultType="java.lang.Integer">
+        select IFNULL(sum(TIMESTAMPDIFF(HOUR,distributionDate,loadingDate)),0) from(
+        select tds.distributionDate,tpl.loadingDate from t_packing_list tpl
+        LEFT JOIN t_packing_list_detail tpld on tpld.packingListNo=tpl.packingListNo
+        LEFT JOIN t_distribution_subsidiary tdsd on tdsd.associatedOrderNumber=tpld.associatedOrderNumber and tdsd.partDrawingNo=tpld.partDrawingNo
+        LEFT JOIN (select distributionSingleNo,distributionDate from t_distribution_single GROUP BY distributionSingleNo) tds on tds.distributionSingleNo=tdsd.distributionSingleNo
+        where tpld.associatedOrderNumber in (select associatedOrderNumber from t_miss_stock_up_order)
+        and substring(tpl.loadingDate,1,10) <![CDATA[ >= ]]> #{startDate}
+        and substring(tpl.loadingDate,1,10) <![CDATA[ <= ]]> #{endDate} GROUP BY tpl.packingListNo) list
+    </select>
+
+    <!--根据时间段获取没有生成了缺件处理单的装箱单的总数量-->
+    <select id="getNoMisCount" resultType="java.lang.Integer">
+        select count(1) from (
+        select 1 from t_packing_list tpl
+        LEFT JOIN t_packing_list_detail tpld on tpld.packingListNo=tpl.packingListNo
+        where tpld.associatedOrderNumber not in (select associatedOrderNumber from t_miss_stock_up_order)
+        and substring(tpl.loadingDate,1,10) <![CDATA[ >= ]]> #{startDate}
+        and substring(tpl.loadingDate,1,10) <![CDATA[ <= ]]> #{endDate}
+        GROUP BY tpl.packingListNo) list
+    </select>
+
+    <!--根据时间段获取生成了缺件处理单的装箱单的总数量-->
+    <select id="getAllMisCount" resultType="java.lang.Integer">
+        select count(*) from (
+        select 1 from t_packing_list tpl
+        LEFT JOIN t_packing_list_detail tpld on tpld.packingListNo=tpl.packingListNo
+        where tpld.associatedOrderNumber in (select associatedOrderNumber from t_miss_stock_up_order)
+        and substring(tpl.loadingDate,1,10) <![CDATA[ >= ]]> #{startDate}
+        and substring(tpl.loadingDate,1,10) <![CDATA[ <= ]]> #{endDate}
+        GROUP BY tpl.packingListNo) list
+    </select>
+
+
+    <select id="getPackingValue" resultType="java.util.Map">
+        select packingListNo,associatedOrderNumber  from t_packing_list_detail GROUP BY associatedOrderNumber
+    </select>
+    <select id="getOrderDetailFlag" resultType="java.lang.String">
+        select packingListNo  from t_packing_list where packingListNo=#{packingListNo}
+    </select>
+
+
+</mapper>

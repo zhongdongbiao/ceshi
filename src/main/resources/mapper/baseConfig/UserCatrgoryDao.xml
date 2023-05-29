@@ -1,0 +1,193 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="utry.data.modular.baseConfig.dao.UserCategoryDao">
+
+    <select id="selectUser" resultType="utry.data.modular.baseConfig.dto.HrmAccountInfoDTO">
+        SELECT
+            AccountID as accountId,
+            Account as account,
+            RealName as realName
+        FROM
+            hrm_db.t_hrm_accountinfo
+        WHERE deleted = '0'
+    </select>
+
+    <select id="selectCategory" resultType="java.lang.String">
+        SELECT
+            t.productTypeCode
+        FROM
+            t_user_type u
+                LEFT JOIN t_product_type t ON t.productTypeCode = u.typeId
+        WHERE u.default = '0'
+    </select>
+
+    <insert id="addCategory" parameterType="utry.data.modular.baseConfig.dto.UserTypeDTO">
+        INSERT INTO t_user_type (id, userId, typeId, createTime,updateTime)
+        VALUES
+        <foreach collection="list" item="typeId" separator=",">
+            (REPLACE(UUID(), _utf8'-', _utf8''),#{accountId},#{typeId},#{createTime},NOW())
+        </foreach>
+    </insert>
+
+    <select id="selectConfig"
+            resultType="utry.data.modular.baseConfig.dto.UserCategoryConfigDTO">
+        SELECT
+            h.accountId,
+            h.account,
+            h.realName,
+            GROUP_CONCAT(t.productType) AS productType,
+            DATE_FORMAT(u.createTime, '%Y-%m-%d %H:%i:%s') AS createTime,
+            Max(DATE_FORMAT(u.updateTime, '%Y-%m-%d %H:%i:%s')) AS updateTime
+        FROM
+            t_user_type u
+                LEFT JOIN (
+                SELECT
+                    productType,
+                    productTypeCode
+                FROM
+                    t_product_type
+                GROUP BY
+                    productType
+            ) t ON t.productTypeCode = u.typeId
+                LEFT JOIN hrm_db.t_hrm_accountinfo h ON u.userId = h.AccountID
+        WHERE u.default = '0'
+        GROUP BY
+            u.userId
+        ORDER BY
+            Max(DATE_FORMAT(u.updateTime, '%Y-%m-%d %H:%i:%s')) DESC
+    </select>
+
+    <select id="selectTypeTree" resultType="utry.data.modular.partsManagement.model.ProductType">
+        SELECT
+            id,
+            productCategory AS name,
+            productTypeCode,
+            productType,
+            productCategoryCode
+        FROM
+            t_product_type
+        WHERE systemState = "已启用"
+    </select>
+
+    <select id="ifExist" parameterType="java.util.List" resultType="java.lang.String">
+        SELECT
+        u.id
+        FROM
+        t_user_type u
+        LEFT JOIN t_product_type p ON u.typeId = p.productTypeCode
+        WHERE u.typeId in
+        <foreach collection="list" open="(" close=")" separator="," item="typeId">
+            #{typeId}
+        </foreach>
+        LIMIT 1
+    </select>
+
+    <delete id="deleteConfig" parameterType="java.lang.String">
+        DELETE
+        FROM
+            t_user_type
+        WHERE
+            userId = #{accountId}
+    </delete>
+
+    <select id="selectUserType" resultType="java.lang.String">
+        SELECT
+            t.productTypeCode
+        FROM
+            t_user_type u
+                LEFT JOIN t_product_type t ON t.productTypeCode = u.typeId
+        WHERE
+            u.userId = #{accountId} AND u.default = '0'
+    </select>
+
+    <select id="selectDefault" resultType="utry.data.modular.baseConfig.dto.HrmAccountInfoDTO">
+        SELECT
+            userId as accountId,id
+        FROM
+            t_user_type
+        WHERE `default` = '1'
+    </select>
+
+    <update id="updateDefault" parameterType="java.lang.String">
+        UPDATE t_user_type
+        SET userId = #{accountId}
+        WHERE
+        id = #{id}
+    </update>
+
+    <insert id="insertDefault" parameterType="java.lang.String">
+        INSERT INTO t_user_type (id, userId, `default`)
+        VALUES
+        (REPLACE(UUID(), _utf8'-', _utf8''),#{accountId},'1')
+    </insert>
+
+    <select id="selectRoot" resultType="utry.data.modular.baseConfig.dto.CategoryRootDTO">
+        SELECT
+            id,productCategory as name,productCategoryCode
+        FROM
+            t_product_type
+        WHERE systemState = "已启用"
+        GROUP BY productCategoryCode
+    </select>
+
+    <select id="ifEditExist" resultType="java.lang.String">
+        SELECT
+        u.id
+        FROM
+        t_user_type u
+        LEFT JOIN t_product_type p ON u.typeId = p.productTypeCode
+        WHERE u.typeId IN
+        <foreach collection="list" open="(" close=")" separator="," item="typeId">
+            #{typeId}
+        </foreach>
+        AND u.userId = #{accountId}
+        LIMIT 1
+    </select>
+
+    <select id="selectTargetId" resultType="java.lang.String">
+        SELECT
+        c.targetId
+        FROM
+        t_indicator_configuration c
+        LEFT JOIN t_target t ON t.id = c.targetId
+        WHERE c.indicatorUserId = #{accountId}
+        AND t.businessCode = 'category'
+        GROUP BY `c`.targetId
+    </select>
+
+    <delete id="deleteUserTargetId" parameterType="java.util.List">
+        delete from t_indicator_configuration where indicatorUserId = #{accountId} and targetId in
+        <foreach collection="list" open="(" close=")" separator="," item="targetId">
+            #{targetId}
+        </foreach>
+    </delete>
+
+    <delete id="deleteTargetId" parameterType="java.lang.String">
+        delete from t_target where id in
+        <foreach collection="list" open="(" close=")" separator="," item="targetId">
+            #{targetId}
+        </foreach>
+    </delete>
+
+    <select id="selectLast" resultType="java.lang.String">
+        SELECT
+        c.targetId
+        FROM
+        t_indicator_configuration c
+        LEFT JOIN t_target t ON t.id = c.targetId
+        WHERE c.indicatorUserId != #{accountId} AND c.targetId IN
+        <foreach collection="list" open="(" close=")" separator="," item="targetId">
+            #{targetId}
+        </foreach>
+        GROUP BY c.targetId
+    </select>
+
+    <delete id="deleteMyself" parameterType="java.lang.String">
+        DELETE
+        FROM
+            t_user_type
+        WHERE
+            userId = #{accountId} AND `default` = '0'
+    </delete>
+</mapper>

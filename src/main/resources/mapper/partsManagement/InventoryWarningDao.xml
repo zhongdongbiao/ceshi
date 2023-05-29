@@ -1,0 +1,856 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="utry.data.modular.partsManagement.dao.InventoryWarningDao">
+    <!-- 开启二级缓存 -->
+    <cache eviction="LRU" flushInterval="300000" readOnly="true" size="1024"></cache>
+
+    <resultMap id="warehouseAmountBOResultMap" type="utry.data.modular.partsManagement.bo.WarehouseAmountBO">
+        <result property="factoryCode" column="factoryCode" jdbcType="VARCHAR"/>
+        <result property="factoryName" column="factoryName" jdbcType="VARCHAR"/>
+        <result property="total" column="total" jdbcType="DECIMAL"/>
+    </resultMap>
+
+    <resultMap id="securityBOResultMap" type="utry.data.modular.partsManagement.bo.SecurityBO">
+        <result property="warehouseCode" column="warehouseCode" jdbcType="VARCHAR"/>
+        <result property="partDrawingNumber" column="partDrawingNumber" jdbcType="VARCHAR"/>
+        <result property="count" column="count" jdbcType="INTEGER"/>
+    </resultMap>
+
+    <insert id="insertInventoryWarning">
+        insert into t_inventory_warning (partDrawingNumber,partCode,partDrawingNo ,partDrawingName,describedDrawingNo,attributesDrawingNo,accountingCenter,
+        supplierName,purchasingPrice,suitableModel,productCategory,factoryName,minSafetyStock,maxSafetyStock,currentInventory,inventoryDate,systemState,supplierCode,purchaseOrderType,factoryCode)
+        values (#{partDrawingNumber},#{partCode},#{partDrawingNo},#{partDrawingName},#{describedDrawingNo},#{attributesDrawingNo},#{accountingCenter},#{supplierName},
+        #{purchasingPrice},#{suitableModel},#{productCategory},#{factoryName},#{minSafetyStock},#{maxSafetyStock},#{currentInventory},#{inventoryDate},#{systemState},#{supplierCode},#{purchaseOrderType},#{factoryCode})
+    </insert>
+
+    <delete id="batchDelete">
+        delete from t_inventory_warning
+    </delete>
+
+    <!--根据时间段获取部品历史库存-->
+    <select id="getAmountByDate" resultType="java.lang.Integer">
+        select IFNULL(ROUND((sum(currentInventory*purchasingPrice))/1000,0),0) from t_inventory_warning tph
+        LEFT JOIN t_factory_data tfd on tfd.factoryName=tph.factoryName
+        LEFT JOIN t_user_factory tuf on tuf.factoryId=tfd.factoryCode
+        where 1=1
+        <if test="userId != null and userId != ''">
+            and tuf.userId=#{userId}
+        </if>
+        <if test="startDate != null and startDate != ''">
+            and substring(tph.inventoryDate,1,10) <![CDATA[ >= ]]> #{startDate}
+        </if>
+        <if test="endDate != null and endDate != ''">
+            and substring(tph.inventoryDate,1,10) <![CDATA[ <= ]]> #{endDate}
+        </if>
+    </select>
+
+    <!--获取库存预警的部件数-->
+    <select id="getInventoryWarning" resultType="java.lang.Integer">
+        select COUNT(1) from t_inventory_warning tiw LEFT JOIN (select IFNULL(tpo.orderNumber,0)-IFNULL(tcsod.cancelNumber,0)-IFNULL(tmsuo.cancelNumber,0)-IFNULL(trd.outNumber,0) quantityDemanded,tpo.partDrawingNo from t_part_order tpo
+		LEFT JOIN(
+		select partDrawingNo,sum(cancelNumber) cancelNumber,documentNumber from t_cancel_service_order_detail GROUP BY partDrawingNo) tcsod on tcsod.documentNumber=tpo.documentNumber
+        and  tcsod.partDrawingNo = tpo.partDrawingNo
+		LEFT JOIN(
+		select sum(goodQuantity-processNumber) cancelNumber,partDrawingNo,associatedOrderNumber,systemState from t_miss_stock_up_order where systemState='取消' GROUP BY partDrawingNo) tmsuo
+		on tmsuo.associatedOrderNumber=tpo.documentNumber and tmsuo.partDrawingNo=tpo.partDrawingNo
+		LEFT JOIN(
+		select associatedOrderNumber,partDrawingNo,sum(outNumber) outNumber from t_packing_list_detail GROUP BY partDrawingNo) trd on trd.associatedOrderNumber=tpo.documentNumber
+        and trd.partDrawingNo=tpo.partDrawingNo
+		where tpo.state='0' GROUP BY tpo.partDrawingNo) tqd
+        on tiw.partDrawingNo =tqd.partDrawingNo
+        where substring(inventoryDate,1,10)=DATE_FORMAT(NOW(), '%Y-%m-%d')  and  tiw.currentInventory - IFNULL(tqd.quantityDemanded,0)   <![CDATA[ < ]]>   tiw.minSafetyStock
+        and  tiw.currentInventory - IFNULL(tqd.quantityDemanded,0)  <![CDATA[ > ]]>  0
+    </select>
+
+    <!--获取库存缺件的部件数-->
+    <select id="getLack" resultType="java.lang.Integer">
+        select COUNT(1) from t_inventory_warning tiw LEFT JOIN (select IFNULL(tpo.orderNumber,0)-IFNULL(tcsod.cancelNumber,0)-IFNULL(tmsuo.cancelNumber,0)-IFNULL(trd.outNumber,0) quantityDemanded,tpo.partDrawingNo from t_part_order tpo
+		LEFT JOIN(
+		select partDrawingNo,sum(cancelNumber) cancelNumber,documentNumber from t_cancel_service_order_detail GROUP BY partDrawingNo) tcsod on tcsod.documentNumber=tpo.documentNumber
+        and  tcsod.partDrawingNo = tpo.partDrawingNo
+		LEFT JOIN(
+		select sum(goodQuantity-processNumber) cancelNumber,partDrawingNo,associatedOrderNumber,systemState from t_miss_stock_up_order where systemState='取消' GROUP BY partDrawingNo) tmsuo
+		on tmsuo.associatedOrderNumber=tpo.documentNumber and tmsuo.partDrawingNo=tpo.partDrawingNo
+		LEFT JOIN(
+		select associatedOrderNumber,partDrawingNo,sum(outNumber) outNumber from t_packing_list_detail GROUP BY partDrawingNo) trd on trd.associatedOrderNumber=tpo.documentNumber
+        and trd.partDrawingNo=tpo.partDrawingNo
+		where tpo.state='0' GROUP BY tpo.partDrawingNo) tqd
+        on tiw.partDrawingNo=tqd.partDrawingNo
+        where substring(inventoryDate,1,10)=DATE_FORMAT(NOW(), '%Y-%m-%d')  and  tiw.currentInventory - IFNULL(tqd.quantityDemanded,0)   <![CDATA[ < ]]>   0
+    </select>
+
+    <!--根据时间段获取每日的部品在线库存-->
+    <select id="getEveryAmountByDate" resultType="utry.data.modular.partsManagement.bo.EveryAmountByDateBO">
+        SELECT SUM(cost_amount) AS amount,
+        <if test="aggregateType != null and aggregateType != ''">
+            <if test="aggregateType=='0'.toString()">
+                DATE_FORMAT(t1.create_time,'%Y-%m-%d') AS inventoryDate
+            </if>
+            <if test="aggregateType=='1'.toString()">
+                DATE_FORMAT(t1.create_time,'%Y-%m') AS inventoryDate
+            </if>
+        </if>
+        FROM t_part_drawing_stock t1
+        LEFT JOIN t_factory_data t2 on t1.factory_code = t2.factoryCode
+        LEFT JOIN t_user_factory t3 on t2.factoryCode = t3.factoryId
+        WHERE t1.create_time BETWEEN #{startDate} AND #{endDate}
+        <if test="userId != null and userId != ''">
+            and t3.userId = #{userId}
+        </if>
+        <if test="aggregateType != null and aggregateType != ''">
+            <if test="aggregateType=='0'.toString()">
+                GROUP BY DATE_FORMAT(t1.create_time,'%Y-%m-%d')
+            </if>
+            <if test="aggregateType=='1'.toString()">
+                GROUP BY DATE_FORMAT(t1.create_time,'%Y-%m')
+            </if>
+        </if>
+        ORDER BY t1.create_time
+    </select>
+
+    <!--获取在库金额品类全景-->
+    <select id="getProductCategory" resultType="java.util.Map">
+        select IFNULL(ROUND(sum(tiw.purchasingPrice*tiw.currentInventory)/1000,2),0) amount,productCategory,convert((sum(tiw.purchasingPrice*tiw.currentInventory)/(select sum(currentInventory*purchasingPrice)
+        from t_inventory_warning where substring(inventoryDate,1,10)=DATE_FORMAT(NOW(), '%Y-%m-%d'))),decimal(15,2))*100 as percent
+        from t_inventory_warning tiw
+		where substring(tiw.inventoryDate,1,10)=DATE_FORMAT(NOW(), '%Y-%m-%d')
+        group by productCategory HAVING amount is not null and productCategory is not null and percent is not null
+    </select>
+
+    <!--获取部品在线库存金额-->
+    <select id="getAmount" resultType="java.lang.Integer">
+        select IFNULL(sum(currentInventory*purchasingPrice),0)   from t_inventory_warning where substring(inventoryDate,1,10)=DATE_FORMAT(NOW(), '%Y-%m-%d')
+    </select>
+
+    <!--获取担当别在库金额-->
+    <select id="getBear" resultType="java.util.Map">
+        select sum(tiw.currentInventory*tiw.purchasingPrice)/1000 as total,tha.RealName
+        from t_inventory_warning tiw
+        LEFT JOIN t_factory_data tfd on tfd.factoryName=tiw.factoryName
+        LEFT JOIN t_user_factory tuf on tuf.factoryId=tfd.factoryCode
+        LEFT JOIN hrm_db.t_hrm_accountinfo tha on tuf.userId=tha.AccountID where tiw.inventoryDate=now() GROUP BY tha.RealName
+    </select>
+
+    <!--查询工厂别在库金额-->
+    <select id="getAllWarehouseAmount" resultMap="warehouseAmountBOResultMap">
+        SELECT
+        sum(t1.cost_amount)/1000 AS total,
+        t1.factory_name AS factoryName,
+        t1.factory_code AS factoryCode
+        FROM t_part_drawing_stock t1
+        LEFT JOIN t_user_factory t2 on t1.factory_code = t2.factoryId
+        <where>
+            create_time BETWEEN #{startDate} AND #{endDate}
+            <if test="warehouseCode != null and warehouseCode != ''">
+                AND warehouse_code = #{warehouseCode}
+            </if>
+            <if test="userId != null and userId != ''">
+                AND t2.userId = #{userId}
+            </if>
+        </where>
+        GROUP BY factory_code
+    </select>
+
+    <!--根据库存预警查询条件获取库存预警列表-->
+    <select id="getInventoryWarningVo" resultType="utry.data.modular.partsManagement.vo.InventoryWarningVo">
+        select partDrawingNumber,partDrawingName,factoryName,productCategory,bear,location,minSafetyStock,currentInventory,orderNeeds,warehouseName,
+        supplierName,procurement from (select tiw.partDrawingNo as partDrawingNumber,tiw.partDrawingName,tiw.factoryName,tiw.productCategory,tha.RealName bear,tli.locationNumber location,tiw.minSafetyStock,tiw.currentInventory,tqd.quantityDemanded orderNeeds,tli.warehouseName,
+        tiw.supplierName,atpdn.amount procurement
+        from t_inventory_warning tiw LEFT JOIN (select IFNULL(tpo.orderNumber,0)-IFNULL(tcsod.cancelNumber,0)-IFNULL(tmsuo.cancelNumber,0)-IFNULL(trd.outNumber,0) quantityDemanded,tpo.partDrawingNo from t_part_order tpo
+        LEFT JOIN(
+        select partDrawingNo,sum(cancelNumber) cancelNumber,documentNumber from t_cancel_service_order_detail GROUP BY partDrawingNo) tcsod on tcsod.documentNumber=tpo.documentNumber
+        and  tcsod.partDrawingNo = tpo.partDrawingNo
+        LEFT JOIN(
+        select sum(goodQuantity-processNumber) cancelNumber,partDrawingNo,associatedOrderNumber,systemState from t_miss_stock_up_order where systemState='取消' GROUP BY partDrawingNo) tmsuo
+        on tmsuo.associatedOrderNumber=tpo.documentNumber and tmsuo.partDrawingNo=tpo.partDrawingNo
+        LEFT JOIN(
+        select associatedOrderNumber,partDrawingNo,sum(outNumber) outNumber from t_packing_list_detail GROUP BY partDrawingNo) trd on trd.associatedOrderNumber=tpo.documentNumber
+        and trd.partDrawingNo=tpo.partDrawingNo
+        where tpo.state='0' GROUP BY tpo.partDrawingNo) tqd
+        on tiw.partDrawingNo =tqd.partDrawingNo
+        LEFT JOIN t_factory_data tfd on tiw.factoryName=tfd.factoryName
+        LEFT JOIN t_user_factory tuf on tfd.factoryCode=tuf.factoryId
+        LEFT JOIN hrm_db.t_hrm_accountinfo tha on tuf.userId=tha.AccountID
+        LEFT JOIN t_location_Information tli on tli.partDrawingNo=tiw.partDrawingNo
+        LEFT JOIN (select IFNULL(tpod.orderNumber,0)-IFNULL(tcpod.cancelNumber,0) amount,tpod.partDrawingNo from
+        (SELECT documentNo from t_purchase_order  where systemState!='已完成' and systemState!='已作废') tpo
+        LEFT JOIN  t_purchase_order_detail tpod on tpo.documentNo= tpod.documentNo
+        LEFT JOIN t_cancel_purchase_order_detail tcpod on tpod.documentNo= tcpod.purchaseOrderNo
+        and tpod.partDrawingNo=tcpod.partDrawingNo) atpdn on atpdn.partDrawingNo = tiw.partDrawingNo
+        where substring(inventoryDate,1,10)=DATE_FORMAT(NOW(), '%Y-%m-%d') and tiw.currentInventory -
+        IFNULL(tqd.quantityDemanded ,0) <![CDATA[ > ]]> 0 and tiw.currentInventory -
+        IFNULL(tqd.quantityDemanded ,0) <![CDATA[ < ]]> tiw.minSafetyStock GROUP BY tiw.partDrawingNo) list
+        where 1=1
+        <if test="partDrawingNumber != null and partDrawingNumber.type != '' and partDrawingNumber.type=='0'.toString()">
+            and partDrawingNumber = #{partDrawingNumber.value}
+        </if>
+        <if test="partDrawingNumber != null and partDrawingNumber.type != '' and partDrawingNumber.type=='1'.toString()">
+            and partDrawingNumber like concat('%',#{partDrawingNumber.value},'%')
+        </if>
+        <if test="partDrawingNumber != null and partDrawingNumber.type != '' and partDrawingNumber.type=='2'.toString()">
+            and partDrawingNumber != #{partDrawingNumber.value}
+        </if>
+
+        <if test="partDrawingName != null and partDrawingName.type != '' and partDrawingName.type=='0'.toString()">
+            and partDrawingName = #{partDrawingName.value}
+        </if>
+        <if test="partDrawingName != null and partDrawingName.type != '' and partDrawingName.type=='1'.toString()">
+            and partDrawingName like concat('%',#{partDrawingName.value},'%')
+        </if>
+        <if test="partDrawingName != null and partDrawingName.type != '' and partDrawingName.type=='2'.toString()">
+            and partDrawingName != #{partDrawingName.value}
+        </if>
+
+        <if test="productCategory != null and productCategory.type != '' and productCategory.type=='0'.toString()">
+            and productCategory = #{productCategory.value}
+        </if>
+        <if test="productCategory != null and productCategory.type != '' and productCategory.type=='1'.toString()">
+            and productCategory like concat('%',#{productCategory.value},'%')
+        </if>
+        <if test="productCategory != null and productCategory.type != '' and productCategory.type=='2'.toString()">
+            and productCategory != #{productCategory.value}
+        </if>
+
+        <if test="bear != null and bear.type != '' and bear.type=='0'.toString()">
+            and bear = #{bear.value}
+        </if>
+        <if test="bear != null and bear.type != '' and bear.type=='1'.toString()">
+            and bear like concat('%',#{bear.value},'%')
+        </if>
+        <if test="bear != null and bear.type != '' and bear.type=='2'.toString()">
+            and bear != #{bear.value}
+        </if>
+
+        <if test="location != null and location.type != '' and location.type=='0'.toString()">
+            and location = #{location.value}
+        </if>
+        <if test="location != null and location.type != '' and location.type=='1'.toString()">
+            and location like concat('%',#{location.value},'%')
+        </if>
+        <if test="location != null and location.type != '' and location.type=='2'.toString()">
+            and location != #{location.value}
+        </if>
+
+        <if test="procurement != null and procurement.type != '' and procurement.type != null">
+            and procurement ${procurement.type} #{procurement.value}+0
+        </if>
+
+        <if test="minSafetyStock != null and minSafetyStock.type != '' and minSafetyStock.type != null">
+            and minSafetyStock ${minSafetyStock.type} #{minSafetyStock.value}+0
+        </if>
+
+        <if test="orderNeeds != null and orderNeeds.type != '' and orderNeeds.type != null">
+            and orderNeeds ${orderNeeds.type} #{orderNeeds.value}+0
+        </if>
+
+
+        <if test="warehouseName != null and warehouseName.type != '' and warehouseName.type=='0'.toString()">
+            and warehouseName = #{warehouseName.value}
+        </if>
+        <if test="warehouseName != null and warehouseName.type != '' and warehouseName.type=='1'.toString()">
+            and warehouseName like concat('%',#{warehouseName.value},'%')
+        </if>
+        <if test="warehouseName != null and warehouseName.type != '' and warehouseName.type=='2'.toString()">
+            and warehouseName != #{warehouseName.value}
+        </if>
+
+        <if test="supplierName != null and supplierName.type != '' and supplierName.type=='0'.toString()">
+            and supplierName = #{supplierName.value}
+        </if>
+        <if test="supplierName != null and supplierName.type != '' and supplierName.type=='1'.toString()">
+            and supplierName like concat('%',#{supplierName.value},'%')
+        </if>
+        <if test="supplierName != null and supplierName.type != '' and supplierName.type=='2'.toString()">
+            and supplierName != #{supplierName.value}
+        </if>
+
+        <if test="procurement != null and procurement.sort != null and procurement.sort != ''">
+            order by procurement ${procurement.sort}
+        </if>
+        <if test="minSafetyStock != null and minSafetyStock.sort != null and minSafetyStock.sort != ''">
+            order by minSafetyStock ${minSafetyStock.sort}
+        </if>
+        <if test="currentInventory != null and currentInventory.sort != null and currentInventory.sort != ''">
+            order by currentInventory ${currentInventory.sort}
+        </if>
+        <if test="orderNeeds != null and orderNeeds.sort != null and orderNeeds.sort != ''">
+            order by orderNeeds ${orderNeeds.sort}
+        </if>
+        <if test="procurement.sort == '' and minSafetyStock.sort == '' and currentInventory.sort == '' and orderNeeds.sort == ''">
+            order by procurement desc
+        </if>
+    </select>
+
+    <!--分页条件查询缺货部品列表-->
+    <select id="getStockGoods" resultType="utry.data.modular.partsManagement.vo.InventoryWarningVo">
+        select partDrawingNumber,partDrawingName,factoryName,productCategory,bear,location,minSafetyStock,currentInventory,orderNeeds,warehouseName,
+        supplierName,procurement from (select tiw.partDrawingNo as partDrawingNumber,tiw.partDrawingName,tiw.factoryName,tiw.productCategory,tha.RealName bear,tli.locationNumber location,tiw.minSafetyStock,tiw.currentInventory,tqd.quantityDemanded orderNeeds,tli.warehouseName,
+        tiw.supplierName,atpdn.amount procurement
+        from t_inventory_warning tiw LEFT JOIN (select IFNULL(tpo.orderNumber,0)-IFNULL(tcsod.cancelNumber,0)-IFNULL(tmsuo.cancelNumber,0)-IFNULL(trd.outNumber,0) quantityDemanded,tpo.partDrawingNo from t_part_order tpo
+        LEFT JOIN(
+        select partDrawingNo,sum(cancelNumber) cancelNumber,documentNumber from t_cancel_service_order_detail GROUP BY partDrawingNo) tcsod on tcsod.documentNumber=tpo.documentNumber
+        and  tcsod.partDrawingNo = tpo.partDrawingNo
+        LEFT JOIN(
+        select sum(goodQuantity-processNumber) cancelNumber,partDrawingNo,associatedOrderNumber,systemState from t_miss_stock_up_order where systemState='取消' GROUP BY partDrawingNo) tmsuo
+        on tmsuo.associatedOrderNumber=tpo.documentNumber and tmsuo.partDrawingNo=tpo.partDrawingNo
+        LEFT JOIN(
+        select associatedOrderNumber,partDrawingNo,sum(outNumber) outNumber from t_packing_list_detail GROUP BY partDrawingNo) trd on trd.associatedOrderNumber=tpo.documentNumber
+        and trd.partDrawingNo=tpo.partDrawingNo
+        where tpo.state='0' GROUP BY tpo.partDrawingNo) tqd
+        on tiw.partDrawingNo =tqd.partDrawingNo
+        LEFT JOIN t_factory_data tfd on tiw.factoryName=tfd.factoryName
+        LEFT JOIN t_user_factory tuf on tfd.factoryCode=tuf.factoryId
+        LEFT JOIN hrm_db.t_hrm_accountinfo tha on tuf.userId=tha.AccountID
+        LEFT JOIN t_location_Information tli on tli.partDrawingNo=tiw.partDrawingNo
+        LEFT JOIN (select IFNULL(tpod.orderNumber,0)-IFNULL(tcpod.cancelNumber,0) amount,tpod.partDrawingNo from
+        (SELECT documentNo from t_purchase_order  where systemState!='已完成' and systemState!='已作废') tpo
+        LEFT JOIN  t_purchase_order_detail tpod on tpo.documentNo= tpod.documentNo
+        LEFT JOIN t_cancel_purchase_order_detail tcpod on tpod.documentNo= tcpod.purchaseOrderNo
+        and tpod.partDrawingNo=tcpod.partDrawingNo) atpdn on atpdn.partDrawingNo = tiw.partDrawingNo
+        where substring(inventoryDate,1,10)=DATE_FORMAT(NOW(), '%Y-%m-%d') and tiw.currentInventory -
+        IFNULL(tqd.quantityDemanded ,0) <![CDATA[ < ]]> 0 GROUP BY tiw.partDrawingNo) list
+        where 1=1
+        <if test="partDrawingNumber != null and partDrawingNumber.type != '' and partDrawingNumber.type=='0'.toString()">
+            and partDrawingNumber = #{partDrawingNumber.value}
+        </if>
+        <if test="partDrawingNumber != null and partDrawingNumber.type != '' and partDrawingNumber.type=='1'.toString()">
+            and partDrawingNumber like concat('%',#{partDrawingNumber.value},'%')
+        </if>
+        <if test="partDrawingNumber != null and partDrawingNumber.type != '' and partDrawingNumber.type=='2'.toString()">
+            and partDrawingNumber != #{partDrawingNumber.value}
+        </if>
+
+        <if test="partDrawingName != null and partDrawingName.type != '' and partDrawingName.type=='0'.toString()">
+            and partDrawingName = #{partDrawingName.value}
+        </if>
+        <if test="partDrawingName != null and partDrawingName.type != '' and partDrawingName.type=='1'.toString()">
+            and partDrawingName like concat('%',#{partDrawingName.value},'%')
+        </if>
+        <if test="partDrawingName != null and partDrawingName.type != '' and partDrawingName.type=='2'.toString()">
+            and partDrawingName != #{partDrawingName.value}
+        </if>
+
+        <if test="productCategory != null and productCategory.type != '' and productCategory.type=='0'.toString()">
+            and productCategory = #{productCategory.value}
+        </if>
+        <if test="productCategory != null and productCategory.type != '' and productCategory.type=='1'.toString()">
+            and productCategory like concat('%',#{productCategory.value},'%')
+        </if>
+        <if test="productCategory != null and productCategory.type != '' and productCategory.type=='2'.toString()">
+            and productCategory != #{productCategory.value}
+        </if>
+
+        <if test="bear != null and bear.type != '' and bear.type=='0'.toString()">
+            and bear = #{bear.value}
+        </if>
+        <if test="bear != null and bear.type != '' and bear.type=='1'.toString()">
+            and bear like concat('%',#{bear.value},'%')
+        </if>
+        <if test="bear != null and bear.type != '' and bear.type=='2'.toString()">
+            and bear != #{bear.value}
+        </if>
+
+        <if test="location != null and location.type != '' and location.type=='0'.toString()">
+            and location = #{location.value}
+        </if>
+        <if test="location != null and location.type != '' and location.type=='1'.toString()">
+            and location like concat('%',#{location.value},'%')
+        </if>
+        <if test="location != null and location.type != '' and location.type=='2'.toString()">
+            and location != #{location.value}
+        </if>
+
+        <if test="procurement != null and procurement.type != '' and procurement.type != null">
+            and procurement ${procurement.type} #{procurement.value}+0
+        </if>
+
+        <if test="minSafetyStock != null and minSafetyStock.type != '' and minSafetyStock.type != null">
+            and minSafetyStock ${minSafetyStock.type} #{minSafetyStock.value}+0
+        </if>
+
+        <if test="orderNeeds != null and orderNeeds.type != '' and orderNeeds.type != null">
+            and orderNeeds ${orderNeeds.type} #{orderNeeds.value}+0
+        </if>
+
+
+        <if test="warehouseName != null and warehouseName.type != '' and warehouseName.type=='0'.toString()">
+            and warehouseName = #{warehouseName.value}
+        </if>
+        <if test="warehouseName != null and warehouseName.type != '' and warehouseName.type=='1'.toString()">
+            and warehouseName like concat('%',#{warehouseName.value},'%')
+        </if>
+        <if test="warehouseName != null and warehouseName.type != '' and warehouseName.type=='2'.toString()">
+            and warehouseName != #{warehouseName.value}
+        </if>
+
+        <if test="supplierName != null and supplierName.type != '' and supplierName.type=='0'.toString()">
+            and supplierName = #{supplierName.value}
+        </if>
+        <if test="supplierName != null and supplierName.type != '' and supplierName.type=='1'.toString()">
+            and supplierName like concat('%',#{supplierName.value},'%')
+        </if>
+        <if test="supplierName != null and supplierName.type != '' and supplierName.type=='2'.toString()">
+            and supplierName != #{supplierName.value}
+        </if>
+
+        <if test="procurement != null and procurement.sort != null and procurement.sort != ''">
+            order by procurement ${procurement.sort}
+        </if>
+        <if test="minSafetyStock != null and minSafetyStock.sort != null and minSafetyStock.sort != ''">
+            order by minSafetyStock ${minSafetyStock.sort}
+        </if>
+        <if test="currentInventory != null and currentInventory.sort != null and currentInventory.sort != ''">
+            order by currentInventory ${currentInventory.sort}
+        </if>
+        <if test="orderNeeds != null and orderNeeds.sort != null and orderNeeds.sort != ''">
+            order by orderNeeds ${orderNeeds.sort}
+        </if>
+        <if test="procurement.sort == '' and minSafetyStock.sort == '' and currentInventory.sort == '' and orderNeeds.sort == ''">
+            order by procurement desc
+        </if>
+</select>
+
+    <!--根据部件图号查询库存预警信息-->
+    <select id="getInventoryWarningByPartDrawingNo"
+            resultType="utry.data.modular.partsManagement.model.InventoryWarning">
+        select partDrawingNumber,describedDrawingNo,attributesDrawingNo,accountingCenter,
+        supplierName,purchasingPrice,suitableModel,productCategory,factoryName,minSafetyStock,maxSafetyStock,
+        currentInventory,systemState,supplierCode,purchaseOrderType,factoryCode from t_inventory_warning where substring(inventoryDate,1,10)=DATE_FORMAT(NOW(), '%Y-%m-%d') and partDrawingNumber=#{partDrawingNo}
+    </select>
+
+    <!--获取工厂别缺件部品-->
+    <select id="getFactoryStockGoods" resultType="java.util.Map">
+        select sum(stockoutNumber) stockoutNumber,tmdo.factoryName from t_miss_deal_order_detail tmdod
+        LEFT JOIN t_miss_deal_order tmdo on tmdod.documentNo=tmdo.documentNo
+        <where>
+            <if test="startDate != null and startDate != ''">
+                and substring(tmdo.documentDate,1,10) <![CDATA[ >= ]]> #{startDate}
+            </if>
+            <if test="endDate != null and endDate != ''">
+                and substring(tmdo.documentDate,1,10) <![CDATA[ <= ]]> #{endDate}
+            </if>
+        </where>
+        GROUP BY tmdo.factoryName
+        <if test="sort != null and sort != '' and sort=='0'.toString()">
+            order by stockoutNumber asc
+        </if>
+        <if test="sort != null and sort != '' and sort=='1'.toString()">
+            order by stockoutNumber desc
+        </if>
+    </select>
+
+    <!-- TODO 获取每日需求金额-->
+    <select id="getAmountBydate" resultType="utry.data.modular.partsManagement.dto.AmountDTO">
+        select
+        <if test="aggregateType != null and aggregateType != '' and aggregateType=='0'.toString()">
+            substring(tod.documentDate,1,10) documentDate,
+        </if>
+        <if test="aggregateType != null and aggregateType != '' and aggregateType=='1'.toString()">
+            substring(tod.documentDate,1,7) documentDate,
+        </if>
+        TRUNCATE(sum((IFNULL(tpo.orderNumber,0)-IFNULL(tcsod.cancelNumber,0)-IFNULL(tmsuo.cancelNumber,0))*IFNULL(tiw.purchasingPrice,0))/1000,2) demandAmount
+        from t_order_detail tod
+        LEFT JOIN t_part_order tpo on tod.documentNumber=tpo.documentNumber
+        LEFT JOIN(
+        select partDrawingNo,sum(cancelNumber) cancelNumber,documentNumber from t_cancel_service_order_detail GROUP BY partDrawingNo) tcsod on tcsod.documentNumber=tpo.documentNumber
+        and  tcsod.partDrawingNo = tpo.partDrawingNo
+        LEFT JOIN(
+        select sum(goodQuantity-processNumber) cancelNumber,partDrawingNo,associatedOrderNumber,systemState from t_miss_stock_up_order where systemState='取消' GROUP BY partDrawingNo) tmsuo
+        on tmsuo.associatedOrderNumber=tpo.documentNumber and tmsuo.partDrawingNo=tpo.partDrawingNo
+        LEFT JOIN t_inventory_warning tiw on tpo.partDrawingNo=tiw.partDrawingNo  and substring(tod.documentDate,1,10)=substring(tiw.inventoryDate,1,10)
+        <if test="aggregateType != null and aggregateType != '' and aggregateType=='0'.toString()">
+            GROUP BY substring(tod.documentDate,1,10)
+        </if>
+        <if test="aggregateType != null and aggregateType != '' and aggregateType=='1'.toString()">
+            GROUP BY substring(tod.documentDate,1,7)
+        </if>
+        ORDER BY documentDate asc
+    </select>
+
+    <!--根据时间段获取每日的部品在库-->
+    <select id="getEveryCountByDate" resultType="java.util.Map">
+        select TRUNCATE(sum(currentInventory),2) amount,
+        <if test="aggregateType != null and aggregateType != '' and aggregateType=='0'.toString()">
+            substring(inventoryDate,1,10) inventoryDate
+        </if>
+        <if test="aggregateType != null and aggregateType != '' and aggregateType=='1'.toString()">
+            substring(inventoryDate,1,7) inventoryDate
+        </if>
+         from t_inventory_warning where
+        substring(inventoryDate,1,10) <![CDATA[ >= ]]> #{startDate} and substring(inventoryDate,1,10) <![CDATA[ <= ]]> #{endDate}
+        <if test="aggregateType != null and aggregateType != '' and aggregateType=='0'.toString()">
+            group by substring(inventoryDate,1,10)
+        </if>
+        <if test="aggregateType != null and aggregateType != '' and aggregateType=='1'.toString()">
+            group by substring(inventoryDate,1,7)
+        </if>
+
+        ORDER BY inventoryDate asc
+    </select>
+
+    <!--获取每日需求数量-->
+    <select id="getCountByDate" resultType="utry.data.modular.partsManagement.dto.AmountDTO">
+        select
+        <if test="aggregateType != null and aggregateType != '' and aggregateType=='0'.toString()">
+            substring(tod.documentDate,1,10) documentDate,
+        </if>
+        <if test="aggregateType != null and aggregateType != '' and aggregateType=='1'.toString()">
+            substring(tod.documentDate,1,7) documentDate,
+        </if>
+        TRUNCATE(sum((IFNULL(tpo.orderNumber,0)-IFNULL(tcsod.cancelNumber,0)-IFNULL(tmsuo.cancelNumber,0)))/1000,2) demandAmount
+        from t_order_detail tod
+        LEFT JOIN t_part_order tpo on tod.documentNumber=tpo.documentNumber
+        LEFT JOIN(
+        select partDrawingNo,sum(cancelNumber) cancelNumber,documentNumber from t_cancel_service_order_detail GROUP BY partDrawingNo) tcsod on tcsod.documentNumber=tpo.documentNumber
+        and  tcsod.partDrawingNo = tpo.partDrawingNo
+        LEFT JOIN(
+        select sum(goodQuantity-processNumber) cancelNumber,partDrawingNo,associatedOrderNumber,systemState from t_miss_stock_up_order where systemState='取消' GROUP BY partDrawingNo) tmsuo
+        on tmsuo.associatedOrderNumber=tpo.documentNumber and tmsuo.partDrawingNo=tpo.partDrawingNo
+        LEFT JOIN t_inventory_warning tiw on tpo.partDrawingNo=tiw.partDrawingNo  and substring(tod.documentDate,1,10)=substring(tiw.inventoryDate,1,10)
+        <if test="aggregateType != null and aggregateType != '' and aggregateType=='0'.toString()">
+            GROUP BY substring(tod.documentDate,1,10)
+        </if>
+        <if test="aggregateType != null and aggregateType != '' and aggregateType=='1'.toString()">
+            GROUP BY substring(tod.documentDate,1,7)
+        </if>
+        ORDER BY documentDate asc
+    </select>
+
+    <!--获取单日在库金额列表-->
+    <select id="getDayAmount" resultType="utry.data.modular.partsManagement.vo.DayAmountVo">
+        select factoryName,bear,inLibrary,demand,
+        securityLibrary,procurementTransit,totalOrder,
+        abnormalOrder from (select tfd.factoryName,tha.RealName as bear,TRUNCATE(SUM(tiw.currentInventory*tiw.purchasingPrice),2) as inLibrary,TRUNCATE(SUM(tqd.quantityDemanded*tiw.purchasingPrice),2) as demand,
+        TRUNCATE(SUM(tiw.minSafetyStock*tiw.purchasingPrice),2) as securityLibrary,TRUNCATE(SUM(atpdn.procurementTransit*tiw.purchasingPrice),2) as procurementTransit,TRUNCATE(SUM(atpdn.totalOrder),2) as totalOrder,
+        SUM(atpdn.abnormalOrder) abnormalOrder
+        from t_inventory_warning tiw LEFT JOIN (select tpo.documentNumber,
+        tpo.partDrawingNo,sum(tpo.orderNumber-IFNULL(tpld.outNumber, 0)-IFNULL(tsod.cancelNumber, 0))
+        quantityDemanded  from t_part_order tpo left join t_packing_list_detail tpld  on
+        tpo.documentNumber=tpld.associatedOrderNumber and tpld.partDrawingNo=tpo.partDrawingNo
+        LEFT JOIN t_cancel_service_order_detail tsod on tpo.documentNumber=tsod.documentNumber and tpo.partDrawingNo=tsod.partDrawingNo
+        LEFT JOIN t_order_detail tod on tod.documentNumber=tpo.documentNumber
+        where substring(tod.documentDate,1,10)=#{date}
+        GROUP BY partDrawingNo,documentNumber) tqd
+        on tiw.partDrawingNo=tqd.partDrawingNo
+        LEFT JOIN t_factory_data tfd on tiw.factoryName=tfd.factoryName
+        LEFT JOIN t_user_factory tuf on tpi.factoryCode=tuf.factoryId
+        LEFT JOIN hrm_db.t_hrm_accountinfo tha on tuf.userId=tha.AccountID
+        LEFT JOIN t_location_Information tli on tli.partDrawingNo=tiw.partDrawingNo
+        LEFT JOIN (select count(DISTINCT(tpod.documentNo)) totalOrder,SUM(tpod.orderNumber) procurementTransit,tpod.partDrawingNo,sum(abo.abnormalOrder) abnormalOrder
+        from t_purchase_order_detail tpod
+        LEFT JOIN t_purchase_order tpo on tpod.documentNo= tpo.documentNo
+        LEFT JOIN (select count(DISTINCT(tpod.documentNo)) abnormalOrder,tpod.partDrawingNo from t_purchase_order_detail tpod
+        LEFT JOIN t_purchase_order tpo on tpod.documentNo= tpo.documentNo where substring(tpo.documentDate,1,10)=#{date} and tpod.documentNo not in(
+        select receiptNumber from t_cancel_purchase_order_detail
+        ) and tpo.systemState !='已完成' and tpo.systemState !='已作废' and now() >   DATE_ADD(tpo.documentDate,INTERVAL tpo.purchaseTime day) GROUP BY tpod.partDrawingNo) abo
+        on abo.partDrawingNo=tpod.partDrawingNo
+        where substring(tpo.documentDate,1,10)=#{date} and tpod.documentNo not in(
+        select receiptNumber from t_cancel_purchase_order_detail
+        ) and tpo.completionDate is null
+        GROUP BY tpod.partDrawingNo) atpdn on atpdn.partDrawingNo = tiw.partDrawingNo
+        where substring(tiw.inventoryDate,1,10)=#{date}
+        GROUP BY tfd.factoryName,tha.RealName) list
+        where 1=1
+        <if test="factoryName != null and factoryName.type != '' and factoryName.type != null and factoryName.type=='0'.toString()">
+            and factoryName = #{factoryName.value}
+        </if>
+        <if test="factoryName != null and factoryName.type != '' and factoryName.type != null and factoryName.type=='1'.toString()">
+            and factoryName like concat('%',#{factoryName.value},'%')
+        </if>
+        <if test="factoryName != null and factoryName.type != '' and factoryName.type != null and factoryName.type=='2'.toString()">
+            and factoryName != #{factoryName.value}
+        </if>
+
+        <if test="bear != null and bear.type != '' and bear.type != null and bear.type=='0'.toString()">
+            and bear = #{bear.value}
+        </if>
+        <if test="bear != null and bear.type != '' and bear.type != null and bear.type=='1'.toString()">
+            and bear like concat('%',#{bear.value},'%')
+        </if>
+        <if test="bear != null and bear.type != '' and bear.type != null and bear.type=='2'.toString()">
+            and bear != #{bear.value}
+        </if>
+
+        <if test="inLibrary != null and inLibrary.type != '' and inLibrary.type != null">
+            and inLibrary ${inLibrary.type} #{inLibrary.value}
+        </if>
+        <if test="demand != null and demand.type != '' and demand.type != null">
+            and demand ${demand.type} #{demand.value}
+        </if>
+        <if test="securityLibrary != null and securityLibrary.type != '' and securityLibrary.type != null">
+            and securityLibrary ${securityLibrary.type} #{securityLibrary.value}
+        </if>
+        <if test="procurementTransit != null and procurementTransit.type != '' and procurementTransit.type != null">
+            and procurementTransit ${procurementTransit.type} #{procurementTransit.value}
+        </if>
+        <if test="totalOrder != null and totalOrder.type != '' and totalOrder.type != null">
+            and totalOrder ${totalOrder.type} #{totalOrder.value}
+        </if>
+
+        <if test="inLibrary != null and inLibrary.sort != null and inLibrary.sort != ''">
+            order by inLibrary ${inLibrary.sort}
+        </if>
+        <if test="demand != null and demand.sort != null and demand.sort != ''">
+            order by demand ${demand.sort}
+        </if>
+        <if test="securityLibrary != null and securityLibrary.sort != null and securityLibrary.sort != ''">
+            order by securityLibrary ${securityLibrary.sort}
+        </if>
+        <if test="procurementTransit != null and procurementTransit.sort != null and procurementTransit.sort != ''">
+            order by procurementTransit ${procurementTransit.sort}
+        </if>
+        <if test="totalOrder != null and totalOrder.sort != null and totalOrder.sort != ''">
+            order by totalOrder ${totalOrder.sort}
+        </if>
+    </select>
+
+    <!--获取单日在库数量列表-->
+    <select id="getDayCount" resultType="utry.data.modular.partsManagement.vo.DayAmountVo">
+        select factoryName,bear,inLibrary,demand,
+        securityLibrary,procurementTransit,totalOrder,
+        abnormalOrder from (select tiw.factoryName,tha.RealName as bear,SUM(tiw.currentInventory) as inLibrary,SUM(tqd.quantityDemanded) as demand,
+        SUM(tiw.minSafetyStock) as securityLibrary,SUM(atpdn.procurementTransit) as procurementTransit,SUM(atpdn.totalOrder) as totalOrder,
+        SUM(atpdn.abnormalOrder) abnormalOrder
+        from t_inventory_warning tiw LEFT JOIN (select tpo.documentNumber,
+        tpo.partDrawingNo,sum(tpo.orderNumber-IFNULL(tpld.outNumber, 0)-IFNULL(tsod.cancelNumber, 0))
+        quantityDemanded  from t_part_order tpo left join t_packing_list_detail tpld  on
+        tpo.documentNumber=tpld.associatedOrderNumber and tpld.partDrawingNo=tpo.partDrawingNo
+        LEFT JOIN t_cancel_service_order_detail tsod on tpo.documentNumber=tsod.documentNumber and tpo.partDrawingNo=tsod.partDrawingNo
+        LEFT JOIN t_order_detail tod on tod.documentNumber=tpo.documentNumber
+        where substring(tod.documentDate,1,10)=#{date}
+        GROUP BY partDrawingNo,documentNumber) tqd
+        on tiw.partDrawingNo =tqd.partDrawingNo
+        LEFT JOIN t_factory_data tfd on tiw.factoryName=tfd.factoryName
+        LEFT JOIN t_user_factory tuf on tpi.factoryCode=tuf.factoryId
+        LEFT JOIN hrm_db.t_hrm_accountinfo tha on tuf.userId=tha.AccountID
+        LEFT JOIN t_location_Information tli on tli.partDrawingNo=tiw.partDrawingNo
+        LEFT JOIN (select count(DISTINCT(tpod.documentNo)) totalOrder,SUM(tpod.orderNumber) procurementTransit,tpod.partDrawingNo,sum(abo.abnormalOrder) abnormalOrder
+        from t_purchase_order_detail tpod
+        LEFT JOIN t_purchase_order tpo on tpod.documentNo= tpo.documentNo
+        LEFT JOIN (select count(DISTINCT(tpod.documentNo)) abnormalOrder,tpod.partDrawingNo from t_purchase_order_detail tpod
+        LEFT JOIN t_purchase_order tpo on tpod.documentNo= tpo.documentNo where substring(tpo.documentDate,1,10)=#{date} and tpod.documentNo not in(
+        select receiptNumber from t_cancel_purchase_order_detail
+        ) and tpo.completionDate is null and now()  >   DATE_ADD(tpo.documentDate,INTERVAL tpo.purchaseTime day) GROUP BY tpod.partDrawingNo) abo
+        on abo.partDrawingNo=tpod.partDrawingNo
+        where substring(tpo.documentDate,1,10)=#{date} and tpod.documentNo not in(
+        select receiptNumber from t_cancel_purchase_order_detail
+        ) and tpo.completionDate is null
+        GROUP BY tpod.partDrawingNo) atpdn on atpdn.partDrawingNo = tiw.partDrawingNo
+        where substring(tiw.inventoryDate,1,10)=#{date}
+        GROUP BY tfd.factoryName,tha.RealName) list
+        where 1=1
+        <if test="factoryName != null and factoryName.type != '' and factoryName.type != null and factoryName.type=='0'.toString()">
+            and factoryName = #{factoryName.value}
+        </if>
+        <if test="factoryName != null and factoryName.type != '' and factoryName.type != null and factoryName.type=='1'.toString()">
+            and factoryName like concat('%',#{factoryName.value},'%')
+        </if>
+        <if test="factoryName != null and factoryName.type != '' and factoryName.type != null and factoryName.type=='2'.toString()">
+            and factoryName != #{factoryName.value}
+        </if>
+
+        <if test="bear != null and bear.type != '' and bear.type != null and bear.type=='0'.toString()">
+            and bear = #{bear.value}
+        </if>
+        <if test="bear != null and bear.type != '' and bear.type != null and bear.type=='1'.toString()">
+            and bear like concat('%',#{bear.value},'%')
+        </if>
+        <if test="bear != null and bear.type != '' and bear.type != null and bear.type=='2'.toString()">
+            and bear != #{bear.value}
+        </if>
+
+        <if test="inLibrary != null and inLibrary.type != '' and inLibrary.type != null">
+            and inLibrary ${inLibrary.type} #{inLibrary.value}
+        </if>
+        <if test="demand != null and demand.type != '' and demand.type != null">
+            and demand ${demand.type} #{demand.value}
+        </if>
+        <if test="securityLibrary != null and securityLibrary.type != '' and securityLibrary.type != null">
+            and securityLibrary ${securityLibrary.type} #{securityLibrary.value}
+        </if>
+        <if test="procurementTransit != null and procurementTransit.type != '' and procurementTransit.type != null">
+            and procurementTransit ${procurementTransit.type} #{procurementTransit.value}
+        </if>
+        <if test="totalOrder != null and totalOrder.type != '' and totalOrder.type != null">
+            and totalOrder ${totalOrder.type} #{totalOrder.value}
+        </if>
+
+        <if test="inLibrary != null and inLibrary.sort != null and inLibrary.sort != ''">
+            order by inLibrary ${inLibrary.sort}
+        </if>
+        <if test="demand != null and demand.sort != null and demand.sort != ''">
+            order by demand ${demand.sort}
+        </if>
+        <if test="securityLibrary != null and securityLibrary.sort != null and securityLibrary.sort != ''">
+            order by securityLibrary ${securityLibrary.sort}
+        </if>
+        <if test="procurementTransit != null and procurementTransit.sort != null and procurementTransit.sort != ''">
+            order by procurementTransit ${procurementTransit.sort}
+        </if>
+        <if test="totalOrder != null and totalOrder.sort != null and totalOrder.sort != ''">
+            order by totalOrder ${totalOrder.sort}
+        </if>
+    </select>
+
+    <!--根据时间段获取每日的部品安全在库数量-->
+    <select id="getSecurityNumber" resultType="java.util.Map">
+        select TRUNCATE(sum(minSafetyStock),2) amount,
+        <if test="aggregateType != null and aggregateType != '' and aggregateType=='0'.toString()">
+            substring(inventoryDate,1,10) inventoryDate
+        </if>
+        <if test="aggregateType != null and aggregateType != '' and aggregateType=='1'.toString()">
+            substring(inventoryDate,1,7) inventoryDate
+        </if>
+        from t_inventory_warning where
+        substring(inventoryDate,1,10) <![CDATA[ >= ]]> #{startDate} and substring(inventoryDate,1,10) <![CDATA[ <= ]]> #{endDate}
+        <if test="aggregateType != null and aggregateType != '' and aggregateType=='0'.toString()">
+            group by substring(inventoryDate,1,10)
+        </if>
+        <if test="aggregateType != null and aggregateType != '' and aggregateType=='1'.toString()">
+            group by substring(inventoryDate,1,7)
+        </if>
+
+        ORDER BY inventoryDate asc
+    </select>
+
+    <!--根据时间段获取每日的部品安全在库金额-->
+    <select id="getSecurityMoney" resultType="java.util.Map">
+        select TRUNCATE(sum(minSafetyStock*purchasingPrice)/1000,2) amount,
+        <if test="aggregateType != null and aggregateType != '' and aggregateType=='0'.toString()">
+            substring(inventoryDate,1,10) inventoryDate
+        </if>
+        <if test="aggregateType != null and aggregateType != '' and aggregateType=='1'.toString()">
+            substring(inventoryDate,1,7) inventoryDate
+        </if>
+        from t_inventory_warning where
+        substring(inventoryDate,1,10) <![CDATA[ >= ]]> #{startDate} and substring(inventoryDate,1,10) <![CDATA[ <= ]]> #{endDate}
+        <if test="aggregateType != null and aggregateType != '' and aggregateType=='0'.toString()">
+            group by substring(inventoryDate,1,10)
+        </if>
+        <if test="aggregateType != null and aggregateType != '' and aggregateType=='1'.toString()">
+            group by substring(inventoryDate,1,7)
+        </if>
+
+        ORDER BY inventoryDate asc
+    </select>
+
+    <!-- 根据userId查询在库金额
+    关于 create_time，例如今天是2022-06-08，查询最新在线库存（最新的数据时间是 create_time=2022-06-08 04:00:00），
+    则 create_time between 2022-06-08 00:00:00 AND 2022-06-09 00:00:00 -->
+    <select id="getAmountByUserId" resultType="java.math.BigDecimal">
+        SELECT sum(cost_amount)/1000
+        FROM t_part_drawing_stock t1
+        LEFT JOIN t_user_factory t2 ON t1.factory_code = t2.factoryId
+        WHERE create_time BETWEEN #{startDate} AND #{endDate}
+        <if test="userId != null and userId != ''">
+            and t2.userId = #{userId}
+        </if>
+    </select>
+
+    <!-- 根据时间、用户id查询在库金额 -->
+    <select id="getAmountByMonthUserId" resultType="java.math.BigDecimal">
+        SELECT sum(cost_amount)/1000
+        FROM t_part_drawing_stock t1
+        LEFT JOIN t_factory_data t2 ON t1.factory_code = t2.factoryCode
+        LEFT JOIN t_user_factory t3 ON t2.factoryCode = t3.factoryId
+        WHERE create_time BETWEEN #{startDate} AND #{endDate}
+        <if test="userId != null and userId != ''">
+            and t3.userId = #{userId}
+        </if>
+    </select>
+
+    <!--获取安全在库数量-->
+    <select id="getSecurityBO" resultMap="securityBOResultMap">
+        SELECT warehouseCode,partDrawingNumber,partDrawingNo,sum(minSafetyStock) AS count
+        FROM t_warehouse_inventory_warning
+        WHERE inventoryDate BETWEEN DATE_FORMAT(#{date}, '%Y-%m-%d %H:%i:%s') AND DATE_FORMAT(DATE_ADD(#{date}, INTERVAL 1 DAY), '%Y-%m-%d %H:%i:%s')
+        GROUP BY warehouseCode,partDrawingNumber,partDrawingNo
+    </select>
+
+    <!-- 获取实际在库金额（元） -->
+    <select id="getAmountInStock" resultType="java.math.BigDecimal">
+        SELECT sum(cost_amount)
+        FROM t_part_drawing_stock t1
+        LEFT JOIN t_factory_data t2 ON t1.factory_code = t2.factoryCode
+        LEFT JOIN t_user_factory t3 ON t2.factoryCode = t3.factoryId
+        WHERE create_time BETWEEN #{startDate} AND #{endDate}
+        <if test="userId != null and userId != ''">
+            and t3.userId = #{userId}
+        </if>
+    </select>
+
+<!--    获取某个时间段的安全在库数量-->
+    <select id="getAllSecurityBO" resultType="utry.data.modular.partsManagement.bo.SecurityBO">
+        SELECT warehouseCode,substring(inventoryDate,1,10) inventoryDate,partDrawingNo,partDrawingNumber,sum(minSafetyStock) AS count
+        FROM t_warehouse_inventory_warning
+        WHERE inventoryDate BETWEEN DATE_FORMAT(#{startDate}, '%Y-%m-%d %H:%i:%s') AND DATE_FORMAT(DATE_ADD(#{endDate}, INTERVAL 1 DAY), '%Y-%m-%d %H:%i:%s')
+        GROUP BY warehouseCode,partDrawingNumber,substring(inventoryDate,1,10),partDrawingNo
+    </select>
+    <select id="select" resultType="java.lang.Integer">
+        select count(*) from t_inventory_warning where inventoryDate=#{inventoryDate} and partDrawingNumber=#{partDrawingNumber}
+    </select>
+
+    <select id="selectWarehouseInventoryWarning" resultType="java.lang.Integer">
+        select count(*) from t_warehouse_inventory_warning where inventoryDate=#{inventoryDate} and partDrawingNumber=#{partDrawingNumber}
+        and warehouseCode=#{warehouseCode}
+    </select>
+
+    <!-- 查时间范围在库数量 -->
+    <select id="getEveryCountInStockByDate"
+            resultType="utry.data.modular.partsManagement.bo.EveryCountByDateBO">
+        SELECT SUM(reality_number) AS count,
+        <if test="aggregateType != null and aggregateType != ''">
+            <if test="aggregateType=='0'.toString()">
+                DATE_FORMAT(t1.create_time,'%Y-%m-%d') AS inventoryDate
+            </if>
+            <if test="aggregateType=='1'.toString()">
+                DATE_FORMAT(t1.create_time,'%Y-%m') AS inventoryDate
+            </if>
+        </if>
+        FROM t_part_drawing_stock t1
+        LEFT JOIN t_factory_data t2 on t1.factory_code = t2.factoryCode
+        LEFT JOIN t_user_factory t3 on t2.factoryCode = t3.factoryId
+        WHERE t1.create_time BETWEEN #{startDate} AND #{endDate}
+        <if test="aggregateType != null and aggregateType != ''">
+            <if test="aggregateType=='0'.toString()">
+                GROUP BY DATE_FORMAT(t1.create_time,'%Y-%m-%d')
+            </if>
+            <if test="aggregateType=='1'.toString()">
+                GROUP BY DATE_FORMAT(t1.create_time,'%Y-%m')
+            </if>
+        </if>
+        ORDER BY t1.create_time
+    </select>
+
+
+    <insert id="batchInventoryWarning" parameterType="java.util.List">
+        insert into t_inventory_warning (partDrawingNumber,partDrawingName,describedDrawingNo,attributesDrawingNo,accountingCenter,
+        supplierName,purchasingPrice,suitableModel,productCategory,factoryName,minSafetyStock,maxSafetyStock,currentInventory,systemState)
+        values
+        <foreach collection="list" item="item" separator=",">
+            (#{item.partDrawingNumber},#{item.partDrawingName},#{item.describedDrawingNo},#{item.attributesDrawingNo},#{item.accountingCenter},#{item.supplierName},
+            #{item.purchasingPrice},#{item.suitableModel},#{item.productCategory},#{item.factoryName},#{item.minSafetyStock},#{item.maxSafetyStock},#{item.currentInventory},#{item.systemState})
+        </foreach>
+    </insert>
+
+    <!--部件图号历史数据新增-->
+    <insert id="batchPartsHistory">
+        insert into t_part_history (partDrawingNumber,partDrawingName,describedDrawingNo,attributesDrawingNo,accountingCenter,
+        supplierName,purchasingPrice,suitableModel,productCategory,factoryName,minSafetyStock,maxSafetyStock,currentInventory,systemState)
+        values
+        <foreach collection="list" item="item" separator=",">
+            (#{item.partDrawingNumber},#{item.partDrawingName},#{item.describedDrawingNo},#{item.attributesDrawingNo},#{item.accountingCenter},#{item.supplierName},
+            #{item.purchasingPrice},#{item.suitableModel},#{item.productCategory},#{item.factoryName},#{item.minSafetyStock},#{item.maxSafetyStock},#{item.currentInventory},#{item.systemState})
+        </foreach>
+    </insert>
+
+    <!--仓库别库存预警数据创建-->
+    <insert id="createWarehouseInventoryWarning">
+        insert into t_warehouse_inventory_warning (partDrawingNumber,partCode,partDrawingNo ,partDrawingName,describedDrawingNo,attributesDrawingNo,accountingCenter,
+        supplierName,purchasingPrice,suitableModel,productCategory,factoryName,minSafetyStock,maxSafetyStock,currentInventory,inventoryDate,systemState,supplierCode,purchaseOrderType,factoryCode,warehouseCode,warehouseName)
+        values (#{partDrawingNumber},#{partCode},#{partDrawingNo},#{partDrawingName},#{describedDrawingNo},#{attributesDrawingNo},#{accountingCenter},#{supplierName},
+        #{purchasingPrice},#{suitableModel},#{productCategory},#{factoryName},#{minSafetyStock},#{maxSafetyStock},#{currentInventory},#{inventoryDate},#{systemState},#{supplierCode},#{purchaseOrderType},#{factoryCode},#{warehouseCode},#{warehouseName})
+    </insert>
+
+</mapper>

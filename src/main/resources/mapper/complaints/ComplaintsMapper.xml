@@ -1,0 +1,1406 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<!--投诉直辖mapper-->
+<mapper namespace="utry.data.modular.complaints.dao.ComplaintsDao">
+
+    <!-- 开启二级缓存 -->
+<!--    <cache eviction="LRU" flushInterval="100000" readOnly="true" size="1024"></cache>-->
+    <!--新增投诉单信息-->
+    <insert id="complaintDetailAdd">
+        insert into t_complaint_handling (
+            complaintNumber,systemState,recordSource,dispatchingOrder,
+            complaintType,complaintClassify,documentNumber,provinces,
+            provincesCode,city,cityCode,county,countyCode,productCategory,
+            productCategoryCode,productType,productTypeCode,productSeries,
+            productModel,machineNumber,solutionSubmissionTime,solutionLandingTime,
+            storeNumber,storeName,storeRank,complaintStartTime,complaintEndTime,
+            exceptionDay,phoneDescribe,accountingCenter,accountingCenterCode,
+            upgradeTime,currentProcessingDepartment
+        )values(
+            #{complaintNumber},#{systemState},#{recordSource},#{dispatchingOrder},
+            #{complaintType},#{complaintClassify},#{documentNumber},#{provinces},
+            #{provincesCode},#{city},#{cityCode},#{county},#{countyCode},#{productCategory},
+            #{productCategoryCode},#{productType},#{productTypeCode},#{productSeries},
+            #{productModel},#{machineNumber},#{solutionSubmissionTime},#{solutionLandingTime},
+            #{storeNumber},#{storeName},#{storeRank},#{complaintStartTime},#{complaintEndTime},
+            #{exceptionDay},#{describe},#{accountingCenter},#{accountingCenterCode},
+            #{upgradeTime},#{currentProcessingDepartment}
+        )
+    </insert>
+    <!--热线服务单新增-->
+    <insert id="hotLineAdd">
+        insert into t_complaint_hot_line (
+            hotlineNumber,systemState,recordSource,provinces,provincesCode,
+            city,cityCode,county,countyCode,productCategory,productCategoryCode,
+            productType,productTypeCode,productSeries,storeNumber,storeName,
+            accountingCenter,accountingCenterCode,serviceType,serviceDetails,
+            subsidiaryLedger,creationTime,recordId,recordFileName,productModel,productSeriesCode,
+            customerNo,dispatchingOrder,storeLevel,machineNumber,callDetail,hotlineTime
+        )values(
+            #{hotlineNumber},#{systemState},#{recordSource},#{provinces},#{provincesCode},
+            #{city},#{cityCode},#{county},#{countyCode},#{productCategory},#{productCategoryCode},
+            #{productType},#{productTypeCode},#{productSeries},#{storeNumber},#{storeName},
+            #{accountingCenter},#{accountingCenterCode},#{serviceType},#{serviceDetails},
+            #{subsidiaryLedger},date_format(NOW(),'%Y-%m-%d %H:%i:%s'),
+            #{recordId},#{recordFileName},#{productModel},#{productSeriesCode},
+            #{customerNo},#{dispatchingOrder},#{storeLevel},#{machineNumber},#{callDetail},#{HotlineTime}
+        )
+    </insert>
+    <!--批量插入投诉留言-->
+    <insert id="complaintMessageAdd">
+        INSERT INTO t_complaint_message (
+            complaintNumber,messageContents,messageDepartmentNumber,
+            messageDepartment,messagePeopleNumber,messagePeople,messageTime
+        )VALUES
+        <foreach collection="list" separator="," item="item">
+            (
+                #{item.complaintNumber},#{item.messageContents},#{item.messageDepartmentNumber},
+                #{item.messageDepartment},#{item.messagePeopleNumber},#{item.messagePeople},#{item.messageTime}
+            )
+        </foreach>
+    </insert>
+    <!--批量插入投诉处理明细-->
+    <insert id="complaintProcessDetailAdd">
+        INSERT INTO t_complaint_process_detail (
+            complaintNumber,processingDepartment,processor,upgradeDepartment,
+            completionProcessingTime,processingSuggestion,processingResults,
+            elapsedTime,rowNotes
+        )VALUES
+        <foreach collection="list" separator="," item="item">
+            (
+                #{item.complaintNumber},#{item.processingDepartment},#{item.processor},#{item.upgradeDepartment},
+                #{item.completionProcessingTime},#{item.processingSuggestion},#{item.processingResults},
+                #{item.elapsedTime},#{item.rowNotes}
+            )
+        </foreach>
+    </insert>
+    <!--修改投诉单信息-->
+    <update id="complaintDetailEdit">
+        update t_complaint_handling
+        <set>
+            <if test="systemState != null">
+                systemState = #{systemState},
+            </if>
+            <if test="recordSource != null">
+                recordSource = #{recordSource},
+            </if>
+            <if test="dispatchingOrder != null">
+                dispatchingOrder = #{dispatchingOrder},
+            </if>
+            <if test="complaintType != null">
+                complaintType = #{complaintType},
+            </if>
+            <if test="complaintClassify != null">
+                complaintClassify = #{complaintClassify},
+            </if>
+            <if test="documentNumber != null">
+                documentNumber = #{documentNumber},
+            </if>
+            <if test="provinces != null">
+                provinces = #{provinces},
+            </if>
+            <if test="provincesCode != null">
+                provincesCode = #{provincesCode},
+            </if>
+            <if test="city != null">
+                city = #{city},
+            </if>
+            <if test="cityCode != null">
+                cityCode = #{cityCode},
+            </if>
+            <if test="county != null">
+                county = #{county},
+            </if>
+            <if test="countyCode != null">
+                countyCode = #{countyCode},
+            </if>
+            <if test="productCategory != null">
+                productCategory = #{productCategory},
+            </if>
+            <if test="productCategoryCode != null">
+                productCategoryCode = #{productCategoryCode},
+            </if>
+            <if test="productType != null">
+                productType = #{productType},
+            </if>
+            <if test="productTypeCode != null">
+                productTypeCode = #{productTypeCode},
+            </if>
+            <if test="productSeries != null">
+                productSeries = #{productSeries},
+            </if>
+            <if test="productModel != null">
+                productModel = #{productModel},
+            </if>
+            <if test="machineNumber != null">
+                machineNumber = #{machineNumber},
+            </if>
+            <if test="solutionSubmissionTime != null">
+                solutionSubmissionTime = #{solutionSubmissionTime},
+            </if>
+            <if test="solutionLandingTime != null">
+                solutionLandingTime = #{solutionLandingTime},
+            </if>
+            <if test="storeNumber != null">
+                storeNumber = #{storeNumber},
+            </if>
+            <if test="storeName != null">
+                storeName = #{storeName},
+            </if>
+            <if test="storeRank != null">
+                storeRank = #{storeRank},
+            </if>
+            <if test="complaintStartTime != null">
+                complaintStartTime = #{complaintStartTime},
+            </if>
+            <if test="complaintEndTime != null">
+                complaintEndTime = #{complaintEndTime},
+            </if>
+            <if test="exceptionDay != null">
+                exceptionDay = #{exceptionDay},
+            </if>
+            <if test="describe != null">
+                phoneDescribe = #{describe},
+            </if>
+            <if test="accountingCenter != null">
+                accountingCenter = #{accountingCenter},
+            </if>
+            <if test="accountingCenterCode != null">
+                accountingCenterCode = #{accountingCenterCode},
+            </if>
+            <if test="upgradeTime != null">
+                upgradeTime = #{upgradeTime},
+            </if>
+            <if test="currentProcessingDepartment != null">
+                currentProcessingDepartment = #{currentProcessingDepartment},
+            </if>
+            <if test="accountingArea != null">
+                accountingArea = #{accountingArea},
+            </if>
+            <if test="accountingAreaCode != null">
+                accountingAreaCode = #{accountingAreaCode},
+            </if>
+        </set>
+        where complaintNumber = #{complaintNumber}
+    </update>
+    <!--热线服务单修改-->
+    <update id="hotLineEdit">
+        update t_complaint_hot_line
+        <set>
+            <if test="systemState != null">
+                systemState = #{systemState},
+            </if>
+            <if test="recordSource != null">
+                recordSource = #{recordSource},
+            </if>
+            <if test="provinces != null">
+                provinces = #{provinces},
+            </if>
+            <if test="provincesCode != null">
+                provincesCode = #{provincesCode},
+            </if>
+            <if test="city != null">
+                city = #{city},
+            </if>
+            <if test="cityCode != null">
+                cityCode = #{cityCode},
+            </if>
+            <if test="county != null">
+                county = #{county},
+            </if>
+            <if test="countyCode != null">
+                countyCode = #{countyCode},
+            </if>
+            <if test="productCategory != null">
+                productCategory = #{productCategory},
+            </if>
+            <if test="productCategoryCode != null">
+                productCategoryCode = #{productCategoryCode},
+            </if>
+            <if test="productType != null">
+                productType = #{productType},
+            </if>
+            <if test="productTypeCode != null">
+                productTypeCode = #{productTypeCode},
+            </if>
+            <if test="productSeries != null">
+                productSeries = #{productSeries},
+            </if>
+            <if test="storeNumber != null">
+                storeNumber = #{storeNumber},
+            </if>
+            <if test="storeName != null">
+                storeName = #{storeName},
+            </if>
+            <if test="accountingCenter != null">
+                accountingCenter = #{accountingCenter},
+            </if>
+            <if test="accountingCenterCode != null">
+                accountingCenterCode = #{accountingCenterCode},
+            </if>
+            <if test="serviceType != null">
+                serviceType = #{serviceType},
+            </if>
+            <if test="serviceDetails != null">
+                serviceDetails = #{serviceDetails},
+            </if>
+            <if test="subsidiaryLedger != null">
+                subsidiaryLedger = #{subsidiaryLedger},
+            </if>
+            <if test="recordId != null">
+                recordId = #{recordId},
+            </if>
+            <if test="recordFileName != null">
+                recordFileName = #{recordFileName},
+            </if>
+            <if test="productModel != null">
+                productModel = #{productModel},
+            </if>
+            <if test="productSeriesCode != null">
+                productSeriesCode = #{productSeriesCode},
+            </if>
+            <if test="customerNo != null">
+                customerNo = #{customerNo},
+            </if>
+            <if test="dispatchingOrder != null">
+                dispatchingOrder = #{dispatchingOrder},
+            </if>
+            <if test="storeLevel != null">
+                storeLevel = #{storeLevel},
+            </if>
+            <if test="machineNumber != null">
+                machineNumber = #{machineNumber},
+            </if>
+            <if test="callDetail != null">
+                callDetail = #{callDetail},
+            </if>
+            <if test="HotlineTime != null">
+                hotlineTime = #{HotlineTime},
+            </if>
+            <if test="accountingArea != null">
+                accountingArea = #{accountingArea},
+            </if>
+            <if test="accountingAreaCode != null">
+                accountingAreaCode = #{accountingAreaCode},
+            </if>
+        </set>
+        where hotlineNumber = #{hotlineNumber}
+    </update>
+    <update id="solveEligibleToNull">
+        update t_region_dispatching_detail set solveEligible = null where dispatchingOrder = #{dispatchingOrder}
+    </update>
+    <!--删除投诉单号关联的投诉留言-->
+    <delete id="complaintMessageDel">
+        delete from t_complaint_message
+        where complaintNumber = #{complaintNumber}
+    </delete>
+    <!--删除投诉单号关联的投诉处理明细-->
+    <delete id="complaintProcessDetailDel">
+        delete from t_complaint_process_detail
+        where complaintNumber = #{complaintNumber}
+    </delete>
+    <!--通过投诉单号查询单个投诉单信息-->
+    <select id="complaintById" resultType="java.util.Map">
+        select complaintNumber,systemState,recordSource,dispatchingOrder,
+               complaintType,complaintClassify,documentNumber,provinces,
+               provincesCode,city,cityCode,county,countyCode,productCategory,
+               productCategoryCode,productType,productTypeCode,productSeries,
+               productModel,machineNumber,solutionSubmissionTime,solutionLandingTime,
+               storeNumber,storeName,storeRank,complaintStartTime,complaintEndTime,
+               exceptionDay,phoneDescribe,accountingCenter,accountingCenterCode,
+               upgradeTime,currentProcessingDepartment
+        from t_complaint_handling
+        where complaintNumber = #{complaintNumber}
+    </select>
+    <!--通过热线编号查询单个热线服务单-->
+    <select id="hotLineById" resultType="java.util.Map">
+        select hotlineNumber,systemState,recordSource,provinces,provincesCode,
+               city,cityCode,county,countyCode,productCategory,productCategoryCode,
+               productType,productTypeCode,productSeries,storeNumber,storeName,
+               accountingCenter,accountingCenterCode,serviceType,serviceDetails,
+               subsidiaryLedger
+        from t_complaint_hot_line
+        where hotlineNumber = #{hotlineNumber}
+    </select>
+    <!--查询投诉单号关联的投诉留言-->
+    <select id="complaintMessageListById" resultType="java.util.Map">
+        select * from t_complaint_message
+        where complaintNumber = #{complaintNumber}
+    </select>
+    <!--查询投诉单号关联的投诉处理明细-->
+    <select id="complaintProcessDetailListById" resultType="java.util.Map">
+        select * from t_complaint_process_detail
+        where complaintNumber = #{complaintNumber}
+    </select>
+    <select id="notFinishIds" resultType="java.lang.String">
+        select complaintNumber from t_complaint_handling where systemState &lt;&gt; '已结案'
+    </select>
+    <!--  根据热线单号查询投诉单号  -->
+    <select id="selectComplainNumberByHotlineNumber" resultType="java.lang.String">
+        select complaintNumber from t_complaint_handling where documentNumber = #{hotlineNumber}
+    </select>
+
+    <!--  新增履历信息业务  -->
+    <insert id="resumeDetail">
+        insert into t_complaint_resume (hotlineNumber,recordFile)
+        values
+        <foreach collection="list" item="item" separator=",">
+            (#{item.hotlineNumber},#{item.recordFile})
+        </foreach>
+    </insert>
+
+
+
+    <sql id="dateCondition">
+        <if test="dto.beginDate != null and dto.beginDate != ''">
+            and complaintStartTime &gt;= concat_ws(' ',#{dto.beginDate},'00:00:00')
+        </if>
+        <if test="dto.endDate != null and dto.endDate != ''">
+            and complaintStartTime &lt;= concat_ws(' ',#{dto.endDate},'23:59:59')
+        </if>
+        <if test="dto.productTypeCodeList != null and dto.productTypeCodeList.size > 0">
+            and productTypeCode in
+            <foreach collection="dto.productTypeCodeList" open="(" close=")" separator="," item="productTypeCode">
+                #{productTypeCode}
+            </foreach>
+        </if>
+    </sql>
+
+    <sql id="downDateCondition">
+        <if test="dto.beginDate != null and dto.beginDate != ''">
+            and cast(complaintStartTime as date) &gt;= #{dto.beginDate}
+        </if>
+        <if test="dto.endDate != null and dto.endDate != ''">
+            and cast(complaintStartTime as date) &lt;= #{dto.endDate}
+        </if>
+        <if test="dto.productTypeCodeList != null and dto.productTypeCodeList.size > 0">
+            and productTypeCode in
+            <foreach collection="dto.productTypeCodeList" open="(" close=")" separator="," item="productTypeCode">
+                #{productTypeCode}
+            </foreach>
+        </if>
+        <if test="dto.areaCodeList != null and dto.areaCodeList.size > 0">
+            and a.accountingAreaCode in
+            <foreach collection="dto.areaCodeList" open="(" close=")" separator="," item="areaCode">
+                #{areaCode}
+            </foreach>
+        </if>
+    </sql>
+
+    <!--  查询7天解决率和投诉件数  -->
+    <select id="sevenDaySolveRate" resultType="java.util.Map">
+        select concat(round(ifnull(sum(ifnull(TIMESTAMPDIFF(DAY,cast(complaintStartTime as date),
+            if(length(trim(solutionLandingTime)) > 0,cast(solutionLandingTime as date),cast(complaintEndTime as date))) - exceptionDay &lt;= 7,0)) / count(1) * 100,0),1),'%') sevenSolveRate,
+            count(complaintStartTime) complaintNumber
+        from t_complaint_handling a
+        <where>
+            <include refid="dateCondition"></include>
+            <if test="dto.complaintType != null and dto.complaintType != ''">
+                and complaintType = #{dto.complaintType}
+            </if>
+            <if test="dto.complaintClassify != null and dto.complaintClassify != ''">
+                and complaintClassify = #{dto.complaintClassify}
+            </if>
+            <if test="dto.areaCodeList != null and dto.areaCodeList.size > 0">
+                and a.accountingAreaCode in
+                <foreach collection="dto.areaCodeList" open="(" close=")" separator="," item="areaCode">
+                    #{areaCode}
+                </foreach>
+            </if>
+        </where>
+    </select>
+
+    <!--  分组查询每天的解决率  -->
+    <select id="daysSolveRate" resultType="java.util.Map">
+        select cast(complaintStartTime as date) complaintStartTime,
+            round(sum(ifnull(TIMESTAMPDIFF(DAY,cast(complaintStartTime as date),
+            if(length(trim(solutionLandingTime)) > 0,cast(solutionLandingTime as date),cast(complaintEndTime as date))) - exceptionDay &lt;= 7,0))/count(complaintStartTime) * 100,1) sevenSolveRate
+        from t_complaint_handling
+        <where>
+            <include refid="dateCondition"></include>
+        </where>
+        group by cast(complaintStartTime as date)
+    </select>
+
+    <!--  查询投诉率  -->
+    <select id="complaintRate" resultType="java.util.Map">
+        select
+            (select count(1) number1
+                from t_complaint_handling a
+                <where>
+                    <include refid="dateCondition"></include>
+                </where>
+            ) as complaintNumber,
+            concat(round(ifnull((
+            select (
+                select count(1) number1
+                from t_complaint_handling a
+                <where>
+                    <include refid="dateCondition"></include>
+                </where>
+            )
+            /
+            (select count(1) number2
+                from t_complaint_hot_line b
+                <where>
+                    <if test="dto.beginDate != null and dto.beginDate != ''">
+                        and creationTime &gt;= concat_ws(' ',#{dto.beginDate},'00:00:00')
+                    </if>
+                    <if test="dto.endDate != null and dto.endDate != ''">
+                        and creationTime &lt;= concat_ws(' ',#{dto.endDate},'23:59:59')
+                    </if>
+                    <if test="dto.productTypeCodeList != null and dto.productTypeCodeList.size > 0">
+                        and productTypeCode in
+                        <foreach collection="dto.productTypeCodeList" open="(" close=")" separator="," item="productTypeCode">
+                            #{productTypeCode}
+                        </foreach>
+                    </if>
+                </where>
+            )
+            from dual) * 100,0),2),'%')
+        as complaintRate from dual
+    </select>
+    
+    <!--  查询每天的投诉率  -->
+    <select id="daysComplaintRate" resultType="java.util.Map">
+        select complaintStartTime,round(number1/number2 * 100,2) complaintRate from (
+            select cast(complaintStartTime as date) complaintStartTime,count(complaintStartTime) number1
+                from t_complaint_handling
+            <where>
+                <include refid="dateCondition"></include>
+            </where>
+            group by cast(complaintStartTime as date)) a
+            inner join (
+            select cast(creationTime as date) creationTime,count(creationTime) number2
+                from t_complaint_hot_line
+                <where>
+                    <if test="dto.beginDate != null and dto.beginDate != ''">
+                        and cast(creationTime as date) &gt;= #{dto.beginDate}
+                    </if>
+                    <if test="dto.endDate != null and dto.endDate != ''">
+                        and cast(creationTime as date) &lt;= #{dto.endDate}
+                    </if>
+                    <if test="dto.productTypeCodeList != null and dto.productTypeCodeList.size > 0">
+                        and productTypeCode in
+                        <foreach collection="dto.productTypeCodeList" open="(" close=")" separator="," item="productTypeCode">
+                            #{productTypeCode}
+                        </foreach>
+                    </if>
+                </where>
+                group by cast(creationTime as date)
+        ) b on a.complaintStartTime = b.creationTime
+    </select>
+    
+    <!--  查询每月的投诉率  -->
+    <select id="monthComplaintRate" resultType="java.util.Map">
+        select month1 complaintStartTime, round(number1/number2 * 100,2) complaintRate from (
+            select date_format(complaintStartTime, '%Y-%m') month1,count(1) number1
+                from t_complaint_handling
+            <where>
+                <include refid="dateCondition"></include>
+            </where>
+            group by month1) a
+            inner join (
+            select date_format(creationTime, '%Y-%m') month2,count(1) number2
+                from t_complaint_hot_line
+                <where>
+                    <if test="dto.beginDate != null and dto.beginDate != ''">
+                        and cast(creationTime as date) &gt;= #{dto.beginDate}
+                    </if>
+                    <if test="dto.endDate != null and dto.endDate != ''">
+                        and cast(creationTime as date) &lt;= #{dto.endDate}
+                    </if>
+                    <if test="dto.productTypeCodeList != null and dto.productTypeCodeList.size > 0">
+                        and productTypeCode in
+                        <foreach collection="dto.productTypeCodeList" open="(" close=")" separator="," item="productTypeCode">
+                            #{productTypeCode}
+                        </foreach>
+                    </if>
+                </where>
+                group by month2
+        ) b on a.month1 = b.month2
+    </select>
+    
+    <!--  投诉率 - 下钻页面之投诉原因  -->
+    <select id="complaintRateReason" resultType="java.util.Map">
+        SELECT complaintType, complaintClassify, COUNT(1) AS number FROM t_complaint_handling
+        <where>
+            <include refid="dateCondition"></include>
+        </where>
+        GROUP BY complaintType, complaintClassify
+    </select>
+    
+    <!--  投诉率 - 下钻页面之产品品类投诉率  -->
+    <select id="complaintRateProductCategory" resultType="java.util.Map">
+        SELECT productCategory, productCategoryCode, COUNT(1) AS number FROM t_complaint_handling 
+        <where>
+            <include refid="dateCondition"></include>
+            <if test="dto.complaintType != null and dto.complaintType != ''">
+                and complaintType = #{dto.complaintType}
+            </if>
+            <if test="dto.complaintClassify != null and dto.complaintClassify != ''">
+                and complaintClassify = #{dto.complaintClassify}
+            </if>
+        </where>
+        GROUP BY productCategoryCode
+    </select>
+    
+    <!--  投诉率 - 下钻页面之大区投诉率  -->
+    <select id="complaintRateAccountingCenter" resultType="java.util.Map">
+    SELECT h.accountingCenter, h.accountingCenterCode, COUNT(1) AS number, h.accountingArea, h.accountingAreaCode FROM t_complaint_handling h
+        <where>
+            <include refid="dateCondition"></include>
+            <if test="dto.complaintType != null and dto.complaintType != ''">
+                and complaintType = #{dto.complaintType}
+            </if>
+            <if test="dto.complaintClassify != null and dto.complaintClassify != ''">
+                and complaintClassify = #{dto.complaintClassify}
+            </if>
+        </where>
+        GROUP BY h.accountingAreaCode
+    </select>
+    
+    <!--  投诉率 - 下钻页面之地域(省份)投诉率  -->
+    <select id="complaintRateProvinces" resultType="java.util.Map">
+        SELECT provinces, provincesCode, COUNT(1) AS number FROM t_complaint_handling 
+        <where>
+            <include refid="dateCondition"></include>
+            <if test="dto.complaintType != null and dto.complaintType != ''">
+                and complaintType = #{dto.complaintType}
+            </if>
+            <if test="dto.complaintClassify != null and dto.complaintClassify != ''">
+                and complaintClassify = #{dto.complaintClassify}
+            </if>
+        </where>
+        GROUP BY provincesCode
+    </select>
+
+    <!--  查询未结案数据  -->
+    <select id="notOverCase" resultType="java.util.Map">
+        select complaintClassify, count(complaintClassify) complaintNumber
+            from t_complaint_handling
+            <where>
+                and if(length(trim(complaintEndTime)) > 0,1,0) = 0
+                <include refid="dateCondition"></include>
+            </where>
+            group by complaintClassify
+    </select>
+
+    <!--  查询未结案总数  -->
+    <select id="notOverCaseNumber" resultType="java.util.Map">
+        select '未结案总数' as notOverCase, count(complaintClassify) notOverNumber
+        from t_complaint_handling
+        <where>
+            and if(length(trim(complaintEndTime)) > 0,1,0) = 0
+            <include refid="dateCondition"></include>
+        </where>
+    </select>
+
+    <!--  查询投诉量占比  -->
+    <select id="selectComplainNumberProportion" resultType="java.util.Map">
+        select
+            concat(round(ifnull(sum(if(t.differ &lt;= 86400,t.complaintNumber,0))/sum(t.complaintNumber) * 100,0),1),'%') as currentDayProportion,
+            concat(round(ifnull(sum(if(t.differ &gt; 86400 and t.differ &lt;= 259200,t.complaintNumber,0))/sum(t.complaintNumber) * 100,0),1),'%') as oneDayProportion,
+            concat(round(ifnull(sum(if(t.differ &gt; 259200 and t.differ &lt;= 604800,t.complaintNumber,0))/sum(t.complaintNumber) * 100,0),1),'%')as fourDayProportion,
+            concat(round(ifnull(sum(if(t.differ &gt; 604800,t.complaintNumber,0))/sum(t.complaintNumber) * 100,0),1),'%') as sevenDayProportion
+        from (
+            select TIMESTAMPDIFF(SECOND,complaintStartTime,NOW()) as differ,count(complaintStartTime) complaintNumber
+            from t_complaint_handling
+             <where>
+                 <include refid="dateCondition"></include>
+                 <if test="dto.provinceCode != null and dto.provinceCode != ''">
+                     and provincesCode = substring(#{dto.provinceCode},1,2)
+                 </if>
+             </where>
+            group by TIMESTAMPDIFF(SECOND,complaintStartTime,NOW())
+        ) t
+    </select>
+
+    <!--  按省份查询投诉量或投诉7天解决率  -->
+    <select id="selectComplainNumberByProvince" resultType="java.util.Map">
+        select
+            <if test="dto.complaintFlag == 1">
+                a.provinces name,count(a.provinces) value
+            </if>
+            <if test="dto.complaintFlag == 2">
+                a.provinces name,
+                round(ifnull(sum(ifnull(TIMESTAMPDIFF(DAY,cast(complaintStartTime as date),
+                if(length(trim(solutionLandingTime)) > 0,cast(solutionLandingTime as date),cast(complaintEndTime as date))) - exceptionDay &lt;= 7,0)) / count(provinces) * 100,0),1) value
+            </if>
+        from t_complaint_handling a
+        <where>
+            <include refid="dateCondition"></include>
+        </where>
+        group by a.provincesCode
+    </select>
+
+    <!--  分组查询投诉量排名  -->
+    <select id="selectComplainNumberRank" resultType="java.util.Map">
+        select
+            <if test="dto.rankFlag == 1">
+               a.provinces name,a.provincesCode,count(a.provincesCode) rankNumber
+            </if>
+            <if test="dto.rankFlag == 2">
+                a.accountingArea name,a.accountingAreaCode areaCode,c.adminName adminName,count(accountingAreaCode) rankNumber
+            </if>
+            from t_complaint_handling a
+        <if test="dto.rankFlag == 1">
+            <where>
+                <include refid="dateCondition"></include>
+            </where>
+            group by a.provincesCode
+            order by count(a.provincesCode) desc
+        </if>
+        <if test="dto.rankFlag == 2">
+            left join t_district_accounting c on a.accountingAreaCode = c.areaCode
+            <where>
+                <include refid="dateCondition"></include>
+            </where>
+            group by a.accountingAreaCode
+            order by count(accountingAreaCode) desc
+        </if>
+    </select>
+
+    <!--  查询投诉7天解决率排名  -->
+    <select id="selectComplainSolveRank" resultType="java.util.Map">
+        select
+            <if test="dto.rankFlag == 1">
+                a.provinces name,a.provincesCode,
+                round(ifnull(sum(ifnull(TIMESTAMPDIFF(DAY,cast(complaintStartTime as date),
+                    if(length(trim(solutionLandingTime)) > 0,cast(solutionLandingTime as date),cast(complaintEndTime as date))) - exceptionDay &lt;= 7,0)) / count(provinces) * 100,0),1) rankNumber
+            </if>
+            <if test="dto.rankFlag == 2">
+                a.accountingArea name,a.accountingAreaCode areaCode,c.adminName adminName,
+                round(ifnull(sum(ifnull(TIMESTAMPDIFF(DAY,cast(complaintStartTime as date),
+                    if(length(trim(solutionLandingTime)) > 0,cast(solutionLandingTime as date),cast(complaintEndTime as date))) - exceptionDay &lt;= 7,0)) / count(a.accountingAreaCode) * 100,0),1) rankNumber
+            </if>
+        from t_complaint_handling a
+        <if test="dto.rankFlag == 1">
+            <where>
+                <include refid="dateCondition"></include>
+            </where>
+            group by a.provincesCode
+            order by rankNumber desc
+        </if>
+        <if test="dto.rankFlag == 2">
+            left join t_district_accounting c on a.accountingAreaCode = c.areaCode
+            <where>
+                <include refid="dateCondition"></include>
+                <if test="dto.complaintType != null and dto.complaintType != ''">
+                    and a.complaintType = #{dto.complaintType}
+                </if>
+            </where>
+            group by a.accountingAreaCode
+            order by rankNumber desc
+        </if>
+    </select>
+
+    <!--  按省份查询投诉7天解决率占比  -->
+    <select id="selectComplainSolveProportion" resultType="java.util.Map">
+        select
+            concat(round(ifnull(sum(if(t.value &gt;95,1,0))/count(t.name) * 100,0),1),'%') as currentDayProportion,
+            concat(round(ifnull(sum(if(t.value &gt;90 and t.value &lt;=95,1,0))/count(t.name) * 100,0),1),'%') as oneDayProportion,
+            concat(round(ifnull(sum(if(t.value &gt;=80 and t.value &lt;=90,1,0))/count(t.name) * 100,0),1),'%') as fourDayProportion,
+            concat(round(ifnull(sum(if(t.value &lt;80,1,0))/count(t.name) * 100,0),1),'%') as sevenDayProportion
+        from (
+            select
+                a.provinces name,
+                round(ifnull(sum(ifnull(TIMESTAMPDIFF(DAY,cast(complaintStartTime as date),
+                if(length(trim(solutionLandingTime)) > 0,cast(solutionLandingTime as date),cast(complaintEndTime as date))) - exceptionDay &lt;= 7,0)) / count(provinces) * 100,0),1) value
+            from t_complaint_handling a
+            <where>
+                <include refid="dateCondition"></include>
+            </where>
+            group by a.provincesCode
+        ) t
+    </select>
+
+    <!--  按市查询投诉7天解决率占比  -->
+    <select id="selectComplainSolveProportionByCity" resultType="java.util.Map">
+        select
+            concat(round(sum(if(t.value &gt;95,1,0))/count(t.name) * 100,1),'%') as currentDayProportion,
+            concat(round(sum(if(t.value &gt;90 and t.value &lt;=95,1,0))/count(t.name) * 100,1),'%') as oneDayProportion,
+            concat(round(sum(if(t.value &gt;=80 and t.value &lt;=90,1,0))/count(t.name) * 100,1),'%') as fourDayProportion,
+            concat(round(sum(if(t.value &lt;80,1,0))/count(t.name) * 100,1),'%') as sevenDayProportion
+        from (
+            select
+                <if test="dto.provinceCode == 11 or dto.provinceCode == 12 or dto.provinceCode == 31 or dto.provinceCode == 50">
+                    a.county name,
+                </if>
+                <if test="dto.provinceCode != 11 and dto.provinceCode != 12 and dto.provinceCode != 31 and dto.provinceCode != 50">
+                    a.city name,
+                </if>
+                round(ifnull(sum(ifnull(TIMESTAMPDIFF(DAY,cast(complaintStartTime as date),
+                if(length(trim(solutionLandingTime)) > 0,cast(solutionLandingTime as date),cast(complaintEndTime as date))) - exceptionDay &lt;= 7,0)) / count(provinces) * 100,0),1) value
+            from t_complaint_handling a
+            <where>
+                <include refid="dateCondition"></include>
+                <if test="dto.provinceCode != null and dto.provinceCode != ''">
+                    and a.provincesCode = substring(#{dto.provinceCode},1,2)
+                </if>
+            </where>
+            <if test="dto.provinceCode == 11 or dto.provinceCode == 12 or dto.provinceCode == 31 or dto.provinceCode == 50">
+                group by a.countyCode
+            </if>
+            <if test="dto.provinceCode != 11 and dto.provinceCode != 12 and dto.provinceCode != 31 and dto.provinceCode != 50">
+                group by a.cityCode
+            </if>
+        ) t
+    </select>
+
+    <!--  投诉异常监控  -->
+    <select id="complaintAbnormalMonitor" resultType="java.util.Map">
+        select
+            x.nodeName,
+            sum(x.timeOutNumber) timeOutNumber,
+            ifnull(y.mediaComplaint,0) mediaComplaint,
+            ifnull(y.nodeNumber,0) nodeNumber,
+            ifnull(y.submissionTime,0) submissionTime,
+            ifnull(y.landTime,0) landTime,
+            ifnull(y.upgradeTime,0) upgradeTime,
+            ifnull(y.endTime,0) endTime
+        from(
+            select a.complaintNumber,
+            (CASE
+            WHEN !ISNULL(a.complaintEndTime) and length(trim(a.complaintEndTime)) > 0 THEN
+            'CC回访结案'
+            WHEN b.deptNumber>=2 THEN
+            '处理升级'
+            WHEN !ISNULL(a.solutionLandingTime) and length(trim(a.solutionLandingTime)) > 0 THEN
+            '方案落地'
+            WHEN !ISNULL(a.solutionSubmissionTime) and length(trim(a.solutionSubmissionTime)) > 0 THEN
+            '解决方案提交'
+            WHEN !ISNULL(a.complaintStartTime) and length(trim(a.complaintStartTime)) > 0 THEN
+            '处理单创建'
+            END)AS nodeName,
+            (CASE
+            WHEN !ISNULL(a.complaintEndTime) and length(trim(a.complaintEndTime)) > 0 THEN
+            0
+            WHEN b.deptNumber>=2 THEN
+            0
+            WHEN !ISNULL(a.solutionLandingTime) and length(trim(a.solutionLandingTime)) > 0 THEN
+            if(TIMESTAMPDIFF(DAY,cast(complaintStartTime as date),cast(solutionLandingTime as date)) > 7,1,0)
+            WHEN !ISNULL(a.solutionSubmissionTime) and length(trim(a.solutionSubmissionTime)) > 0 THEN
+            if(TIMESTAMPDIFF(DAY,cast(complaintStartTime as date),cast(solutionSubmissionTime as date)) > 1,1,0)
+            WHEN !ISNULL(a.complaintStartTime) and length(trim(a.complaintStartTime)) > 0 THEN
+            0
+            END)AS timeOutNumber
+        from t_complaint_handling a
+            left join(
+                select complaintNumber,
+                    sum(if(length(trim(upgradeDepartment)) > 0 and !ISNULL(upgradeDepartment),1,0)) deptNumber,
+                    min(completionProcessingTime) completionProcessingTime,round(sum(elapsedTime) * 60 * 60,2) upgradeTime
+                from t_complaint_process_detail
+                group by complaintNumber
+                ) b on a.complaintNumber = b.complaintNumber
+                <where>
+                    <include refid="dateCondition"></include>
+                    <if test="dto.complaintType != null and dto.complaintType != ''">
+                        and a.complaintType = #{dto.complaintType}
+                    </if>
+                    <if test="dto.productCategoryCode != null and dto.productCategoryCode.size > 0">
+                        and a.productCategoryCode in
+                        <foreach collection="dto.productCategoryCode" open="(" close=")" separator="," item="categoryCode">
+                            #{categoryCode}
+                        </foreach>
+                    </if>
+                    <if test="dto.productTypeCode != null and dto.productTypeCode.size > 0">
+                        and a.productTypeCode in
+                        <foreach collection="dto.productTypeCode" open="(" close=")" separator="," item="typeCode">
+                            #{typeCode}
+                        </foreach>
+                    </if>
+                    <if test="dto.areaCodeList != null and dto.areaCodeList.size > 0">
+                        and a.accountingAreaCode in
+                        <foreach collection="dto.areaCodeList" open="(" close=")" separator="," item="areaCode">
+                            #{areaCode}
+                        </foreach>
+                    </if>
+                    <if test="dto.cityCode != null and dto.cityCode != ''">
+                        <if test="dto.cityCode.length() == 6">
+                            and a.countyCode = #{dto.cityCode}
+                        </if>
+                        <if test="dto.cityCode.length() != 6">
+                            and a.cityCode = #{dto.cityCode}
+                        </if>
+                    </if>
+                    <if test="dto.storeName != null and dto.storeName != ''">
+                        and a.storeName = #{dto.storeName}
+                    </if>
+                    <if test="dto.accountingCenterCode != null and dto.accountingCenterCode != ''">
+                        and a.accountingCenterCode = #{dto.accountingCenterCode}
+                    </if>
+                </where>
+            ) x
+        left join(
+            select
+                t.nodeName,
+                sum(t.mediaComplaint) mediaComplaint,
+                count(t.nodeName) nodeNumber,
+                round(avg(if(t.nodeName = '解决方案提交', TIMESTAMPDIFF(minute,complaintStartTime,solutionSubmissionTime),0)),0) submissionTime,
+                round(avg(if(t.nodeName = '方案落地', TIMESTAMPDIFF(minute,solutionSubmissionTime,solutionLandingTime),0)),0) landTime,
+                round(avg(if(t.nodeName = '处理升级',t.upgradeTime / 60,0)),0) upgradeTime,
+                round(avg(if(t.nodeName = 'CC回访结案', TIMESTAMPDIFF(minute,if(length(trim(t.completionProcessingTime)) > 0 and t.completionProcessingTime!=null,t.completionProcessingTime,
+                if(length(trim(solutionLandingTime)) > 0 and solutionLandingTime!=null,solutionLandingTime,
+                if(length(trim(solutionSubmissionTime)) > 0 and solutionSubmissionTime!=null,solutionSubmissionTime,
+                complaintStartTime))),complaintEndTime),0)),0) endTime
+            from(
+                select a.complaintNumber,
+                (CASE
+                WHEN !ISNULL(a.complaintEndTime) and length(trim(a.complaintEndTime)) > 0 THEN
+                'CC回访结案'
+                WHEN b.deptNumber>=2 THEN
+                '处理升级'
+                WHEN !ISNULL(a.solutionLandingTime) and length(trim(a.solutionLandingTime)) > 0 THEN
+                '方案落地'
+                WHEN !ISNULL(a.solutionSubmissionTime) and length(trim(a.solutionSubmissionTime)) > 0 THEN
+                '解决方案提交'
+                WHEN !ISNULL(a.complaintStartTime) and length(trim(a.complaintStartTime)) > 0 THEN
+                '处理单创建'
+                END)AS nodeName,
+                (CASE
+                WHEN !ISNULL(a.complaintEndTime) and length(trim(a.complaintEndTime)) > 0 THEN
+                0
+                WHEN b.deptNumber>=2 THEN
+                0
+                WHEN !ISNULL(a.solutionLandingTime) and length(trim(a.solutionLandingTime)) > 0 THEN
+                if(TIMESTAMPDIFF(DAY,cast(complaintStartTime as date),cast(solutionLandingTime as date)) > 7,1,0)
+                WHEN !ISNULL(a.solutionSubmissionTime) and length(trim(a.solutionSubmissionTime)) > 0 THEN
+                if(TIMESTAMPDIFF(DAY,cast(complaintStartTime as date),cast(solutionSubmissionTime as date)) > 1,1,0)
+                WHEN !ISNULL(a.complaintStartTime) and length(trim(a.complaintStartTime)) > 0 THEN
+                0
+                END)AS timeOutNumber,
+                if(a.complaintType = '媒体投诉',1,0) mediaComplaint,
+                a.complaintEndTime,
+                b.upgradeTime,
+                a.solutionLandingTime,
+                a.solutionSubmissionTime,
+                a.complaintStartTime,
+                b.completionProcessingTime
+            from t_complaint_handling a
+                left join(
+                    select complaintNumber,
+                        sum(if(length(trim(upgradeDepartment)) > 0 and !ISNULL(upgradeDepartment),1,0)) deptNumber,
+                        min(completionProcessingTime) completionProcessingTime,round(sum(elapsedTime) * 60 * 60,2) upgradeTime
+                    from t_complaint_process_detail
+                    group by complaintNumber
+                ) b on a.complaintNumber = b.complaintNumber
+                <where>
+                    <include refid="dateCondition"></include>
+                    <if test="dto.complaintClassify != null and dto.complaintClassify != ''">
+                        and a.complaintClassify = #{dto.complaintClassify}
+                    </if>
+                    <if test="dto.complaintType != null and dto.complaintType != ''">
+                        and a.complaintType = #{dto.complaintType}
+                    </if>
+                    <if test="dto.productCategoryCode != null and dto.productCategoryCode.size > 0 and dto.productTypeCode != null and dto.productTypeCode.size > 0">
+                        and (
+                        a.productCategoryCode in
+                        <foreach collection="dto.productCategoryCode" open="(" close=")" separator="," item="categoryCode">
+                            #{categoryCode}
+                        </foreach>
+                        or
+                        a.productTypeCode in
+                        <foreach collection="dto.productTypeCode" open="(" close=")" separator="," item="typeCode">
+                            #{typeCode}
+                        </foreach>
+                        )
+                    </if>
+                    <if test="dto.productCategoryCode != null and dto.productCategoryCode.size > 0 and (dto.productTypeCode == null or dto.productTypeCode.size == 0)">
+                        and a.productCategoryCode in
+                        <foreach collection="dto.productCategoryCode" open="(" close=")" separator="," item="categoryCode">
+                            #{categoryCode}
+                        </foreach>
+                    </if>
+                    <if test="dto.productTypeCode != null and dto.productTypeCode.size > 0 and (dto.productCategoryCode == null or dto.productCategoryCode.size == 0)">
+                        and a.productTypeCode in
+                        <foreach collection="dto.productTypeCode" open="(" close=")" separator="," item="typeCode">
+                            #{typeCode}
+                        </foreach>
+                    </if>
+                    <if test="dto.areaCodeList != null and dto.areaCodeList.size > 0">
+                        and a.accountingAreaCode in
+                        <foreach collection="dto.areaCodeList" open="(" close=")" separator="," item="areaCode">
+                            #{areaCode}
+                        </foreach>
+                    </if>
+                    <if test="dto.cityCode != null and dto.cityCode != ''">
+                        <if test="dto.cityCode.length() == 6">
+                            and a.countyCode = #{dto.cityCode}
+                        </if>
+                        <if test="dto.cityCode.length() != 6">
+                            and a.cityCode = #{dto.cityCode}
+                        </if>
+                    </if>
+                    <if test="dto.storeName != null and dto.storeName != ''">
+                        and a.storeName = #{dto.storeName}
+                    </if>
+                    <if test="dto.accountingCenterCode != null and dto.accountingCenterCode != ''">
+                        and a.accountingCenterCode = #{dto.accountingCenterCode}
+                    </if>
+                </where>
+                ) t
+                group by t.nodeName
+            )y on x.nodeName = y.nodeName
+        group by x.nodeName
+    </select>
+
+    <!--  查询单据列表  -->
+    <select id="selectDocumentsList" resultType="java.util.Map">
+        select a.systemState,a.storeName,a.productType,a.currentProcessingDepartment,a.complaintNumber,
+               a.complaintType,a.complaintClassify,a.complaintStartTime,a.dispatchingOrder,
+               if(length(trim(a.solutionLandingTime)) > 0 and !ISNULL(a.solutionLandingTime),solutionLandingTime,'-') solutionLandingTime,
+               if(length(trim(a.complaintEndTime)) > 0 and !ISNULL(a.complaintEndTime),complaintEndTime,'-') complaintEndTime,
+               round(TIMESTAMPDIFF(SECOND,complaintStartTime,
+                                    if(length(trim(complaintEndTime)) > 0 and !ISNULL(complaintEndTime),complaintEndTime,NOW())) / 86400,2) totalDays,
+               if(length(trim(a.accountingArea)) > 0 and !ISNULL(a.accountingArea),a.accountingArea,'-') regionalName,
+               (CASE WHEN a.provincesCode = 11 or a.provincesCode = 12 or a.provincesCode = 31 or a.provincesCode = 50 THEN concat(a.provinces,a.county)
+                   ELSE concat(a.provinces,a.city)
+                   END) areaName
+        from t_complaint_handling a
+        <if test="dto.nodeName != null and dto.nodeName != ''">
+            left join(
+            select a.complaintNumber,
+            (CASE
+            WHEN !ISNULL(a.complaintEndTime) and length(trim(a.complaintEndTime)) > 0 THEN
+            'CC回访结案'
+            WHEN b.deptNumber>=2 THEN
+            '处理升级'
+            WHEN !ISNULL(a.solutionLandingTime) and length(trim(a.solutionLandingTime)) > 0 THEN
+            '方案落地'
+            WHEN !ISNULL(a.solutionSubmissionTime) and length(trim(a.solutionSubmissionTime)) > 0 THEN
+            '解决方案提交'
+            WHEN !ISNULL(a.complaintStartTime) and length(trim(a.complaintStartTime)) > 0 THEN
+            '处理单创建'
+            END)AS nodeName,
+            (CASE
+            WHEN !ISNULL(a.complaintEndTime) and length(trim(a.complaintEndTime)) > 0 THEN
+            0
+            WHEN b.deptNumber>=2 THEN
+            0
+            WHEN !ISNULL(a.solutionLandingTime) and length(trim(a.solutionLandingTime)) > 0 THEN
+            if(TIMESTAMPDIFF(DAY,cast(complaintStartTime as date),cast(solutionLandingTime as date)) > 7,1,0)
+            WHEN !ISNULL(a.solutionSubmissionTime) and length(trim(a.solutionSubmissionTime)) > 0 THEN
+            if(TIMESTAMPDIFF(DAY,cast(complaintStartTime as date),cast(solutionSubmissionTime as date)) > 1,1,0)
+            WHEN !ISNULL(a.complaintStartTime) and length(trim(a.complaintStartTime)) > 0 THEN
+            0
+            END)AS timeOutNumber
+            from t_complaint_handling a
+            left join(
+            select complaintNumber,
+            sum(if(length(trim(upgradeDepartment)) > 0 and !ISNULL(upgradeDepartment),1,0)) deptNumber,
+            min(completionProcessingTime) completionProcessingTime,round(sum(elapsedTime) * 60 * 60,2) upgradeTime
+            from t_complaint_process_detail
+            group by complaintNumber
+            ) b on a.complaintNumber = b.complaintNumber
+            ) x on a.complaintNumber = x.complaintNumber
+        </if>
+        <if test="dto.exceptionFlag != null and dto.exceptionFlag != '' and dto.exceptionFlag == 1">
+            left join(
+            select a.complaintNumber,
+            (CASE
+            WHEN !ISNULL(a.complaintEndTime) and length(trim(a.complaintEndTime)) > 0 THEN
+            0
+            WHEN b.deptNumber>=2 THEN
+            0
+            WHEN !ISNULL(a.solutionLandingTime) and length(trim(a.solutionLandingTime)) > 0 THEN
+            if(TIMESTAMPDIFF(DAY,cast(complaintStartTime as date),cast(solutionLandingTime as date)) > 7,1,0)
+            WHEN !ISNULL(a.solutionSubmissionTime) and length(trim(a.solutionSubmissionTime)) > 0 THEN
+            if(TIMESTAMPDIFF(DAY,cast(complaintStartTime as date),cast(solutionSubmissionTime as date)) > 1,1,0)
+            WHEN !ISNULL(a.complaintStartTime) and length(trim(a.complaintStartTime)) > 0 THEN
+            0
+            END)AS timeOutFlag
+            from t_complaint_handling a
+            left join(
+            select complaintNumber,
+            sum(if(length(trim(upgradeDepartment)) > 0 and !ISNULL(upgradeDepartment),1,0)) deptNumber,
+            min(completionProcessingTime) completionProcessingTime,round(sum(elapsedTime) * 60 * 60,2) upgradeTime
+            from t_complaint_process_detail
+            group by complaintNumber
+            ) b on a.complaintNumber = b.complaintNumber ) t on a.complaintNumber = t.complaintNumber
+        </if>
+        <where>
+            <include refid="dateCondition"></include>
+            <if test="dto.exceptionFlag != null and dto.exceptionFlag != '' and dto.exceptionFlag == 1">
+                and t.timeOutFlag =#{dto.exceptionFlag}
+            </if>
+            <if test="dto.complaintClassify != null and dto.complaintClassify != ''">
+                and a.complaintClassify =#{dto.complaintClassify}
+                and (isnull(a.complaintEndTime) || length(trim(a.complaintEndTime)) = 0)
+            </if>
+            <if test="dto.nodeName != null and dto.nodeName != ''">
+                and x.nodeName =#{dto.nodeName}
+            </if>
+            <if test="dto.productCategoryCode != null and dto.productCategoryCode.size > 0 and dto.productTypeCode != null and dto.productTypeCode.size > 0">
+                and (
+                    a.productCategoryCode in
+                    <foreach collection="dto.productCategoryCode" open="(" close=")" separator="," item="categoryCode">
+                        #{categoryCode}
+                    </foreach>
+                    or
+                    a.productTypeCode in
+                    <foreach collection="dto.productTypeCode" open="(" close=")" separator="," item="typeCode">
+                        #{typeCode}
+                    </foreach>
+                )
+            </if>
+            <if test="dto.productCategoryCode != null and dto.productCategoryCode.size > 0 and (dto.productTypeCode == null or dto.productTypeCode.size == 0)">
+                and a.productCategoryCode in
+                <foreach collection="dto.productCategoryCode" open="(" close=")" separator="," item="categoryCode">
+                    #{categoryCode}
+                </foreach>
+            </if>
+            <if test="dto.productTypeCode != null and dto.productTypeCode.size > 0 and (dto.productCategoryCode == null or dto.productCategoryCode.size == 0)">
+                and a.productTypeCode in
+                <foreach collection="dto.productTypeCode" open="(" close=")" separator="," item="typeCode">
+                    #{typeCode}
+                </foreach>
+            </if>
+            <if test="dto.accountingCenterCode != null and dto.accountingCenterCode != ''">
+                and a.accountingCenterCode = #{dto.accountingCenterCode}
+            </if>
+            <if test="dto.areaCodeList != null and dto.areaCodeList.size > 0">
+                and a.accountingAreaCode in
+                <foreach collection="dto.areaCodeList" open="(" close=")" separator="," item="areaCode">
+                    #{areaCode}
+                </foreach>
+            </if>
+        </where>
+        group by a.complaintNumber
+<!--        <if test="dto.screenQuery != null and dto.screenQuery.size > 0">-->
+<!--            <trim prefix="having" suffixOverrides="and">-->
+<!--                <foreach collection="dto.screenQuery" item="item" index="index" separator="">-->
+<!--                    ${item} and-->
+<!--                </foreach>-->
+<!--            </trim>-->
+<!--        </if>-->
+        order by a.systemState desc,a.complaintStartTime asc
+<!--        <if test="dto.orderQuery == null or dto.orderQuery == ''">-->
+<!--            ,a.complaintStartTime asc-->
+<!--        </if>-->
+<!--        <if test="dto.orderQuery != null and dto.orderQuery != ''">-->
+<!--            , ${dto.orderQuery}-->
+<!--        </if>-->
+    </select>
+
+    <!--  投诉原因分析  -->
+    <select id="complaintReasonAnalysis" resultType="java.util.Map">
+        select complaintType,sum(t.number1) typeNumber,group_concat(concat(complaintClassify,':',number2) separator ',') as complaintClassify
+            from(
+                select complaintType,count(complaintType) number1,complaintClassify,count(complaintClassify) number2
+                from t_complaint_handling a
+                <where>
+                    <include refid="downDateCondition"></include>
+                </where>
+                group by complaintType,complaintClassify
+            )t
+        group by t.complaintType
+    </select>
+
+    <!--  分组查询每月或每天的解决率  -->
+    <select id="averageSolveRate" resultType="java.util.Map">
+        select
+            <if test="dto.polymerizeWay == 1">
+                DATE_FORMAT(complaintStartTime,'%Y-%m') complaintStartTime,
+            </if>
+            <if test="dto.polymerizeWay == 2">
+                cast(complaintStartTime as date) complaintStartTime,
+            </if>
+            round(sum(ifnull(TIMESTAMPDIFF(DAY,cast(complaintStartTime as date),
+            if(length(trim(solutionLandingTime)) > 0,cast(solutionLandingTime as date),cast(complaintEndTime as date))) - exceptionDay &lt;= 7,0))/count(complaintStartTime) * 100,1) sevenSolveRate
+        from t_complaint_handling a
+        <where>
+            <include refid="downDateCondition"></include>
+            <if test="dto.complaintType != null and dto.complaintType != ''">
+                and complaintType = #{dto.complaintType}
+            </if>
+            <if test="dto.complaintClassify != null and dto.complaintClassify != ''">
+                and complaintClassify = #{dto.complaintClassify}
+            </if>
+        </where>
+        <if test="dto.polymerizeWay == 1">
+            group by DATE_FORMAT(complaintStartTime,'%Y-%m')
+        </if>
+        <if test="dto.polymerizeWay == 2">
+            group by cast(complaintStartTime as date)
+        </if>
+    </select>
+
+    <!--  按月或按日查询N+1解决方案及时提交率  -->
+    <select id="daysSubmissionRate" resultType="java.util.Map">
+        select
+            <if test="dto.polymerizeWay == 1">
+                DATE_FORMAT(complaintStartTime,'%Y-%m') complaintStartTime,
+            </if>
+            <if test="dto.polymerizeWay == 2">
+                cast(complaintStartTime as date) complaintStartTime,
+            </if>
+            round(ifnull(sum(ifnull(TIMESTAMPDIFF(DAY,cast(complaintStartTime as date),cast(solutionSubmissionTime as date)) &lt;= 1,0)) / count(1) * 100,0),1) submissionRate
+        from t_complaint_handling a
+        <where>
+            <include refid="downDateCondition"></include>
+            <if test="dto.complaintType != null and dto.complaintType != ''">
+                and complaintType = #{dto.complaintType}
+            </if>
+            <if test="dto.complaintClassify != null and dto.complaintClassify != ''">
+                and complaintClassify = #{dto.complaintClassify}
+            </if>
+        </where>
+        <if test="dto.polymerizeWay == 1">
+            group by DATE_FORMAT(complaintStartTime,'%Y-%m')
+        </if>
+        <if test="dto.polymerizeWay == 2">
+            group by cast(complaintStartTime as date)
+        </if>
+    </select>
+
+    <!--  查询N+1解决方案及时提交率  -->
+    <select id="complaintSolveSubmissionRate" resultType="java.util.Map">
+        select concat(round(ifnull(sum(ifnull(TIMESTAMPDIFF(DAY,cast(complaintStartTime as date),cast(solutionSubmissionTime as date)) &lt;= 1,0)) / count(1) * 100,0),1),'%') submissionRate,
+            ifnull(sum(ifnull(TIMESTAMPDIFF(DAY,cast(complaintStartTime as date),cast(solutionSubmissionTime as date)) &lt;= 1,0)),0) submissionNumber
+        from t_complaint_handling a
+        <where>
+            <include refid="downDateCondition"></include>
+            <if test="dto.complaintType != null and dto.complaintType != ''">
+                and complaintType = #{dto.complaintType}
+            </if>
+            <if test="dto.complaintClassify != null and dto.complaintClassify != ''">
+                and complaintClassify = #{dto.complaintClassify}
+            </if>
+        </where>
+    </select>
+
+    <!--  投诉来源分析  -->
+    <select id="complaintSourceAnalysis" resultType="java.util.Map">
+        select recordSource as name,count(recordSource) as value
+            from t_complaint_handling a
+        <where>
+            <include refid="downDateCondition"></include>
+        </where>
+        group by recordSource
+    </select>
+
+    <!--  品类投诉分析  -->
+    <select id="categoryComplaintAnalysis" resultType="java.util.Map">
+        select productCategory as name,count(productCategoryCode) as value
+            from t_complaint_handling a
+        <where>
+            <include refid="downDateCondition"></include>
+        </where>
+        group by productCategoryCode
+    </select>
+
+    <!--  全部大区  -->
+    <select id="selectAllRegion" resultType="java.util.Map">
+        select areaCode as districtId,area
+            from t_district_accounting group by areaCode
+    </select>
+
+    <!--  根据投诉单号查询投诉详情  -->
+    <select id="selectComplaintDetailByNumber" resultType="java.util.Map">
+        select systemState,
+               complaintStartTime,
+               if(length(trim(a.solutionSubmissionTime)) > 0,solutionSubmissionTime,'') solutionSubmissionTime,
+               if(length(trim(a.solutionLandingTime)) > 0,solutionLandingTime,'') solutionLandingTime,
+               if(b.deptNumber >= 2,b.completionProcessingTime,'') upgradeTime,
+               if(length(trim(a.complaintEndTime)) > 0,complaintEndTime,'') complaintEndTime,
+               DATE_ADD(complaintStartTime,INTERVAL 1 DAY) predictSubmissionTime,
+               a.complaintNumber,
+               recordSource,
+               complaintType,
+               complaintClassify,
+               documentNumber,
+               (CASE WHEN a.provincesCode = 11 or a.provincesCode = 12 or a.provincesCode = 31 or a.provincesCode = 50 THEN concat(a.provinces,a.county)
+                   ELSE concat(a.provinces,a.city)
+                   END) region,
+               solutionLandingTime,
+               storeNumber,
+               storeName,
+               storeRank,
+               productType,
+               productSeries,
+               productModel,
+               machineNumber,
+               phoneDescribe
+        from t_complaint_handling a
+        left join(
+            select complaintNumber,
+                sum(if(length(trim(upgradeDepartment)) > 0 and !ISNULL(upgradeDepartment),1,0)) deptNumber,
+                max(completionProcessingTime) completionProcessingTime
+            from t_complaint_process_detail
+            group by complaintNumber
+        ) b on a.complaintNumber = b.complaintNumber
+        where a.complaintNumber = #{complaintNumber}
+    </select>
+
+    <!--  根据投诉单号查询投诉留言信息  -->
+    <select id="selectComplaintMessageByNumber" resultType="java.util.Map">
+        select messageContents,
+               messageDepartmentNumber,
+               messageDepartment,
+               messagePeopleNumber,
+               messagePeople,
+               messageTime
+            from t_complaint_message
+        where complaintNumber = #{complaintNumber}
+    </select>
+
+    <!--  根据投诉单号查询投诉处理明细  -->
+    <select id="selectComplaintProcessDetailByNumber" resultType="java.util.Map">
+        select processingDepartment,
+               processor,
+               upgradeDepartment,
+               completionProcessingTime,
+               processingSuggestion,
+               processingResults,
+               elapsedTime,
+               rowNotes
+            from t_complaint_process_detail
+        where complaintNumber = #{complaintNumber}
+    </select>
+
+    <!--  按市查询投诉量或投诉7天解决率  -->
+    <select id="selectComplainNumberByCity" resultType="java.util.Map">
+        select
+        <if test="dto.complaintFlag == 1">
+            <if test="dto.provinceCode == 11 or dto.provinceCode == 12 or dto.provinceCode == 31 or dto.provinceCode == 50">
+                a.county name,count(a.county) value
+            </if>
+            <if test="dto.provinceCode != 11 and dto.provinceCode != 12 and dto.provinceCode != 31 and dto.provinceCode != 50">
+                a.city name,count(a.city) value
+            </if>
+        </if>
+        <if test="dto.complaintFlag == 2">
+            <if test="dto.provinceCode == 11 or dto.provinceCode == 12 or dto.provinceCode == 31 or dto.provinceCode == 50">
+                a.county name,
+            </if>
+            <if test="dto.provinceCode != 11 and dto.provinceCode != 12 and dto.provinceCode != 31 and dto.provinceCode != 50">
+                a.city name,
+            </if>
+            round(ifnull(sum(ifnull(TIMESTAMPDIFF(DAY,cast(complaintStartTime as date),
+            if(length(trim(solutionLandingTime)) > 0,cast(solutionLandingTime as date),cast(complaintEndTime as date))) - exceptionDay &lt;= 7,0)) / count(provinces) * 100,0),1) value
+        </if>
+        from t_complaint_handling a
+        <where>
+            <include refid="dateCondition"></include>
+            <if test="dto.provinceCode != null and dto.provinceCode != ''">
+                and a.provincesCode = #{dto.provinceCode}
+            </if>
+        </where>
+        <if test="dto.provinceCode == 11 or dto.provinceCode == 12 or dto.provinceCode == 31 or dto.provinceCode == 50">
+            group by a.countyCode
+        </if>
+        <if test="dto.provinceCode != 11 and dto.provinceCode != 12 and dto.provinceCode != 31 and dto.provinceCode != 50">
+            group by a.cityCode
+        </if>
+    </select>
+
+    <!--  门店排名  -->
+    <select id="selectComplainByStore" resultType="java.util.Map">
+        select
+        <if test="dto.complaintFlag == 1">
+            a.storeName name,a.accountingArea name,c.adminName,count(a.storeNumber) rankNumber
+        </if>
+        <if test="dto.complaintFlag == 2">
+            a.storeName name,a.accountingArea name,c.adminName,
+            round(ifnull(sum(ifnull(TIMESTAMPDIFF(DAY,cast(complaintStartTime as date),
+            if(length(trim(solutionLandingTime)) > 0,cast(solutionLandingTime as date),cast(complaintEndTime as date))) - exceptionDay &lt;= 7,0)) / count(a.storeNumber) * 100,0),1) rankNumber
+        </if>
+        from t_complaint_handling a
+        left join t_district_accounting c on a.accountingAreaCode = c.areaCode
+        <where>
+            <include refid="dateCondition"></include>
+            <if test="dto.provinceCode != null and dto.provinceCode != ''">
+                and a.provincesCode =#{dto.provinceCode}
+            </if>
+        </where>
+        group by a.storeNumber
+        order by rankNumber desc
+    </select>
+
+    <!--  通过核算中心查询部门信息  -->
+    <select id="selectDeptInfoByCenterCode" resultType="java.util.Map">
+        select departmentNumber,departmentName
+            from t_department
+        where accountingCenterCode=#{accountingCenterCode}
+        and systemStatus = '已启用'
+    </select>
+
+    <!--  通过投诉单号查询投诉升级信息  -->
+    <select id="selectComplaintUpdateByNumber" resultType="java.util.Map">
+        select complaintNumber,upgradeDepartmentId,upgradeDepartment,
+               completionProcessingTime,processingResults,notice
+        from t_complaint_update_record
+        where complaintNumber=#{complaintNumber}
+    </select>
+
+    <!--  批量插入投诉升级记录  -->
+    <insert id="complaintRecordAdd">
+        INSERT INTO t_complaint_update_record (
+        complaintNumber,upgradeDepartmentId,upgradeDepartment,
+        completionProcessingTime,processingResults
+        )VALUES
+        <foreach collection="list" separator="," item="item">
+            (
+            #{item.complaintNumber},#{item.upgradeDepartmentId},#{item.upgradeDepartment},
+            #{item.completionProcessingTime},#{item.processingResults}
+            )
+        </foreach>
+    </insert>
+
+    <!--  更新升级记录通知标志  -->
+    <update id="updateUpdateNotice">
+        <foreach collection="list" item="item" open="" close="" separator=";">
+            update t_complaint_update_record
+            <set>
+                <if test="item.upgradeDepartmentId != null and item.upgradeDepartmentId != ''">
+                    upgradeDepartmentId=#{item.upgradeDepartmentId},
+                </if>
+                <if test="item.upgradeDepartment != null and item.upgradeDepartment != ''">
+                    upgradeDepartment=#{item.upgradeDepartment},
+                </if>
+                notice = '1'
+            </set>
+            where complaintNumber=#{item.complaintNumber}
+            and completionProcessingTime=#{item.completionProcessingTime}
+        </foreach>
+    </update>
+
+    <!--  N+1解决方案提交率排名  -->
+    <select id="solveSubmitRank" resultType="java.util.Map">
+        select
+               a.accountingArea name,a.accountingAreaCode areaCode,c.adminName adminName,
+            round(ifnull(sum(ifnull(TIMESTAMPDIFF(DAY,cast(complaintStartTime as date),cast(solutionSubmissionTime as date)) &lt;= 1,0)) / count(1) * 100,0),1) rankNumber
+        from t_complaint_handling a
+        left join t_district_accounting c on a.accountingAreaCode = c.areaCode
+        <where>
+            <include refid="dateCondition"></include>
+            <if test="dto.complaintType != null and dto.complaintType != ''">
+                and a.complaintType = #{dto.complaintType}
+            </if>
+        </where>
+        group by a.accountingAreaCode
+        order by rankNumber desc
+    </select>
+
+    <!--  结算费用及台量  -->
+    <select id="apiSettleData" resultType="java.util.Map">
+        SELECT ROUND(SUM(settleMoney),2) settleMoney,
+               SUM(serviceUnit) serviceUnit
+        FROM t_cost_settle
+        <where>
+            <if test="dto.beginDate != null and dto.beginDate != ''">
+                and businessDate &gt;= concat_ws(' ',#{dto.beginDate},'00:00:00')
+            </if>
+            <if test="dto.endDate != null and dto.endDate != ''">
+                and businessDate &lt;= concat_ws(' ',#{dto.endDate},'23:59:59')
+            </if>
+            <if test="dto.productTypeCodeList != null and dto.productTypeCodeList.size > 0">
+                and productTypeCode in
+                <foreach collection="dto.productTypeCodeList" open="(" close=")" separator="," item="productTypeCode">
+                    #{productTypeCode}
+                </foreach>
+            </if>
+        </where>
+    </select>
+</mapper>

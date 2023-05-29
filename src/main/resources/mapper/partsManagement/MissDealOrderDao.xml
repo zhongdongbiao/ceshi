@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="utry.data.modular.partsManagement.dao.MissDealOrderDao">
+    <!-- 开启二级缓存 -->
+    <cache eviction="LRU" flushInterval="300000" readOnly="true" size="1024"></cache>
+
+    <resultMap id="missDealOrderBOResultMap" type="utry.data.modular.partsManagement.bo.MissDealOrderBO">
+        <result property="warehouseCode" column="warehouseCode" jdbcType="VARCHAR"/>
+        <result property="partDrawingNo" column="partDrawingNo" jdbcType="VARCHAR"/>
+        <result property="count" column="count" jdbcType="INTEGER"/>
+    </resultMap>
+
+    <insert id="insertMissDealOrder">
+        <if test="detail != null and detail != '' and detail.size >0 ">
+            insert into t_miss_deal_order_detail (documentNo,orderType,partDrawingNo,describedDrawingNo,stockoutNumber,
+            processResults,goodarrivalTime,detailNote)
+            VALUES
+            <foreach collection="detail" item="model" separator=",">
+                (#{documentNo},#{model.orderType},#{model.partDrawingNo},
+                #{model.describedDrawingNo},#{model.stockoutNumber},#{model.processResults},#{model.goodarrivalTime},#{model.detailNote})
+            </foreach>
+            ;
+        </if>
+        insert into t_miss_deal_order (documentNo,documentDate,accountingCenterCode,accountingCenter,warehouseCode,
+        warehouseName,factoryCode,factoryName,note,systemState) values (#{documentNo},#{documentDate},#{accountingCenterCode},
+        #{accountingCenter},#{warehouseCode},#{warehouseName},#{factoryCode},#{factoryName},#{note},#{systemState})
+    </insert>
+
+    <!--根据处理单ID获取缺件处理单数据-->
+    <select id="getMissDealOrderDTO" resultType="utry.data.modular.partsManagement.dto.MissDealOrderDTO">
+        select documentNo,documentDate,accountingCenterCode,accountingCenter,warehouseCode,
+        warehouseName,factoryCode,factoryName,note,systemState from t_miss_deal_order where documentNo=#{missDealOrderId}
+    </select>
+
+    <!--根据处理单单号获取处理单详情-->
+    <select id="getMissDealOrderDetail"
+            resultType="utry.data.modular.partsManagement.model.MissDealOrderDetail">
+        select documentNo,orderType,partDrawingNo,describedDrawingNo,stockoutNumber,processResults,goodarrivalTime,
+        detailNote from t_miss_deal_order_detail where documentNo=#{documentNo} and partDrawingNo=#{partDrawingNo}
+    </select>
+
+    <select id="getOrderDetailFlag" resultType="java.lang.String">
+        select documentNo from t_miss_deal_order where documentNo=#{documentNo}
+    </select>
+
+    <!-- 根据时间、工厂查缺件订单量 -->
+    <select id="selectMissDealOrderCount" resultMap="missDealOrderBOResultMap">
+        SELECT
+        t1.warehouseCode,
+        t2.partDrawingNo,
+        sum(t2.stockoutNumber) AS count
+        FROM (
+            SELECT
+            documentNo,
+            warehouseCode,
+            factoryCode
+            FROM t_miss_deal_order
+            WHERE documentDate BETWEEN DATE_FORMAT(#{date}, '%Y-%m-%d %H:%i:%s') AND DATE_FORMAT(DATE_ADD(#{date}, INTERVAL 1 DAY), '%Y-%m-%d %H:%i:%s')
+            AND factoryCode = #{factoryCode}
+        ) t1
+        JOIN t_miss_deal_order_detail t2 ON t1.documentNo = t2.documentNo
+        GROUP BY t2.partDrawingNo
+    </select>
+
+
+</mapper>

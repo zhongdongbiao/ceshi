@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="utry.data.modular.partsManagement.dao.LogisticsInformationDao">
+    <!-- 开启二级缓存 -->
+    <cache eviction="LRU" flushInterval="300000" readOnly="true" size="1024"></cache>
+
+
+    <insert id="insertLogisticsInformation">
+        insert into t_logistics_information (logisticsSingleNumber,logisticsCompany,arrivalTime,arrivalMessage,type)
+        values (#{logisticsSingleNumber},#{logisticsCompany},#{arrivalTime},#{arrivalMessage},#{type})
+    </insert>
+
+    <!--根据物流单号获取物流信息-->
+    <select id="getLogisticsInformation"
+            resultType="utry.data.modular.partsManagement.model.LogisticsInformation">
+        select logisticsSingleNumber,logisticsCompany,arrivalTime,arrivalMessage,type from t_logistics_information
+        where logisticsSingleNumber=#{logisticsSingleNumber} ORDER BY arrivalTime desc
+    </select>
+    <select id="select" resultType="java.lang.Integer">
+        select count(*) from t_logistics_information
+        where logisticsSingleNumber=#{logisticsSingleNumber} and logisticsCompany=#{logisticsCompany} and arrivalTime=#{arrivalTime}
+          and arrivalMessage=#{arrivalMessage}
+    </select>
+
+
+</mapper>

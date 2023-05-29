@@ -1,0 +1,73 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="utry.data.modular.technicalQuality.dao.QualityFeedbackDao">
+
+    <insert id="insertQualityFeedback" parameterType="utry.data.modular.technicalQuality.model.QualityFeedback">
+        INSERT INTO t_quality_feedback(
+        systemState,
+        manageNumber,
+        dispatchingOrder,
+        documentDate,
+        serviceNumber,
+        factoryCode,
+        factoryName,
+        accountingCenter,
+        serviceStoreNumber,
+        serviceStoreName,
+        productModel,
+        productType,
+        productCategory,
+        productSeries,
+        createTime,
+        updateTime,
+        productTypeCode,
+        productCategoryCode,
+        productSeriesCode,
+        purchaseDate,
+        manufacturingDate,
+        productSymptom
+        )
+        VALUES
+            (#{systemState},#{manageNumber},#{dispatchingOrder},#{documentDate},
+            #{serviceNumber},#{factoryCode},#{factoryName},#{accountingCenter},
+            #{serviceStoreNumber},#{serviceStoreName},
+            #{productModel},#{productType},#{productCategory},
+            #{productSeries},NOW(),NOW(),#{productTypeCode},#{productCategoryCode},#{productSeriesCode},
+            #{purchaseDate},#{manufacturingDate},#{productSymptom}
+            )
+    </insert>
+
+    <update id="updateQualityFeedback" parameterType="utry.data.modular.technicalQuality.dto.SpiQualityFeedbackEditDto">
+        UPDATE t_quality_feedback
+        <set>
+            updateTime = NOW(),
+            <if test="submitTime != null">
+                submitTime = #{submitTime},
+            </if>
+            <if test="auditTime != null">
+                auditTime = #{auditTime},
+            </if>
+            <if test="systemState  != null">
+                systemState = #{systemState},
+            </if>
+            <if test="reviewTime != null">
+                reviewTime = #{reviewTime},
+            </if>
+            <if test="closeOrderTime != null">
+                closeOrderTime = #{closeOrderTime},
+            </if>
+            <if test="auditFinishTime != null">
+                auditFinishTime = #{auditFinishTime},
+            </if>
+        </set>
+        WHERE
+        manageNumber = #{manageNumber}
+    </update>
+
+    <select id="selectQualityFeedbackStatus" parameterType="java.lang.String" resultType="java.lang.String">
+        SELECT systemState FROM t_quality_feedback
+        WHERE
+        manageNumber = #{manageNumber}
+    </select>
+</mapper>

@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="utry.data.modular.sharding.dao.ShardingDao">
+    <!-- 开启二级缓存 -->
+    <cache eviction="LRU" flushInterval="100000" readOnly="true" size="1024"></cache>
+
+
+    <!--    <insert id="addOrder" parameterType="utry.data.modular.settleManagement.model.TOrder">-->
+    <!--        insert into t_order (order_id,name)-->
+    <!--        values-->
+    <!--            (#{item.orderId},#{item.name})-->
+    <!--    </insert>-->
+
+    <select id="getList" resultType="utry.data.modular.sharding.model.OrderDetail">
+        SELECT * FROM aaa
+    </select>
+    <!--    <select id="queryDetailByPageHelper" resultType="utry.data.modular.settleManagement.model.TOrder">-->
+    <!--        select order_id orderId,name name from t_detail t LEFT JOIN test te on t.order_id = te.aa order by t.upTime desc-->
+    <!--    </select>-->
+
+
+    <insert id="addDetail" parameterType="utry.data.modular.sharding.model.OrderDetail">
+        insert into t_detail (order_id, name, upTime)
+        values (#{item.orderId}, #{item.name}, #{item.upTime})
+    </insert>
+
+    <!--    <update id="updateDetail">-->
+    <!--        update t_detail set name = #{item.name} where order_id = #{item.orderId}-->
+    <!--    </update>-->
+
+    <!--    <delete id="delDetail" parameterType="utry.data.modular.settleManagement.model.OrderDetail">-->
+    <!--        delete  from t_detail where order_id = #{item.orderId}-->
+    <!--    </delete>-->
+
+</mapper>

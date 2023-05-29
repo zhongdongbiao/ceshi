@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="utry.data.modular.partsManagement.dao.DistributionCycleDao">
+    <!-- 开启二级缓存 -->
+    <cache eviction="LRU" flushInterval="300000" readOnly="true" size="1024"></cache>
+
+    <insert id="batchDistributionCycleData" parameterType="java.util.List">
+        insert into t_distribution_cycle (id,systemState,storeNumber,storeName,accountingCenter,mon,tue,
+        wed,thurs,fri,sta,sun)
+        values
+        <foreach collection="list" item="item" separator=",">
+            (REPLACE(UUID(), _utf8'-', _utf8''),#{item.systemState},#{item.storeNumber},#{item.storeName},#{item.accountingCenter},
+            #{item.mon},#{item.tue},#{item.wed},#{item.thurs},#{item.fri},#{item.sta},#{item.sun})
+        </foreach>
+    </insert>
+
+    <delete id="batchDelete">
+        delete from t_distribution_cycle
+    </delete>
+
+    <!--根据服务店编号和核算中心获取配货周期-->
+    <select id="getDistributionStateByCondition" resultType="utry.data.modular.partsManagement.model.DistributionCycle">
+      select id,systemState,storeNumber,storeName,accountingCenter,mon,tue,
+      wed,thurs,fri,sta,sun from t_distribution_cycle
+    </select>
+</mapper>

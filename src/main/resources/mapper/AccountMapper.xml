@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC
+        "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="utry.data.modular.account.dao.AccountMapper">
+
+    <select id="fuzzySearch" resultType="utry.data.modular.partsManagement.model.UserData">
+        SELECT
+        id,
+        `name`,
+        account,
+        sex,
+        mobilePhone,
+        description,
+        email,
+        `state`
+        FROM
+        t_user_data
+        WHERE state = '启用'
+        <if test="name != '' and name != null">
+            AND `name` LIKE CONCAT('%', #{name}, '%')
+        </if>
+    </select>
+</mapper>

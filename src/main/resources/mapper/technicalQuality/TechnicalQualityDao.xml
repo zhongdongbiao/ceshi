@@ -1,0 +1,2462 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="utry.data.modular.technicalQuality.dao.TechnicalQualityDao">
+
+    <!-- 开启二级缓存 -->
+    <cache eviction="LRU" flushInterval="300000" readOnly="true" size="1024"></cache>
+    <select id="selectCategoryInformation" resultType="utry.data.modular.technicalQuality.dto.TreeDTO" useCache="false">
+        SELECT * FROM(SELECT
+            productModel AS id,
+            productModel AS `name`,
+            productTypeCode AS pid
+        FROM
+            t_product_information
+        WHERE
+            systemState = "已启用"
+        UNION ALL
+        SELECT
+            productTypeCode AS id,
+            productType AS `name`,
+            productCategoryCode AS pid
+        FROM
+            t_product_type
+        WHERE
+            systemState = "已启用"
+				GROUP BY productTypeCode
+        UNION ALL
+        SELECT
+            productCategoryCode AS id,
+            productCategory AS `name`,
+            '0' AS pid
+        FROM
+            t_product_category
+        WHERE
+            systemState = "已启用"
+		GROUP BY productCategoryCode)t
+        ORDER BY pid
+    </select>
+
+    <select id="selectRoot" resultType="utry.data.modular.technicalQuality.dto.TreeDTO" useCache="false">
+        SELECT
+            productCategory AS name,
+            productCategoryCode AS id
+        FROM
+            t_product_category
+        WHERE
+            systemState = "已启用"
+        GROUP BY
+            productCategoryCode
+        ORDER BY productCategoryCode
+    </select>
+
+    <select id="selectUserByConfig" resultType="utry.data.modular.technicalQuality.dto.TechnicalQualityUserDTO" parameterType="utry.data.modular.technicalQuality.dto.TechnicalQualityQueryDTO">
+        SELECT
+            e.userId AS accountId,
+            a.RealName as name
+        FROM
+            t_target t
+                LEFT JOIN (
+                SELECT
+                    indicatorUserId,targetId
+                FROM
+                    t_indicator_configuration
+                WHERE
+                    indicatorUserId IS NOT NULL
+            ) c ON c.targetId = t.id
+        LEFT JOIN (
+        SELECT
+        t.*
+        FROM
+        (
+        SELECT
+        t1.productTypeCode,
+        IF (
+        t2.userId IS NULL,
+        (
+        SELECT
+        userId
+        FROM
+        t_user_type
+        WHERE
+        `default` = "1"
+        ),
+        userId
+        ) AS userId
+        FROM
+        t_product_type t1
+        LEFT JOIN t_user_type t2 ON t1.productTypeCode = t2.typeId
+        WHERE
+        t1.systemState = "已启用"
+        ) t
+        WHERE userId IS NOT NULL
+        GROUP BY
+        userId)e ON e.userId = c.indicatorUserId
+        LEFT JOIN hrm_db.t_hrm_accountinfo a ON a.AccountID = e.userId
+        WHERE
+                t.targetMonth = SUBSTRING_INDEX(
+                    #{startTime},
+                    '-',
+                    2
+                )
+          AND t.ifTarget = "0"
+          AND t.businessCode = "category"
+          AND e.userId IS NOT NULL
+          GROUP BY e.userId
+    </select>
+
+    <select id="selectUserByType" resultType="utry.data.modular.technicalQuality.dto.TechnicalQualityUserDTO" parameterType="utry.data.modular.technicalQuality.dto.TechnicalQualityQueryDTO">
+        SELECT
+            u.userId as accountId,
+            a.RealName as name
+        FROM
+            t_user_type u
+        LEFT JOIN hrm_db.t_hrm_accountinfo a ON a.AccountID = u.userId
+        GROUP BY u.userId
+    </select>
+
+    <select id="selectMonthIndicator" resultType="utry.data.modular.baseConfig.dto.IndicatorUserDTO" parameterType="java.lang.String">
+        SELECT
+            c.indicatorCode,
+            c.indicatorName,
+            c.indicatorValue
+        FROM
+            t_target t
+                LEFT JOIN t_indicator_configuration c ON c.targetId = t.id
+        WHERE
+            t.businessCode = "category"
+          AND t.targetMonth = SUBSTRING_INDEX(#{startTime},'-', 2)
+          AND t.ifTarget = "0"
+          AND c.indicatorUserId = #{accountId}
+    </select>
+
+    <select id="calculateRepairRate" parameterType ="utry.data.modular.technicalQuality.dto.CalculateDTO" resultType="java.util.Map">
+        SELECT
+        t.*, CAST(0+CAST(IFNULL(ROUND(t.eligible / t.total*100,2 ),0) AS CHAR)AS CHAR) AS REPAIR
+        FROM
+        (
+        SELECT
+        COUNT(a.dispatchingOrder) AS total,
+        SUM(
+        a.repairEligible
+        ) AS eligible
+        FROM
+        t_region_dispatching_detail a FORCE INDEX(in_t)
+        WHERE a.serviceType IN ("非上门维修","维修") AND a.repairEligible IS NOT NULL AND a.systemState NOT IN ('已作废','已关闭','申请作废') AND a.dispatchingSource NOT IN ('自接','营销中心','前置渠道')
+        <if test="(list != null and list.size > 0) or (modelList != null and modelList.size > 0 ) or (productCategoryList != null and productCategoryList.size > 0)">
+            AND( 1=2
+            <if test="list != null and list.size > 0">
+                OR a.productTypeCode IN
+                <foreach collection="list" item="productTypeCode" open="(" separator="," close=")">
+                    #{productTypeCode}
+                </foreach>
+            </if>
+            <if test="modelList != null and modelList.size > 0">
+                OR a.productModel IN
+                <foreach collection="modelList" item="productModel" open="(" separator="," close=")">
+                    #{productModel}
+                </foreach>
+            </if>
+            <if test="productCategoryList != null and productCategoryList.size > 0">
+                OR a.productCategoryCode IN
+                <foreach collection="productCategoryList" item="productCategoryCode" open="(" separator="," close=")">
+                    #{productCategoryCode}
+                </foreach>
+            </if>
+            )
+        </if>
+        <if test="startTime != '' and startTime != null">
+            AND a.dispatchingTime &gt;= #{startTime}
+        </if>
+        <if test="endTime != '' and endTime != null">
+            AND  a.dispatchingTime &lt;= #{endTime}
+        </if>
+        ) t
+    </select>
+
+    <select id="selectUserType" parameterType ="java.lang.String" resultType="java.lang.String">
+        SELECT typeId AS productTypeCode FROM t_user_type
+        WHERE
+            userId = #{accountId}
+        GROUP BY typeId
+    </select>
+
+    <select id="calculateApprovalDuration" parameterType ="utry.data.modular.technicalQuality.dto.CalculateDTO" resultType="java.util.Map">
+        SELECT
+            CONCAT(IFNULL(
+                    ROUND((SUM(t.time) / count(*)) / 3600, 2),
+                    0
+                ),'') AS TIME
+        FROM
+            (
+                SELECT
+        TIMESTAMPDIFF(
+        SECOND,
+        submitTime,
+        IF(systemState="已提交",NOW(),auditFinishTime)) AS `time`,
+		manageNumber,
+        systemState,
+        submitTime,
+        auditFinishTime,
+        productTypeCode,
+        productCategoryCode,
+        documentDate,
+        productModel
+                FROM
+                    t_quality_feedback
+            ) t
+        WHERE
+            t.submitTime IS NOT NULL AND t.submitTime != ''
+        <if test="(list != null and list.size > 0) or (modelList != null and modelList.size > 0 ) or (productCategoryList != null and productCategoryList.size > 0)">
+            AND( 1=2
+            <if test="list != null and list.size > 0">
+                OR t.productTypeCode IN
+                <foreach collection="list" item="productTypeCode" open="(" separator="," close=")">
+                    #{productTypeCode}
+                </foreach>
+            </if>
+            <if test="modelList != null and modelList.size > 0">
+                OR t.productModel IN
+                <foreach collection="modelList" item="productModel" open="(" separator="," close=")">
+                    #{productModel}
+                </foreach>
+            </if>
+            <if test="productCategoryList != null and productCategoryList.size > 0">
+                OR t.productCategoryCode IN
+                <foreach collection="productCategoryList" item="productCategoryCode" open="(" separator="," close=")">
+                    #{productCategoryCode}
+                </foreach>
+            </if>
+            )
+        </if>
+        <if test="startTime != '' and startTime != null">
+            AND t.documentDate &gt;= #{startTime}
+        </if>
+        <if test="endTime != '' and endTime != null">
+            AND  t.documentDate &lt;= #{endTime}
+        </if>
+    </select>
+
+    <select id="calculateCompletionRate" parameterType ="utry.data.modular.technicalQuality.dto.CalculateDTO" resultType="java.util.Map">
+        SELECT
+        IF (
+        COUNT(*) = 0
+        OR COUNT(*) IS NULL,
+        "-",
+        CONCAT(IFNULL(ROUND(
+        SUM(
+        IF (
+        TIMESTAMPDIFF(
+        DAY,
+        SUBSTRING_INDEX(listingDate, ' ', 1),
+        serviceManualTime
+        ) &lt;= 7
+        AND TIMESTAMPDIFF(
+        DAY,
+        SUBSTRING_INDEX(listingDate, ' ', 1),
+        manualTime
+        ) &lt;= 7,
+        1,
+        0
+        )
+        ) / COUNT(*) * 100,
+        2
+        ),0),'')) AS RATE
+        FROM
+        t_product_information
+        WHERE
+        systemState = "已启用"
+        AND listingDate IS NOT NULL AND listingDate &lt;&gt; ""
+        <if test="(list != null and list.size > 0) or (modelList != null and modelList.size > 0 ) or (productCategoryList != null and productCategoryList.size > 0)">
+            AND( 1=2
+            <if test="list != null and list.size > 0">
+                OR productTypeCode IN
+                <foreach collection="list" item="productTypeCode" open="(" separator="," close=")">
+                    #{productTypeCode}
+                </foreach>
+            </if>
+            <if test="modelList != null and modelList.size > 0">
+                OR productModel IN
+                <foreach collection="modelList" item="productModel" open="(" separator="," close=")">
+                    #{productModel}
+                </foreach>
+            </if>
+            <if test="productCategoryList != null and productCategoryList.size > 0">
+                OR productCategoryCode IN
+                <foreach collection="productCategoryList" item="productCategoryCode" open="(" separator="," close=")">
+                    #{productCategoryCode}
+                </foreach>
+            </if>
+            )
+        </if>
+        <if test="startTime != '' and startTime != null">
+            AND listingDate &gt;= #{startTime}
+        </if>
+        <if test="endTime != '' and endTime != null">
+            AND  listingDate &lt;= #{endTime}
+        </if>
+    </select>
+
+    <select id="selectTargetMonthIndicator" resultType="utry.data.modular.baseConfig.dto.IndicatorUserDTO" parameterType="java.lang.String">
+        SELECT
+            c.indicatorCode,
+            c.indicatorName,
+            c.indicatorValue
+        FROM
+            t_target t
+                LEFT JOIN t_indicator_configuration c ON c.targetId = t.id
+        WHERE
+            t.businessCode = "category"
+          AND t.targetMonth = SUBSTRING_INDEX(#{startTime},'-', 2)
+          AND t.ifTarget = "1"
+    </select>
+
+    <select id="selectEngineer" parameterType ="utry.data.modular.technicalQuality.dto.EngineerQueryDTO" resultType="utry.data.modular.technicalQuality.dto.EngineerDTO">
+        SELECT tt.* FROM(SELECT
+        t.storeName,t.engineerName,t.engineerId,t.adminName,
+        CONCAT(CAST(0+CAST(IFNULL(ROUND(t.eligible / t.total*100,2 ),0) AS CHAR)AS CHAR),'%') AS repairRate,
+        CONCAT(IFNULL(t.eligible, 0),'') AS eligible,
+        CONCAT(IFNULL(t.total, 0),'') AS total,
+        CONCAT(IFNULL(t.total - t.eligible, 0),'') AS unEligible
+        FROM
+        (
+        SELECT
+        a.storeName,
+        a.engineerName,
+        a.engineerId,
+        e.adminName,
+        COUNT(a.dispatchingOrder) AS total,
+        SUM(
+        a.repairEligible
+        ) AS eligible
+        FROM
+        t_region_dispatching_detail a FORCE INDEX(in_t)
+        LEFT JOIN t_district_accounting e ON e.areaCode = a.accountingAreaCode
+        WHERE a.serviceType IN ("非上门维修","维修") AND a.repairEligible IS NOT NULL AND a.systemState NOT IN ('已作废','已关闭','申请作废')
+        AND a.dispatchingSource NOT IN ('自接','营销中心','前置渠道')
+        AND a.engineerId IS NOT NULL AND a.engineerId != ""
+        <if test="(list != null and list.size > 0) or (modelList != null and modelList.size > 0 ) or (productCategoryList != null and productCategoryList.size > 0)">
+            AND( 1=2
+            <if test="list != null and list.size > 0">
+                OR a.productTypeCode IN
+                <foreach collection="list" item="productTypeCode" open="(" separator="," close=")">
+                    #{productTypeCode}
+                </foreach>
+            </if>
+            <if test="modelList != null and modelList.size > 0">
+                OR a.productModel IN
+                <foreach collection="modelList" item="productModel" open="(" separator="," close=")">
+                    #{productModel}
+                </foreach>
+            </if>
+            <if test="productCategoryList != null and productCategoryList.size > 0">
+                OR a.productCategoryCode IN
+                <foreach collection="productCategoryList" item="productCategoryCode" open="(" separator="," close=")">
+                    #{productCategoryCode}
+                </foreach>
+            </if>
+            )
+        </if>
+        <if test="startTime != '' and startTime != null">
+            AND a.dispatchingTime &gt;= #{startTime}
+        </if>
+        <if test="endTime != '' and endTime != null">
+            AND a.dispatchingTime &lt;= #{endTime}
+        </if>
+        AND a.dispatchingTime IS NOT NULL
+        GROUP BY
+        a.engineerId
+        ) t
+        ) tt
+        WHERE 1 = 1
+        <if test="engineerName != '' and engineerName!= null and engineerName.textType != '' and engineerName.textType != null and engineerName.textType == '0'.toString()">
+            AND engineerName = #{engineerName.value}
+        </if>
+        <if test="engineerName != '' and engineerName!= null and engineerName.textType != '' and engineerName.textType != null and engineerName.textType == '1'.toString()">
+            AND engineerName LIKE CONCAT('%',#{engineerName.value},'%')
+        </if>
+        <if test="engineerName != '' and engineerName!= null and engineerName.textType != '' and engineerName.textType != null and engineerName.textType == '2'.toString()">
+            AND engineerName &lt;&gt; #{engineerName.value}
+        </if>
+        <if test="engineerId != '' and engineerId!= null and engineerId.textType != '' and engineerId.textType != null and engineerId.textType == '0'.toString()">
+            AND engineerId = #{engineerId.value}
+        </if>
+        <if test="engineerId != '' and engineerId!= null and engineerId.textType != '' and engineerId.textType != null and engineerId.textType == '1'.toString()">
+            AND engineerId LIKE CONCAT('%',#{engineerId.value},'%')
+        </if>
+        <if test="engineerId != '' and engineerId!= null and engineerId.textType != '' and engineerId.textType != null and engineerId.textType == '2'.toString()">
+            AND engineerId &lt;&gt; #{engineerId.value}
+        </if>
+        <if test="storeName != '' and storeName!= null and storeName.textType != '' and storeName.textType != null and storeName.textType == '0'.toString()">
+            AND storeName = #{storeName.value}
+        </if>
+        <if test="storeName != '' and storeName!= null and storeName.textType != '' and storeName.textType != null and storeName.textType == '1'.toString()">
+            AND storeName LIKE CONCAT('%',#{storeName.value},'%')
+        </if>
+        <if test="storeName != '' and storeName!= null and storeName.textType != '' and storeName.textType != null and storeName.textType == '2'.toString()">
+            AND storeName &lt;&gt; #{storeName.value}
+        </if>
+        <if test="adminName != '' and adminName!= null and adminName.textType != '' and adminName.textType != null and adminName.textType == '0'.toString()">
+            AND adminName = #{adminName.value}
+        </if>
+        <if test="adminName != '' and adminName!= null and adminName.textType != '' and adminName.textType != null and adminName.textType == '1'.toString()">
+            AND adminName LIKE CONCAT('%',#{adminName.value},'%')
+        </if>
+        <if test="adminName != '' and adminName!= null and adminName.textType != '' and adminName.textType != null and adminName.textType == '2'.toString()">
+            AND adminName &lt;&gt; #{adminName.value}
+        </if>
+        <if test="repairRate != '' and repairRate!= null and repairRate.numberType != '' and repairRate.numberType != null">
+            AND CAST(0+CAST(IFNULL(ROUND((eligible+0) / (total+0)*100,2 ),0) AS CHAR)AS CHAR) ${repairRate.numberType} #{repairRate.value}+0
+        </if>
+        <if test="total != '' and total!= null and total.numberType != '' and total.numberType != null">
+            AND total+0 ${total.numberType} #{total.value}+0
+        </if>
+        <if test="eligible != '' and eligible!= null and eligible.numberType != '' and eligible.numberType != null">
+            AND eligible+0 ${eligible.numberType} #{eligible.value}+0
+        </if>
+        <if test="unEligible != '' and unEligible!= null and unEligible.numberType != '' and unEligible.numberType != null">
+            AND unEligible+0 ${unEligible.numberType} #{unEligible.value}+0
+        </if>
+        <if test="repairRate != '' and repairRate!= null and repairRate.sort != '' and repairRate.sort != null">
+            ORDER BY 0+repairRate ${repairRate.sort}
+        </if>
+        <if test="total != '' and total!= null and total.sort != '' and total.sort != null">
+            ORDER BY 0+total ${total.sort}
+        </if>
+        <if test="eligible != '' and eligible!= null and eligible.sort != '' and eligible.sort != null">
+            ORDER BY 0+eligible ${eligible.sort}
+        </if>
+        <if test="unEligible != '' and unEligible!= null and unEligible.sort != '' and unEligible.sort != null">
+            ORDER BY 0+unEligible ${unEligible.sort}
+        </if>
+        <if test="repairRate.sort == '' and total.sort == '' and eligible.sort == '' and unEligible.sort == ''">
+            ORDER BY engineerId DESC
+        </if>
+        <if test="number > 0">
+            LIMIT #{number}
+        </if>
+    </select>
+
+    <select id="selectRepairRateByType" parameterType ="utry.data.modular.technicalQuality.dto.TechnicalQualityQueryDTO" resultType="utry.data.modular.technicalQuality.dto.RepairRateHistogramDTO">
+        SELECT tt.* FROM(SELECT
+        t.productType AS name, CONCAT(
+        IFNULL(
+        ROUND(t.eligible / t.total * 100, 2),
+        0
+        ),
+        ''
+        ) AS `value`,
+        t.productTypeCode AS code
+        FROM
+        (
+        SELECT
+        COUNT(a.dispatchingOrder) AS total,
+        a.productType,
+        a.productTypeCode,
+        SUM(
+        a.repairEligible
+        ) AS eligible
+        FROM
+        t_region_dispatching_detail a
+        WHERE a.serviceType IN ("非上门维修","维修") AND a.repairEligible IS NOT NULL AND a.systemState NOT IN ('已作废','已关闭','申请作废')
+        AND a.dispatchingSource NOT IN ('自接','营销中心','前置渠道')
+        <if test="(list != null and list.size > 0) or (modelList != null and modelList.size > 0 ) or (productCategoryList != null and productCategoryList.size > 0)">
+            AND( 1=2
+            <if test="list != null and list.size > 0">
+                OR a.productTypeCode IN
+                <foreach collection="list" item="productTypeCode" open="(" separator="," close=")">
+                    #{productTypeCode}
+                </foreach>
+            </if>
+            <if test="modelList != null and modelList.size > 0">
+                OR a.productModel IN
+                <foreach collection="modelList" item="productModel" open="(" separator="," close=")">
+                    #{productModel}
+                </foreach>
+            </if>
+            <if test="productCategoryList != null and productCategoryList.size > 0">
+                OR a.productCategoryCode IN
+                <foreach collection="productCategoryList" item="productCategoryCode" open="(" separator="," close=")">
+                    #{productCategoryCode}
+                </foreach>
+            </if>
+            )
+        </if>
+        <if test="startTime != '' and startTime != null">
+            AND a.dispatchingTime &gt;= #{startTime}
+        </if>
+        <if test="endTime != '' and endTime != null">
+            AND a.dispatchingTime &lt;= #{endTime}
+        </if>
+        GROUP BY a.productTypeCode
+        ) t
+        ) tt
+        ORDER BY 0+`value` ${sort}
+    </select>
+
+    <select id="selectRepairRateByAccounting" parameterType ="utry.data.modular.technicalQuality.dto.TechnicalQualityQueryDTO" resultType="utry.data.modular.technicalQuality.dto.RepairRateHistogramDTO">
+        SELECT tt.* FROM(SELECT
+        t.area as name,
+        t.areaCode as code,
+        CONCAT(IFNULL(
+        ROUND(t.eligible / t.total *100, 2),
+        0
+        ),'') AS `value`
+        FROM
+        (
+        SELECT
+        a.accountingAreaCode AS areaCode,
+        a.accountingArea AS area,
+        COUNT(a.dispatchingOrder) AS total,
+        SUM(
+        a.repairEligible
+        )
+        AS eligible
+        FROM
+        t_region_dispatching_detail a
+        WHERE a.serviceType IN ("非上门维修","维修") AND a.repairEligible IS NOT NULL AND a.systemState NOT IN ('已作废','已关闭','申请作废') AND a.dispatchingSource NOT IN ('自接','营销中心','前置渠道')
+        AND a.accountingAreaCode IS NOT NULL
+        <if test="(list != null and list.size > 0) or (modelList != null and modelList.size > 0 ) or (productCategoryList != null and productCategoryList.size > 0)">
+            AND( 1=2
+            <if test="list != null and list.size > 0">
+                OR a.productTypeCode IN
+                <foreach collection="list" item="productTypeCode" open="(" separator="," close=")">
+                    #{productTypeCode}
+                </foreach>
+            </if>
+            <if test="modelList != null and modelList.size > 0">
+                OR a.productModel IN
+                <foreach collection="modelList" item="productModel" open="(" separator="," close=")">
+                    #{productModel}
+                </foreach>
+            </if>
+            <if test="productCategoryList != null and productCategoryList.size > 0">
+                OR a.productCategoryCode IN
+                <foreach collection="productCategoryList" item="productCategoryCode" open="(" separator="," close=")">
+                    #{productCategoryCode}
+                </foreach>
+            </if>
+            )
+        </if>
+        <if test="startTime != '' and startTime != null">
+            AND a.dispatchingTime &gt;= #{startTime}
+        </if>
+        <if test="endTime != '' and endTime != null">
+            AND a.dispatchingTime &lt;= #{endTime}
+        </if>
+        GROUP BY a.accountingAreaCode
+        ) t
+        ) tt
+        ORDER BY 0+`value` ${sort}
+    </select>
+
+    <select id="selectEngineerCategory" parameterType ="utry.data.modular.technicalQuality.dto.EngineerDTO" resultType="utry.data.modular.technicalQuality.dto.EngineerDTO">
+        SELECT
+        t.productCategoryCode,t.engineerId,t.productCategory,
+        CONCAT(CAST(0+CAST(IFNULL(ROUND(t.eligible / t.total*100,2 ),0) AS CHAR)AS CHAR),'%') AS repairRate,
+        CONCAT(IFNULL(t.eligible, 0),'') AS eligible,
+        CONCAT(IFNULL(t.total, 0),'') AS total,
+        CONCAT(IFNULL(t.total - t.eligible, 0),'') AS unEligible
+        FROM
+        (
+        SELECT
+        a.productCategoryCode,
+        a.engineerId,
+        a.productCategory,
+        COUNT(a.dispatchingOrder) AS total,
+        SUM(
+        a.repairEligible
+        ) AS eligible
+        FROM
+        t_region_dispatching_detail a FORCE INDEX(in_e)
+        WHERE a.serviceType IN ("非上门维修","维修") AND a.repairEligible IS NOT NULL AND a.systemState NOT IN ('已作废','已关闭','申请作废')
+        AND a.dispatchingSource NOT IN ('自接','营销中心','前置渠道')
+        <if test="startTime != '' and startTime != null">
+            AND a.dispatchingTime &gt;= #{startTime}
+        </if>
+        <if test="endTime != '' and endTime != null">
+            AND a.dispatchingTime &lt;= #{endTime}
+        </if>
+        <if test="engineerId != '' and engineerId != null">
+            AND a.engineerId = #{engineerId}
+        </if>
+        <if test="(list != null and list.size > 0) or (modelList != null and modelList.size > 0 ) or (productCategoryList != null and productCategoryList.size > 0)">
+            AND( 1=2
+            <if test="list != null and list.size > 0">
+                OR a.productTypeCode IN
+                <foreach collection="list" item="productTypeCode" open="(" separator="," close=")">
+                    #{productTypeCode}
+                </foreach>
+            </if>
+            <if test="modelList != null and modelList.size > 0">
+                OR a.productModel IN
+                <foreach collection="modelList" item="productModel" open="(" separator="," close=")">
+                    #{productModel}
+                </foreach>
+            </if>
+            <if test="productCategoryList != null and productCategoryList.size > 0">
+                OR a.productCategoryCode IN
+                <foreach collection="productCategoryList" item="productCategoryCode" open="(" separator="," close=")">
+                    #{productCategoryCode}
+                </foreach>
+            </if>
+            )
+        </if>
+        AND a.dispatchingTime IS NOT NULL
+        GROUP BY
+        a.productCategoryCode
+        ) t
+    </select>
+
+    <select id="selectEngineerType" parameterType ="utry.data.modular.technicalQuality.dto.EngineerDTO" resultType="utry.data.modular.technicalQuality.dto.EngineerDTO">
+        SELECT
+        t.productType,t.engineerId,
+        CONCAT(CAST(0+CAST(IFNULL(ROUND(t.eligible / t.total*100,2 ),0) AS CHAR)AS CHAR),'%') AS repairRate,
+        CONCAT(IFNULL(t.eligible, 0),'') AS eligible,
+        CONCAT(IFNULL(t.total, 0),'') AS total,
+        CONCAT(IFNULL(t.total - t.eligible, 0),'') AS unEligible
+        FROM
+        (
+        SELECT
+        a.productType,
+        a.engineerId,
+        COUNT(a.dispatchingOrder) AS total,
+        SUM(
+        a.repairEligible
+        ) AS eligible
+        FROM
+        t_region_dispatching_detail a FORCE INDEX(in_e)
+        WHERE a.serviceType IN ("非上门维修","维修") AND a.repairEligible IS NOT NULL AND a.systemState NOT IN ('已作废','已关闭','申请作废')
+        AND a.dispatchingSource NOT IN ('自接','营销中心','前置渠道')
+        <if test="startTime != '' and startTime != null">
+            AND a.dispatchingTime &gt;= #{startTime}
+        </if>
+        <if test="endTime != '' and endTime != null">
+            AND a.dispatchingTime &lt;= #{endTime}
+        </if>
+        <if test="engineerId != '' and engineerId != null">
+            AND a.engineerId = #{engineerId}
+        </if>
+        <if test="productCategoryCode != '' and productCategoryCode != null">
+            AND a.productCategoryCode = #{productCategoryCode}
+        </if>
+        <if test="(list != null and list.size > 0) or (modelList != null and modelList.size > 0 ) or (productCategoryList != null and productCategoryList.size > 0)">
+            AND( 1=2
+            <if test="list != null and list.size > 0">
+                OR a.productTypeCode IN
+                <foreach collection="list" item="productTypeCode" open="(" separator="," close=")">
+                    #{productTypeCode}
+                </foreach>
+            </if>
+            <if test="modelList != null and modelList.size > 0">
+                OR a.productModel IN
+                <foreach collection="modelList" item="productModel" open="(" separator="," close=")">
+                    #{productModel}
+                </foreach>
+            </if>
+            <if test="productCategoryList != null and productCategoryList.size > 0">
+                OR a.productCategoryCode IN
+                <foreach collection="productCategoryList" item="productCategoryCode" open="(" separator="," close=")">
+                    #{productCategoryCode}
+                </foreach>
+            </if>
+            )
+        </if>
+        AND a.dispatchingTime IS NOT NULL
+        GROUP BY
+        a.productTypeCode
+        ) t
+    </select>
+
+    <select id="queryOldInformation" resultType="utry.data.modular.baseConfig.dto.QualityFeedbackDTO" useCache="false">
+        SELECT
+            productModel,
+            manualTime,
+            serviceManualTime
+        FROM
+            t_product_information
+        WHERE
+            manualTime IS NOT NULL
+          OR serviceManualTime IS NOT NULL
+    </select>
+
+    <select id="selectApprovalDuration" resultType="utry.data.modular.technicalQuality.dto.ApprovalDurationDTO" parameterType="utry.data.modular.technicalQuality.dto.ApprovalDurationQueryDTO">
+        SELECT tt.* FROM(SELECT
+        CONCAT(
+        IFNULL(
+        ROUND((t.time), 2),
+        0
+        ),
+        ''
+        ) AS auditDuration,
+        t.*
+        FROM
+        (
+        SELECT
+        TIMESTAMPDIFF(
+        SECOND,
+        submitTime,
+        IF(systemState="已提交",NOW(),auditFinishTime)
+        ) AS `time`,
+        submitTime,
+        manageNumber,
+        productTypeCode,
+        productCategoryCode,
+        SUBSTRING_INDEX(documentDate, ' ', 1) AS documentDate,
+        systemState,
+        serviceNumber,
+        serviceStoreName,
+        productCategory,
+        productSeries,
+        productModel,
+        factoryName,
+        manufacturingDate,
+        purchaseDate,
+        productSymptom
+        FROM
+        t_quality_feedback
+        WHERE 1=1
+        <if test="(list != null and list.size > 0) or (modelList != null and modelList.size > 0 ) or (productCategoryList != null and productCategoryList.size > 0)">
+            AND( 1=2
+            <if test="list != null and list.size > 0">
+                OR productTypeCode IN
+                <foreach collection="list" item="productTypeCode" open="(" separator="," close=")">
+                    #{productTypeCode}
+                </foreach>
+            </if>
+            <if test="modelList != null and modelList.size > 0">
+                OR productModel IN
+                <foreach collection="modelList" item="productModel" open="(" separator="," close=")">
+                    #{productModel}
+                </foreach>
+            </if>
+            <if test="productCategoryList != null and productCategoryList.size > 0">
+                OR productCategoryCode IN
+                <foreach collection="productCategoryList" item="productCategoryCode" open="(" separator="," close=")">
+                    #{productCategoryCode}
+                </foreach>
+            </if>
+            )
+        </if>
+        <if test="startTime != '' and startTime != null">
+            AND SUBSTRING_INDEX(documentDate, ' ', 1) &gt;= #{startTime}
+        </if>
+        <if test="endTime != '' and endTime != null">
+            AND SUBSTRING_INDEX(documentDate, ' ', 1) &lt;= #{endTime}
+        </if>
+        ) t
+        <if test="ifException != '' and ifException != null and ifException != '-1'.toString()">
+            WHERE t.submitTime IS NOT NULL AND t.submitTime != ''
+        </if>
+        )tt
+        HAVING 1=1
+        <if test="ifException != '' and ifException != null and ifException != '-1'.toString()">
+            AND auditDuration &gt;= #{ifException} + 0
+        </if>
+        <if test="systemState != '' and systemState!= null and systemState.textType != '' and systemState.textType != null and systemState.textType == '0'.toString()">
+            AND systemState = #{systemState.value}
+        </if>
+        <if test="systemState != '' and systemState!= null and systemState.textType != '' and systemState.textType != null and systemState.textType == '1'.toString()">
+            AND systemState LIKE CONCAT('%',#{systemState.value},'%')
+        </if>
+        <if test="systemState != '' and systemState!= null and systemState.textType != '' and systemState.textType != null and systemState.textType == '2'.toString()">
+            AND systemState &lt;&gt; #{systemState.value}
+        </if>
+        <if test="manageNumber != '' and manageNumber!= null and manageNumber.textType != '' and manageNumber.textType != null and manageNumber.textType == '0'.toString()">
+            AND manageNumber = #{manageNumber.value}
+        </if>
+        <if test="manageNumber != '' and manageNumber!= null and manageNumber.textType != '' and manageNumber.textType != null and manageNumber.textType == '1'.toString()">
+            AND manageNumber LIKE CONCAT('%',#{manageNumber.value},'%')
+        </if>
+        <if test="manageNumber != '' and manageNumber!= null and manageNumber.textType != '' and manageNumber.textType != null and manageNumber.textType == '2'.toString()">
+            AND manageNumber &lt;&gt; #{manageNumber.value}
+        </if>
+        <if test="serviceNumber != '' and serviceNumber!= null and serviceNumber.textType != '' and serviceNumber.textType != null and serviceNumber.textType == '0'.toString()">
+            AND serviceNumber = #{serviceNumber.value}
+        </if>
+        <if test="serviceNumber != '' and serviceNumber!= null and serviceNumber.textType != '' and serviceNumber.textType != null and serviceNumber.textType == '1'.toString()">
+            AND serviceNumber LIKE CONCAT('%',#{serviceNumber.value},'%')
+        </if>
+        <if test="serviceNumber != '' and serviceNumber!= null and serviceNumber.textType != '' and serviceNumber.textType != null and serviceNumber.textType == '2'.toString()">
+            AND serviceNumber &lt;&gt; #{serviceNumber.value}
+        </if>
+        <if test="serviceStoreName != '' and serviceStoreName!= null and serviceStoreName.textType != '' and serviceStoreName.textType != null and serviceStoreName.textType == '0'.toString()">
+            AND serviceStoreName = #{serviceStoreName.value}
+        </if>
+        <if test="serviceStoreName != '' and serviceStoreName!= null and serviceStoreName.textType != '' and serviceStoreName.textType != null and serviceStoreName.textType == '1'.toString()">
+            AND serviceStoreName LIKE CONCAT('%',#{serviceStoreName.value},'%')
+        </if>
+        <if test="serviceStoreName != '' and serviceStoreName!= null and serviceStoreName.textType != '' and serviceStoreName.textType != null and serviceStoreName.textType == '2'.toString()">
+            AND serviceStoreName &lt;&gt; #{serviceStoreName.value}
+        </if>
+        <if test="productCategory != '' and productCategory!= null and productCategory.textType != '' and productCategory.textType != null and productCategory.textType == '0'.toString()">
+            AND productCategory = #{productCategory.value}
+        </if>
+        <if test="productCategory != '' and productCategory!= null and productCategory.textType != '' and productCategory.textType != null and productCategory.textType == '1'.toString()">
+            AND productCategory LIKE CONCAT('%',#{productCategory.value},'%')
+        </if>
+        <if test="productCategory != '' and productCategory!= null and productCategory.textType != '' and productCategory.textType != null and productCategory.textType == '2'.toString()">
+            AND productCategory &lt;&gt; #{productCategory.value}
+        </if>
+        <if test="productSeries != '' and productSeries!= null and productSeries.textType != '' and productSeries.textType != null and productSeries.textType == '0'.toString()">
+            AND productSeries = #{productSeries.value}
+        </if>
+        <if test="productSeries != '' and productSeries!= null and productSeries.textType != '' and productSeries.textType != null and productSeries.textType == '1'.toString()">
+            AND productSeries LIKE CONCAT('%',#{productSeries.value},'%')
+        </if>
+        <if test="productSeries != '' and productSeries!= null and productSeries.textType != '' and productSeries.textType != null and productSeries.textType == '2'.toString()">
+            AND productSeries &lt;&gt; #{productSeries.value}
+        </if>
+        <if test="productModel != '' and productModel!= null and productModel.textType != '' and productModel.textType != null and productModel.textType == '0'.toString()">
+            AND productModel = #{productModel.value}
+        </if>
+        <if test="productModel != '' and productModel!= null and productModel.textType != '' and productModel.textType != null and productModel.textType == '1'.toString()">
+            AND productModel LIKE CONCAT('%',#{productModel.value},'%')
+        </if>
+        <if test="productModel != '' and productSeries!= null and productModel.textType != '' and productModel.textType != null and productModel.textType == '2'.toString()">
+            AND productModel &lt;&gt; #{productModel.value}
+        </if>
+        <if test="factoryName != '' and factoryName!= null and factoryName.textType != '' and factoryName.textType != null and factoryName.textType == '0'.toString()">
+            AND factoryName = #{factoryName.value}
+        </if>
+        <if test="factoryName != '' and factoryName!= null and factoryName.textType != '' and factoryName.textType != null and factoryName.textType == '1'.toString()">
+            AND factoryName LIKE CONCAT('%',#{factoryName.value},'%')
+        </if>
+        <if test="factoryName != '' and factoryName!= null and factoryName.textType != '' and factoryName.textType != null and factoryName.textType == '2'.toString()">
+            AND factoryName &lt;&gt; #{factoryName.value}
+        </if>
+        <if test="documentDate != null and documentDate.type != '' and documentDate.type != null and documentDate.type=='0'.toString()">
+            AND SUBSTRING_INDEX(documentDate, ' ', 1) <![CDATA[ >= ]]> #{documentDate.startDate} AND SUBSTRING_INDEX(documentDate, ' ', 1) <![CDATA[ <= ]]> #{documentDate.endDate}
+        </if>
+        <if test="documentDate != null and documentDate.type != '' and documentDate.type != null and documentDate.type != null and documentDate.type=='1'.toString()">
+            AND SUBSTRING_INDEX(documentDate, ' ', 1) <![CDATA[ <= ]]> #{documentDate.startDate}
+        </if>
+        <if test="documentDate != null and documentDate.type != '' and documentDate.type != null and documentDate.type != null and documentDate.type=='2'.toString()">
+            AND SUBSTRING_INDEX(documentDate, ' ', 1) <![CDATA[ >= ]]> #{documentDate.startDate}
+        </if>
+        <if test="documentDate != null and documentDate.type != '' and documentDate.type != null and documentDate.type=='3'.toString()">
+            AND SUBSTRING_INDEX(documentDate, ' ', 1) = #{documentDate.startDate}
+        </if>
+        <if test="auditDuration != '' and auditDuration!= null and auditDuration.numberType != '' and auditDuration.numberType != null">
+            AND ROUND(`time`/60) ${auditDuration.numberType} #{auditDuration.value}+0
+        </if>
+        <if test="documentDate != '' and documentDate!= null and documentDate.sort != '' and documentDate.sort != null">
+            ORDER BY documentDate ${documentDate.sort}
+        </if>
+        <if test="auditDuration != '' and auditDuration!= null and auditDuration.sort != '' and auditDuration.sort != null">
+            ORDER BY 0+`time` ${auditDuration.sort}
+        </if>
+        <if test="documentDate.sort == '' and auditDuration.sort == ''">
+            ORDER BY manageNumber DESC
+        </if>
+        <if test="number > 0">
+            LIMIT #{number}
+        </if>
+    </select>
+
+    <select id="selectApprovalDurationTime" resultType="utry.data.modular.technicalQuality.dto.ApprovalDurationTimeDTO" parameterType="utry.data.modular.technicalQuality.dto.ApprovalDurationQueryDTO">
+        SELECT
+            t.submitNum,
+            t.auditNum,
+            t.reviewNum,
+            t.closeOrderNum,
+            CONCAT(IFNULL(
+                           ROUND(
+                                   (t.auditTime / t.auditNum),
+                                   0
+                               ),
+                           0),''
+                ) AS auditTime,
+            CONCAT(IFNULL(
+                           ROUND(
+                                   (t.closeOrderTime / t.closeOrderNum),
+                                   0
+                               ),
+                           0),''
+                ) AS closeOrderTime,
+            CONCAT(IFNULL(
+                           ROUND(
+                                   (t.reviewTime / t.reviewNum),
+                                   0
+                               ),
+                           0),''
+                ) AS reviewTime
+        FROM
+            (
+                SELECT
+                    SUM(
+                            IF (
+                                    systemState = '已提交',
+                                    1,
+                                    0
+                                )
+                        ) AS submitNum,
+                    SUM(
+                            IF (
+                                    systemState = '已审核',
+                                    1,
+                                    0
+                                )
+                        ) AS auditNum,
+                    SUM(
+
+                            IF (
+                                    systemState = '已审阅',
+                                    1,
+                                    0
+                                )
+                        ) AS reviewNum,
+                    SUM(
+
+                            IF (
+                                    systemState = '已关单',
+                                    1,
+                                    0
+                                )
+                        ) AS closeOrderNum,
+                    SUM(
+                            IF (
+                                    systemState = '已审核',
+                                    TIMESTAMPDIFF(
+                                            MINUTE,
+                                            submitTime,
+                                            auditTime
+                                        ),
+                                    0
+                                )
+                        ) AS auditTime,
+                    SUM(
+
+                            IF (
+                                    systemState = '已审阅',
+                                    TIMESTAMPDIFF(
+                                            MINUTE,
+                                            submitTime,
+                                            reviewTime
+                                        ),
+                                    0
+                                )
+                        ) AS reviewTime,
+                    SUM(
+                            IF (
+                                    systemState = '已关单',
+                                    TIMESTAMPDIFF(
+                                            MINUTE,
+                                            submitTime,
+                                            closeOrderTime
+                                        ),
+                                    0
+                                )
+                        ) AS closeOrderTime,
+                    productModel,
+            systemState,
+            auditFinishTime
+                FROM
+                    t_quality_feedback
+        WHERE 1 = 1
+        <if test="(list != null and list.size > 0) or (modelList != null and modelList.size > 0 ) or (productCategoryList != null and productCategoryList.size > 0)">
+            AND( 1=2
+            <if test="list != null and list.size > 0">
+                OR productTypeCode IN
+                <foreach collection="list" item="productTypeCode" open="(" separator="," close=")">
+                    #{productTypeCode}
+                </foreach>
+            </if>
+            <if test="modelList != null and modelList.size > 0">
+                OR productModel IN
+                <foreach collection="modelList" item="productModel" open="(" separator="," close=")">
+                    #{productModel}
+                </foreach>
+            </if>
+            <if test="productCategoryList != null and productCategoryList.size > 0">
+                OR productCategoryCode IN
+                <foreach collection="productCategoryList" item="productCategoryCode" open="(" separator="," close=")">
+                    #{productCategoryCode}
+                </foreach>
+            </if>
+            )
+        </if>
+        <if test="startTime != '' and startTime != null">
+            AND SUBSTRING_INDEX(documentDate, ' ', 1) &gt;= #{startTime}
+        </if>
+        <if test="endTime != '' and endTime != null">
+            AND SUBSTRING_INDEX(documentDate, ' ', 1) &lt;= #{endTime}
+        </if>
+        <if test="ifException != '' and ifException != null and ifException != '-1'.toString()">
+            AND TIMESTAMPDIFF(
+            SECOND,
+            submitTime,
+            IF(systemState="已提交",NOW(),auditFinishTime)
+            )  &gt;= #{ifException} + 0
+        </if>
+            ) t
+    </select>
+
+    <select id="selectCompletionRate" parameterType ="utry.data.modular.technicalQuality.dto.CompletionRateQueryDTO" resultType="utry.data.modular.technicalQuality.dto.CompletionRateDTO">
+        SELECT tt.productCategory,tt.productCategoryCode,tt.`count`,tt.completionRate,GROUP_CONCAT(htha.RealName)AS `name` FROM(SELECT
+        p.productCategory,
+        p.productCategoryCode,
+        COUNT(DISTINCT p.productModel) AS `count`,
+        GROUP_CONCAT(DISTINCT a.AccountID) AS `name`,
+        CONCAT(CAST(0+CAST(IFNULL(ROUND(SUM(
+        IF (
+        TIMESTAMPDIFF(
+        DAY,
+        SUBSTRING_INDEX(p.listingDate, ' ', 1),
+        p.serviceManualTime
+        ) &lt;= 7
+        AND TIMESTAMPDIFF(
+        DAY,
+        SUBSTRING_INDEX(p.listingDate, ' ', 1),
+        p.manualTime
+        ) &lt;= 7,
+        1,
+        0
+        )
+        ) / COUNT(*) * 100,
+        2),0) AS CHAR)AS CHAR),'%') AS completionRate
+        FROM
+        t_user_type u
+        LEFT JOIN t_product_information p ON p.productTypeCode = u.typeId
+        LEFT JOIN hrm_db.t_hrm_accountinfo a ON a.AccountID = u.userId
+        WHERE p.listingDate IS NOT NULL AND p.listingDate != "" AND p.systemState = "已启用"
+        <if test="time != '' and time != null">
+            AND SUBSTRING_INDEX(p.listingDate, '-', 2) = #{time}
+        </if>
+        <if test="list != null and list.size > 0">
+            AND p.productTypeCode IN
+            <foreach collection="list" item="productTypeCode" open="(" separator="," close=")">
+                #{productTypeCode}
+            </foreach>
+        </if>
+        GROUP BY p.productCategoryCode
+        )tt
+        LEFT JOIN hrm_db.t_hrm_accountinfo htha ON ( INSTR( tt.`name`, htha.AccountID ))
+        WHERE 1 = 1
+        <if test="productCategory != '' and productCategory!= null and productCategory.textType != '' and productCategory.textType != null and productCategory.textType == '0'.toString()">
+            AND tt.productCategory = #{productCategory.value}
+        </if>
+        <if test="productCategory != '' and productCategory!= null and productCategory.textType != '' and productCategory.textType != null and productCategory.textType == '1'.toString()">
+            AND tt.productCategory LIKE CONCAT('%',#{productCategory.value},'%')
+        </if>
+        <if test="productCategory != '' and productCategory!= null and productCategory.textType != '' and productCategory.textType != null and productCategory.textType == '2'.toString()">
+            AND tt.productCategory &lt;&gt; #{productCategory.value}
+        </if>
+        <if test="name != '' and name!= null and name.textType != '' and name.textType != null and name.textType == '0'.toString()">
+            AND tt.name = #{name.value}
+        </if>
+        <if test="name != '' and name!= null and name.textType != '' and name.textType != null and name.textType == '1'.toString()">
+            AND tt.name LIKE CONCAT('%',#{name.value},'%')
+        </if>
+        <if test="name != '' and name!= null and name.textType != '' and name.textType != null and name.textType == '2'.toString()">
+            AND tt.name &lt;&gt; #{name.value}
+        </if>
+        <if test="completionRate != '' and completionRate!= null and completionRate.numberType != '' and completionRate.numberType != null">
+            AND tt.completionRate ${completionRate.numberType} #{completionRate.value}+0
+        </if>
+        <if test="count != '' and count!= null and count.numberType != '' and count.numberType != null">
+            AND tt.`count` ${count.numberType} #{count.value}+0
+        </if>
+        GROUP BY
+        tt.`name`,tt.productCategoryCode
+        <if test="completionRate != '' and completionRate!= null and completionRate.sort != '' and completionRate.sort != null">
+            ORDER BY 0+tt.completionRate ${completionRate.sort}
+        </if>
+        <if test="count != '' and count!= null and count.sort != '' and count.sort != null">
+            ORDER BY 0+tt.`count` ${count.sort}
+        </if>
+        <if test="completionRate.sort == '' and count.sort == ''">
+            ORDER BY tt.productCategoryCode DESC
+        </if>
+        <if test="number > 0">
+            LIMIT #{number}
+        </if>
+    </select>
+
+    <select id="selectRepairRateTime" resultType="java.util.Map" parameterType="utry.data.modular.technicalQuality.dto.RepairRateQueryDTO">
+        SELECT
+        t.nodeName,
+        count(1) AS `count`,
+        ROUND(SUM(if(t.nodeName='服务完成', VtoF, 0))/SUM(t.nodeName='服务完成'), 2) AS `avg`
+        FROM
+        (
+        SELECT
+        (
+        CASE
+        WHEN a.systemState = '已完成' THEN
+        '服务完成'
+        WHEN a.systemState = '已上门' AND a.pendingState = '解挂' THEN
+        '解挂'
+        WHEN a.systemState = '已上门' AND a.pendingState = '挂单' THEN
+        '挂单'
+        WHEN a.systemState = '已上门' THEN
+        '上门'
+        END
+        ) AS nodeName,
+        TIMESTAMPDIFF(
+        SECOND,
+        a.firstVisitTime,
+        a.finishTime
+        ) - IFNULL(a.pendingTime, 0) AS VtoF
+        FROM
+        t_region_dispatching_detail a FORCE INDEX(in_e)
+        WHERE
+        a.dispatchingSource NOT IN ('自接','营销中心','前置渠道')
+        AND a.systemState NOT IN (
+        '已作废',
+        '已关闭',
+        '申请作废'
+        )
+        AND a.serviceType IN ("非上门维修", "维修")
+        <if test="startTime != '' and startTime != null">
+            AND a.dispatchingTime &gt;= #{startTime}
+        </if>
+        <if test="endTime != '' and endTime != null">
+            AND a.dispatchingTime &lt;= #{endTime}
+        </if>
+        <if test="engineerId != '' and engineerId!= null">
+            AND a.engineerId = #{engineerId}
+        </if>
+        <if test="ifException != '' and ifException != null and ifException != '-1'.toString()">
+            AND if(a.serviceType = '维修',a.towUp &gt; 1,a.towUp &gt;= 1)
+        </if>
+        <if test="(list != null and list.size > 0) or (modelList != null and modelList.size > 0 ) or (productCategoryList != null and productCategoryList.size > 0)">
+            AND( 1=2
+            <if test="list != null and list.size > 0">
+                OR a.productTypeCode IN
+                <foreach collection="list" item="productTypeCode" open="(" separator="," close=")">
+                    #{productTypeCode}
+                </foreach>
+            </if>
+            <if test="modelList != null and modelList.size > 0">
+                OR a.productModel IN
+                <foreach collection="modelList" item="productModel" open="(" separator="," close=")">
+                    #{productModel}
+                </foreach>
+            </if>
+            <if test="productCategoryList != null and productCategoryList.size > 0">
+                OR a.productCategoryCode IN
+                <foreach collection="productCategoryList" item="productCategoryCode" open="(" separator="," close=")">
+                    #{productCategoryCode}
+                </foreach>
+            </if>
+            )
+        </if>
+        ) t
+        GROUP BY
+        t.nodeName
+    </select>
+
+    <select id="selectPendingOrder" resultType="java.util.Map" parameterType="utry.data.modular.technicalQuality.dto.RepairRateQueryDTO">
+        SELECT
+	        COUNT(*) AS `count`,
+	        t.nodeName
+        FROM
+	        (
+		        SELECT
+			        (
+				        CASE
+				        WHEN ISNULL(o.finishOrderTime) THEN
+					        '解挂'
+				        ELSE
+					        '挂单'
+				        END
+			        ) AS nodeName,
+			        MAX(o.pendingId) AS pendingId
+		        FROM
+			        t_region_pending_order o
+		        LEFT JOIN t_region_dispatching_detail d ON d.dispatchingOrder = o.dispatchingOrder
+		        WHERE
+			        d.finishTime IS NULL
+		        AND d.systemState NOT IN (
+			        '已作废',
+			        '已关闭',
+			        '申请作废'
+		        )
+                    AND d.serviceType = '维修'
+            <if test="engineerId != '' and engineerId!= null">
+                AND d.engineerId = #{engineerId}
+            </if>
+                <if test="startTime != '' and startTime != null">
+                    AND d.dispatchingTime &gt;= #{startTime}
+                </if>
+                <if test="endTime != '' and endTime != null">
+                AND d.dispatchingTime &lt;= #{endTime}
+                </if>
+                AND d.dispatchingSource NOT IN ('自接','营销中心','前置渠道')
+        <if test="(list != null and list.size > 0) or (modelList != null and modelList.size > 0 ) or (productCategoryList != null and productCategoryList.size > 0)">
+            AND( 1=2
+            <if test="list != null and list.size > 0">
+                OR d.productTypeCode IN
+                <foreach collection="list" item="productTypeCode" open="(" separator="," close=")">
+                    #{productTypeCode}
+                </foreach>
+            </if>
+            <if test="modelList != null and modelList.size > 0">
+                OR d.productModel IN
+                <foreach collection="modelList" item="productModel" open="(" separator="," close=")">
+                    #{productModel}
+                </foreach>
+            </if>
+            <if test="productCategoryList != null and productCategoryList.size > 0">
+                OR d.productCategoryCode IN
+                <foreach collection="productCategoryList" item="productCategoryCode" open="(" separator="," close=")">
+                    #{productCategoryCode}
+                </foreach>
+            </if>
+            )
+        </if>
+		                GROUP BY
+			                o.dispatchingOrder
+	        ) t
+        GROUP BY
+	        t.nodeName
+    </select>
+
+    <select id="selectCompletionRateByCategory" parameterType ="utry.data.modular.technicalQuality.dto.CompletionRateByCategoryQueryDTO" resultType="utry.data.modular.technicalQuality.dto.CompletionRateByCategoryDTO">
+        SELECT
+        tt.*
+        FROM
+        (
+        SELECT
+        p.productType,
+        p.productModel,
+        GROUP_CONCAT(a.RealName) AS `name`,
+        SUBSTRING_INDEX(p.listingDate, ' ', 1) AS listingDate,
+        SUBSTRING_INDEX(p.manualTime, ' ', 1) AS manualTime,
+        SUBSTRING_INDEX(p.serviceManualTime, ' ', 1) AS serviceManualTime,
+        IF (
+        TIMESTAMPDIFF(
+        DAY,
+        SUBSTRING_INDEX(p.listingDate, ' ', 1),
+        p.serviceManualTime
+        ) &lt;= 7
+        AND TIMESTAMPDIFF(
+        DAY,
+        SUBSTRING_INDEX(p.listingDate, ' ', 1),
+        p.manualTime
+        ) &lt;= 7,
+        'Y',
+        'N'
+        ) AS flag
+        FROM
+        t_user_type u
+        LEFT JOIN t_product_information p ON p.productTypeCode = u.typeId
+        LEFT JOIN hrm_db.t_hrm_accountinfo a ON a.AccountID = u.userId
+        WHERE p.listingDate IS NOT NULL AND p.systemState = "已启用"
+        AND p.listingDate != ""
+        AND p.productCategoryCode = #{productCategoryCode}
+        <if test="time != '' and time != null">
+            AND SUBSTRING_INDEX(p.listingDate, '-', 2) = #{time}
+        </if>
+        <if test="list != null and list.size > 0">
+            AND p.productTypeCode IN
+            <foreach collection="list" item="productTypeCode" open="(" separator="," close=")">
+                #{productTypeCode}
+            </foreach>
+        </if>
+        GROUP BY
+        p.productModel
+        ) tt
+        WHERE 1 = 1
+        <if test="productType != '' and productType!= null and productType.textType != '' and productType.textType != null and productType.textType == '0'.toString()">
+            AND tt.productType = #{productType.value}
+        </if>
+        <if test="productType != '' and productType!= null and productType.textType != '' and productType.textType != null and productType.textType == '1'.toString()">
+            AND tt.productType LIKE CONCAT('%',#{productCategory.value},'%')
+        </if>
+        <if test="productType != '' and productType!= null and productType.textType != '' and productType.textType != null and productType.textType == '2'.toString()">
+            AND tt.productType &lt;&gt; #{productCategory.value}
+        </if>
+        <if test="name != '' and name!= null and name.textType != '' and name.textType != null and name.textType == '0'.toString()">
+            AND tt.name = #{name.value}
+        </if>
+        <if test="name != '' and name!= null and name.textType != '' and name.textType != null and name.textType == '1'.toString()">
+            AND tt.name LIKE CONCAT('%',#{name.value},'%')
+        </if>
+        <if test="name != '' and name!= null and name.textType != '' and name.textType != null and name.textType == '2'.toString()">
+            AND tt.name &lt;&gt; #{name.value}
+        </if>
+        <if test="productModel != '' and productModel!= null and productModel.textType != '' and productModel.textType != null and productModel.textType == '0'.toString()">
+            AND tt.productModel = #{productModel.value}
+        </if>
+        <if test="productModel != '' and productModel!= null and productModel.textType != '' and productModel.textType != null and productModel.textType == '1'.toString()">
+            AND tt.productModel LIKE CONCAT('%',#{productModel.value},'%')
+        </if>
+        <if test="productModel != '' and productModel!= null and productModel.textType != '' and productModel.textType != null and productModel.textType == '2'.toString()">
+            AND tt.productModel &lt;&gt; #{productModel.value}
+        </if>
+        <if test="listingDate != null and listingDate.type != '' and listingDate.type != null and listingDate.type=='0'.toString()">
+            AND SUBSTRING_INDEX(listingDate, ' ', 1) <![CDATA[ >= ]]> #{listingDate.startDate} AND SUBSTRING_INDEX(listingDate, ' ', 1) <![CDATA[ <= ]]> #{listingDate.endDate}
+        </if>
+        <if test="listingDate != null and listingDate.type != '' and listingDate.type != null and listingDate.type=='1'.toString()">
+            AND SUBSTRING_INDEX(listingDate, ' ', 1) <![CDATA[ <= ]]> #{listingDate.startDate}
+        </if>
+        <if test="listingDate != null and listingDate.type != '' and listingDate.type != null and listingDate.type=='2'.toString()">
+            AND SUBSTRING_INDEX(listingDate, ' ', 1) <![CDATA[ >= ]]> #{listingDate.startDate}
+        </if>
+        <if test="listingDate != null and listingDate.type != '' and listingDate.type != null and listingDate.type=='3'.toString()">
+            AND SUBSTRING_INDEX(listingDate, ' ', 1) = #{listingDate.startDate}
+        </if>
+        <if test="manualTime != null and manualTime.type != '' and manualTime.type != null and manualTime.type=='0'.toString()">
+            AND SUBSTRING_INDEX(manualTime, ' ', 1) <![CDATA[ >= ]]> #{manualTime.startDate} AND SUBSTRING_INDEX(manualTime, ' ', 1) <![CDATA[ <= ]]> #{manualTime.endDate}
+        </if>
+        <if test="manualTime != null and manualTime.type != '' and manualTime.type != null and manualTime.type=='1'.toString()">
+            AND SUBSTRING_INDEX(manualTime, ' ', 1) <![CDATA[ <= ]]> #{manualTime.startDate}
+        </if>
+        <if test="manualTime != null and manualTime.type != '' and manualTime.type != null and manualTime.type=='2'.toString()">
+            AND SUBSTRING_INDEX(manualTime, ' ', 1) <![CDATA[ >= ]]> #{manualTime.startDate}
+        </if>
+        <if test="manualTime != null and manualTime.type != '' and manualTime.type != null and manualTime.type=='3'.toString()">
+            AND SUBSTRING_INDEX(manualTime, ' ', 1) = #{manualTime.startDate}
+        </if>
+        <if test="serviceManualTime != null and serviceManualTime.type != '' and serviceManualTime.type != null and serviceManualTime.type=='0'.toString()">
+            AND SUBSTRING_INDEX(serviceManualTime, ' ', 1) <![CDATA[ >= ]]> #{serviceManualTime.startDate} AND SUBSTRING_INDEX(serviceManualTime, ' ', 1) <![CDATA[ <= ]]> #{serviceManualTime.endDate}
+        </if>
+        <if test="serviceManualTime != null and serviceManualTime.type != '' and serviceManualTime.type != null and serviceManualTime.type=='1'.toString()">
+            AND SUBSTRING_INDEX(serviceManualTime, ' ', 1) <![CDATA[ <= ]]> #{serviceManualTime.startDate}
+        </if>
+        <if test="serviceManualTime != null and serviceManualTime.type != '' and serviceManualTime.type != null and serviceManualTime.type=='2'.toString()">
+            AND SUBSTRING_INDEX(serviceManualTime, ' ', 1) <![CDATA[ >= ]]> #{serviceManualTime.startDate}
+        </if>
+        <if test="serviceManualTime != null and serviceManualTime.type != '' and serviceManualTime.type != null and serviceManualTime.type=='3'.toString()">
+            AND SUBSTRING_INDEX(serviceManualTime, ' ', 1) = #{serviceManualTime.startDate}
+        </if>
+        <if test="listingDate != '' and listingDate!= null and listingDate.sort != '' and listingDate.sort != null">
+            ORDER BY tt.listingDate ${listingDate.sort}
+        </if>
+        <if test="manualTime != '' and manualTime!= null and manualTime.sort != '' and manualTime.sort != null">
+            ORDER BY tt.manualTime ${manualTime.sort}
+        </if>
+        <if test="serviceManualTime != '' and serviceManualTime!= null and serviceManualTime.sort != '' and serviceManualTime.sort != null">
+            ORDER BY tt.serviceManualTime ${serviceManualTime.sort}
+        </if>
+        <if test="listingDate.sort == '' and manualTime.sort == '' and serviceManualTime.sort == ''">
+            ORDER BY tt.listingDate DESC
+        </if>
+        <if test="number > 0">
+            LIMIT #{number}
+        </if>
+    </select>
+
+    <select id="selectServiceList" parameterType ="utry.data.modular.technicalQuality.dto.RepairRateQueryDTO" resultType="utry.data.modular.technicalQuality.dto.RepairRateDTO">
+        SELECT tt.*
+        FROM
+        (
+        SELECT
+        CASE
+        WHEN a.systemState="已上门" AND a.pendingState="挂单" THEN "已挂单"
+        WHEN a.systemState="已上门" AND a.pendingState="解挂" THEN "已解挂"
+        ELSE
+        a.systemState
+        END AS systemState,
+        CASE
+        WHEN a.systemState="已上门" AND a.pendingState="挂单" THEN TIMESTAMPDIFF(SECOND,a.updateTime,NOW())
+        WHEN a.systemState="已上门" AND a.pendingState="解挂" THEN TIMESTAMPDIFF(SECOND,a.updateTime,NOW())
+        WHEN a.systemState="已上门" AND a.pendingState IS NULL THEN TIMESTAMPDIFF(SECOND,a.updateTime,NOW())
+        ELSE
+        NULL
+        END AS time,
+        CASE
+        WHEN a.serviceType= '维修' AND a.visitTime IS NOT NULL THEN 1
+        WHEN a.serviceType= '非上门维修' THEN 1
+        ELSE
+        0
+        END
+        +IFNULL(a.towUp,0) AS visitsNumber,
+        a.dispatchingOrder,
+        a.engineerName,
+        a.engineerId,
+        a.storeName,
+        a.productCategory,
+        a.dispatchingTime,
+        a.appointmentTime,
+        a.finishTime,
+        a.accountingArea,
+        a.repairEligible,
+        a.provinces AS area,
+        a.serviceType,
+        TIMESTAMPDIFF(
+        SECOND,
+        a.dispatchingTime,
+        IFNULL(a.TATFinishTime,NOW())
+        ) AS turnoverTime
+        FROM t_region_dispatching_detail a
+        WHERE a.serviceType IN ("非上门维修", "维修")
+        AND a.systemState IN ('已上门','已完成','已提交')
+        AND a.dispatchingSource NOT IN (
+        '自接',
+        '营销中心',
+        '前置渠道'
+        )
+        <if test="(list != null and list.size > 0) or (modelList != null and modelList.size > 0 ) or (productCategoryList != null and productCategoryList.size > 0)">
+            AND( 1=2
+            <if test="list != null and list.size > 0">
+                OR a.productTypeCode IN
+                <foreach collection="list" item="productTypeCode" open="(" separator="," close=")">
+                    #{productTypeCode}
+                </foreach>
+            </if>
+            <if test="modelList != null and modelList.size > 0">
+                OR a.productModel IN
+                <foreach collection="modelList" item="productModel" open="(" separator="," close=")">
+                    #{productModel}
+                </foreach>
+            </if>
+            <if test="productCategoryList != null and productCategoryList.size > 0">
+                OR a.productCategoryCode IN
+                <foreach collection="productCategoryList" item="productCategoryCode" open="(" separator="," close=")">
+                    #{productCategoryCode}
+                </foreach>
+            </if>
+            )
+        </if>
+        <if test="startTime != '' and startTime != null">
+            AND a.dispatchingTime &gt;= #{startTime}
+        </if>
+        <if test="endTime != '' and endTime != null">
+            AND a.dispatchingTime &lt;= #{endTime}
+        </if>
+        )tt
+        WHERE 1 = 1
+        <if test="engineerId != '' and engineerId!= null">
+            AND tt.engineerId = #{engineerId}
+        </if>
+        <if test="ifException != '' and ifException!= null and ifException != '-1'.toString()">
+            AND if(tt.serviceType = '维修',tt.visitsNumber &gt; 2,tt.visitsNumber &gt;= 2)
+        </if>
+        <if test="dispatchingOrder != '' and dispatchingOrder!= null and dispatchingOrder.textType != '' and dispatchingOrder.textType != null and dispatchingOrder.textType == '0'.toString()">
+            AND tt.dispatchingOrder = #{dispatchingOrder.value}
+        </if>
+        <if test="dispatchingOrder != '' and dispatchingOrder!= null and dispatchingOrder.textType != '' and dispatchingOrder.textType != null and dispatchingOrder.textType == '1'.toString()">
+            AND tt.dispatchingOrder LIKE CONCAT('%',#{dispatchingOrder.value},'%')
+        </if>
+        <if test="dispatchingOrder != '' and dispatchingOrder!= null and dispatchingOrder.textType != '' and dispatchingOrder.textType != null and dispatchingOrder.textType == '2'.toString()">
+            AND tt.dispatchingOrder &lt;&gt; #{dispatchingOrder.value}
+        </if>
+        <if test="storeName != '' and storeName!= null and storeName.textType != '' and storeName.textType != null and storeName.textType == '0'.toString()">
+            AND tt.storeName = #{storeName.value}
+        </if>
+        <if test="storeName != '' and storeName!= null and storeName.textType != '' and storeName.textType != null and storeName.textType == '1'.toString()">
+            AND tt.storeName LIKE CONCAT('%',#{storeName.value},'%')
+        </if>
+        <if test="storeName != '' and storeName!= null and storeName.textType != '' and storeName.textType != null and storeName.textType == '2'.toString()">
+            AND tt.storeName &lt;&gt; #{storeName.value}
+        </if>
+        <if test="engineerName != '' and engineerName!= null and engineerName.textType != '' and engineerName.textType != null and engineerName.textType == '0'.toString()">
+            AND tt.engineerName = #{engineerName.value}
+        </if>
+        <if test="engineerName != '' and engineerName!= null and engineerName.textType != '' and engineerName.textType != null and engineerName.textType == '1'.toString()">
+            AND tt.engineerName LIKE CONCAT('%',#{engineerName.value},'%')
+        </if>
+        <if test="engineerName != '' and engineerName!= null and engineerName.textType != '' and engineerName.textType != null and engineerName.textType == '2'.toString()">
+            AND tt.engineerName &lt;&gt; #{engineerName.value}
+        </if>
+        <if test="productCategory != '' and productCategory!= null and productCategory.textType != '' and productCategory.textType != null and productCategory.textType == '0'.toString()">
+            AND tt.productCategory = #{productCategory.value}
+        </if>
+        <if test="productCategory != '' and productCategory!= null and productCategory.textType != '' and productCategory.textType != null and productCategory.textType == '1'.toString()">
+            AND tt.productCategory LIKE CONCAT('%',#{productCategory.value},'%')
+        </if>
+        <if test="productCategory != '' and productCategory!= null and productCategory.textType != '' and productCategory.textType != null and productCategory.textType == '2'.toString()">
+            AND tt.productCategory &lt;&gt; #{productCategory.value}
+        </if>
+        <if test="accountingArea != '' and accountingArea!= null and accountingArea.textType != '' and accountingArea.textType != null and accountingArea.textType == '0'.toString()">
+            AND tt.accountingArea = #{accountingArea.value}
+        </if>
+        <if test="accountingArea != '' and accountingArea!= null and accountingArea.textType != '' and accountingArea.textType != null and accountingArea.textType == '1'.toString()">
+            AND tt.accountingArea LIKE CONCAT('%',#{accountingArea.value},'%')
+        </if>
+        <if test="accountingArea != '' and accountingArea!= null and accountingArea.textType != '' and accountingArea.textType != null and accountingArea.textType == '2'.toString()">
+            AND tt.accountingArea &lt;&gt; #{accountingArea.value}
+        </if>
+        <if test="area != '' and area!= null and area.textType != '' and area.textType != null and area.textType == '0'.toString()">
+            AND tt.area = #{area.value}
+        </if>
+        <if test="area != '' and area!= null and area.textType != '' and area.textType != null and area.textType == '1'.toString()">
+            AND tt.area LIKE CONCAT('%',#{area.value},'%')
+        </if>
+        <if test="area != '' and area!= null and area.textType != '' and area.textType != null and area.textType == '2'.toString()">
+            AND tt.area &lt;&gt; #{area.value}
+        </if>
+        <if test="serviceType != '' and serviceType!= null and serviceType.textType != '' and serviceType.textType != null and serviceType.textType == '0'.toString()">
+            AND tt.serviceType = #{serviceType.value}
+        </if>
+        <if test="serviceType != '' and serviceType!= null and serviceType.textType != '' and serviceType.textType != null and serviceType.textType == '1'.toString()">
+            AND tt.serviceType LIKE CONCAT('%',#{serviceType.value},'%')
+        </if>
+        <if test="serviceType != '' and serviceType!= null and serviceType.textType != '' and serviceType.textType != null and serviceType.textType == '2'.toString()">
+            AND tt.serviceType &lt;&gt; #{serviceType.value}
+        </if>
+        <if test="systemState != '' and systemState!= null and systemState.textType != '' and systemState.textType != null and systemState.textType == '0'.toString()">
+            AND tt.systemState = #{systemState.value}
+        </if>
+        <if test="systemState != '' and systemState!= null and systemState.textType != '' and systemState.textType != null and systemState.textType == '1'.toString()">
+            AND tt.systemState LIKE CONCAT('%',#{systemState.value},'%')
+        </if>
+        <if test="systemState != '' and systemState!= null and systemState.textType != '' and systemState.textType != null and systemState.textType == '2'.toString()">
+            AND tt.systemState &lt;&gt; #{systemState.value}
+        </if>
+        <if test="dispatchingTime != null and dispatchingTime.type != '' and dispatchingTime.type != null and dispatchingTime.type=='0'.toString()">
+            AND tt.dispatchingTime <![CDATA[ >= ]]> #{dispatchingTime.startDate} AND tt.dispatchingTime <![CDATA[ <= ]]> #{dispatchingTime.endDate}
+        </if>
+        <if test="dispatchingTime != null and dispatchingTime.type != '' and dispatchingTime.type != null and dispatchingTime.type=='1'.toString()">
+            AND tt.dispatchingTime <![CDATA[ <= ]]> #{dispatchingTime.startDate}
+        </if>
+        <if test="dispatchingTime != null and dispatchingTime.type != '' and dispatchingTime.type != null and dispatchingTime.type=='2'.toString()">
+            AND tt.dispatchingTime <![CDATA[ >= ]]> #{dispatchingTime.startDate}
+        </if>
+        <if test="dispatchingTime != null and dispatchingTime.type != '' and dispatchingTime.type != null and dispatchingTime.type=='3'.toString()">
+            AND tt.dispatchingTime = #{dispatchingTime.startDate}
+        </if>
+        <if test="appointmentTime != null and appointmentTime.type != '' and appointmentTime.type != null and appointmentTime.type=='0'.toString()">
+            AND tt.appointmentTime <![CDATA[ >= ]]> #{appointmentTime.startDate} AND tt.appointmentTime <![CDATA[ <= ]]> #{appointmentTime.endDate}
+        </if>
+        <if test="appointmentTime != null and appointmentTime.type != '' and appointmentTime.type != null and appointmentTime.type=='1'.toString()">
+            AND tt.appointmentTime <![CDATA[ <= ]]> #{appointmentTime.startDate}
+        </if>
+        <if test="appointmentTime != null and appointmentTime.type != '' and appointmentTime.type != null and appointmentTime.type=='2'.toString()">
+            AND tt.appointmentTime <![CDATA[ >= ]]> #{appointmentTime.startDate}
+        </if>
+        <if test="appointmentTime != null and appointmentTime.type != '' and appointmentTime.type != null and appointmentTime.type=='3'.toString()">
+            AND tt.appointmentTime = #{appointmentTime.startDate}
+        </if>
+        <if test="finishTime != '' and finishTime!= null and finishTime.numberType != '' and finishTime.numberType != null">
+            AND tt.finishTime ${finishTime.numberType} #{finishTime.value}+0
+        </if>
+        <if test="turnoverTime != '' and turnoverTime!= null and turnoverTime.numberType != '' and turnoverTime.numberType != null">
+            AND ROUND(tt.turnoverTime/3600) ${turnoverTime.numberType} #{turnoverTime.value}+0
+        </if>
+        <if test="visitsNumber != '' and visitsNumber!= null and visitsNumber.numberType != '' and visitsNumber.numberType != null">
+            AND tt.visitsNumber ${visitsNumber.numberType} #{visitsNumber.value}+0
+        </if>
+        <if test="dispatchingTime != '' and dispatchingTime!= null and dispatchingTime.sort != '' and dispatchingTime.sort != null">
+            ORDER BY tt.dispatchingTime ${dispatchingTime.sort}
+        </if>
+        <if test="appointmentTime != '' and appointmentTime!= null and appointmentTime.sort != '' and appointmentTime.sort != null">
+            ORDER BY tt.appointmentTime ${appointmentTime.sort}
+        </if>
+        <if test="finishTime != '' and finishTime!= null and finishTime.sort != '' and finishTime.sort != null">
+            ORDER BY tt.finishTime ${finishTime.sort}
+        </if>
+        <if test="turnoverTime != '' and turnoverTime!= null and turnoverTime.sort != '' and turnoverTime.sort != null">
+            ORDER BY tt.turnoverTime ${turnoverTime.sort}
+        </if>
+        <if test="visitsNumber != '' and visitsNumber!= null and visitsNumber.sort != '' and visitsNumber.sort != null">
+            ORDER BY 0+tt.visitsNumber ${visitsNumber.sort}
+        </if>
+        <if test="dispatchingTime.sort == '' and appointmentTime.sort == '' and finishTime.sort == '' and turnoverTime.sort == '' and visitsNumber.sort == ''">
+            ORDER BY tt.dispatchingTime DESC
+        </if>
+        <if test="number > 0">
+            LIMIT #{number}
+        </if>
+    </select>
+
+    <select id="selectRepairRateLineChart" parameterType ="utry.data.modular.technicalQuality.dto.LineChartQueryDTO" resultType="utry.data.modular.technicalQuality.dto.LineChartDTO">
+        SELECT
+        CONCAT(
+        IFNULL(
+        ROUND(t.eligible / t.total * 100, 2),
+        0
+        ),
+        ''
+        ) AS repairRate,
+        CONCAT(CAST(0+CAST(IFNULL(ROUND(t.eligible / t.total*100,2 ),0) AS CHAR)AS CHAR),'%') AS repairRate,
+        <if test="polymerization == '0'.toString()">
+            SUBSTRING_INDEX(t.dispatchingTime, ' ', 1) AS `time`
+        </if>
+        <if test="polymerization == '1'.toString()">
+            SUBSTRING_INDEX(t.dispatchingTime, '-',2) AS `time`
+        </if>
+        FROM
+        (
+        SELECT
+        a.dispatchingTime,
+        COUNT(a.dispatchingOrder) AS total,
+        SUM(
+        a.repairEligible
+        ) AS eligible
+        FROM
+        t_region_dispatching_detail a
+        WHERE a.serviceType IN ("非上门维修","维修") AND a.repairEligible IS NOT NULL AND a.systemState NOT IN ('已作废','已关闭','申请作废')
+        AND a.dispatchingSource NOT IN ('自接','营销中心','前置渠道')
+        <if test="(list != null and list.size > 0) or (modelList != null and modelList.size > 0 ) or (productCategoryList != null and productCategoryList.size > 0)">
+            AND( 1=2
+            <if test="list != null and list.size > 0">
+                OR a.productTypeCode IN
+                <foreach collection="list" item="productTypeCode" open="(" separator="," close=")">
+                    #{productTypeCode}
+                </foreach>
+            </if>
+            <if test="modelList != null and modelList.size > 0">
+                OR a.productModel IN
+                <foreach collection="modelList" item="productModel" open="(" separator="," close=")">
+                    #{productModel}
+                </foreach>
+            </if>
+            <if test="productCategoryList != null and productCategoryList.size > 0">
+                OR a.productCategoryCode IN
+                <foreach collection="productCategoryList" item="productCategoryCode" open="(" separator="," close=")">
+                    #{productCategoryCode}
+                </foreach>
+            </if>
+            )
+        </if>
+        <if test="startTime != '' and startTime != null">
+            AND SUBSTRING_INDEX(a.dispatchingTime, ' ', 1) &gt;= #{startTime}
+        </if>
+        <if test="endTime != '' and endTime != null">
+            AND SUBSTRING_INDEX(a.dispatchingTime, ' ', 1) &lt;= #{endTime}
+        </if>
+        GROUP BY
+        <if test="polymerization == '0'.toString()">
+            SUBSTRING_INDEX(a.dispatchingTime, ' ', 1)
+        </if>
+        <if test="polymerization == '1'.toString()">
+            SUBSTRING_INDEX(a.dispatchingTime, '-',2)
+        </if>
+        )t
+    </select>
+    <select id="selectRepairRatePieChart" parameterType ="utry.data.modular.technicalQuality.dto.PieChartQueryDTO" resultType="utry.data.modular.technicalQuality.dto.PieChartDTO">
+        SELECT tt.* FROM(SELECT
+        partDrawingNo,
+        describedDrawingNo,
+        sum(type = 1) AS repairNum,
+        sum(type = 2) AS replaceNum,
+        dispatchingTime,
+        systemState,
+        productModel,
+        productCategoryCode,
+        productTypeCode,
+        finishTime,
+        repairEligible,
+        dispatchingSource
+        FROM
+        (
+        SELECT
+        t2.serviceType,
+        t2.productModel,
+        t2.dispatchingTime,
+        t2.productTypeCode,
+        t2.productCategoryCode,
+        t2.finishTime,
+        t2.repairEligible,
+        t2.systemState,
+        t2.dispatchingSource,
+        t1.partDrawingNo,
+        t1.describedDrawingNo,
+        t1.faultCauseCode,
+        1 AS type
+        FROM
+        t_region_repair_part t1
+        LEFT JOIN t_region_dispatching_detail t2 ON t1.dispatchingOrder = t2.dispatchingOrder
+        UNION ALL
+        SELECT
+        t4.serviceType,
+        t4.productModel,
+        t4.dispatchingTime,
+        t4.productTypeCode,
+        t4.finishTime,
+        t4.repairEligible,
+        t4.systemState,
+        t4.dispatchingSource,
+        t4.productCategoryCode,
+        t3.partDrawingNo,
+        t3.describedDrawingNo,
+        t3.faultCauseCode,
+        2 AS type
+        FROM
+        t_region_replace_part t3
+        LEFT JOIN t_region_dispatching_detail t4 ON t3.dispatchingOrder = t4.dispatchingOrder
+        ) t
+        WHERE
+        serviceType IN ("非上门维修", "维修")
+        AND repairEligible IS NOT NULL
+        AND systemState NOT IN (
+        '已作废',
+        '已关闭',
+        '申请作废'
+        )
+        AND dispatchingSource NOT IN (
+        '自接',
+        '营销中心',
+        '前置渠道'
+        )
+        <if test="startTime != '' and startTime != null">
+            AND dispatchingTime &gt;= #{startTime}
+        </if>
+        <if test="endTime != '' and endTime != null">
+            AND dispatchingTime &lt;= #{endTime}
+        </if>
+        <if test="(list != null and list.size > 0) or (modelList != null and modelList.size > 0 ) or (productCategoryList != null and productCategoryList.size > 0)">
+            AND( 1=2
+            <if test="list != null and list.size > 0">
+                OR productTypeCode IN
+                <foreach collection="list" item="productTypeCode" open="(" separator="," close=")">
+                    #{productTypeCode}
+                </foreach>
+            </if>
+            <if test="modelList != null and modelList.size > 0">
+                OR productModel IN
+                <foreach collection="modelList" item="productModel" open="(" separator="," close=")">
+                    #{productModel}
+                </foreach>
+            </if>
+            <if test="productCategoryList != null and productCategoryList.size > 0">
+                OR productCategoryCode IN
+                <foreach collection="productCategoryList" item="productCategoryCode" open="(" separator="," close=")">
+                    #{productCategoryCode}
+                </foreach>
+            </if>
+            )
+        </if>
+            GROUP BY
+            partDrawingNo
+            )tt
+        WHERE 1 = 1
+        <if test="partDrawingNo != '' and partDrawingNo!= null and partDrawingNo.textType != '' and partDrawingNo.textType != null and engineerName.textType == '0'.toString()">
+            AND partDrawingNo = #{partDrawingNo.value}
+        </if>
+        <if test="partDrawingNo != '' and partDrawingNo!= null and partDrawingNo.textType != '' and partDrawingNo.textType != null and engineerName.textType == '1'.toString()">
+            AND partDrawingNo LIKE CONCAT('%',#{partDrawingNo.value},'%')
+        </if>
+        <if test="partDrawingNo != '' and partDrawingNo!= null and partDrawingNo.textType != '' and partDrawingNo.textType != null and engineerName.textType == '2'.toString()">
+            AND partDrawingNo &lt;&gt; #{partDrawingNo.value}
+        </if>
+        <if test="describedDrawingNo != '' and describedDrawingNo!= null and describedDrawingNo.textType != '' and describedDrawingNo.textType != null and describedDrawingNo.textType == '0'.toString()">
+            AND describedDrawingNo = #{describedDrawingNo.value}
+        </if>
+        <if test="describedDrawingNo != '' and describedDrawingNo!= null and describedDrawingNo.textType != '' and describedDrawingNo.textType != null and describedDrawingNo.textType == '1'.toString()">
+            AND describedDrawingNo LIKE CONCAT('%',#{describedDrawingNo.value},'%')
+        </if>
+        <if test="describedDrawingNo != '' and describedDrawingNo!= null and describedDrawingNo.textType != '' and describedDrawingNo.textType != null and describedDrawingNo.textType == '2'.toString()">
+            AND describedDrawingNo &lt;&gt; #{describedDrawingNo.value}
+        </if>
+        <if test="repairNum != '' and repairNum!= null and repairNum.numberType != '' and repairNum.numberType != null">
+            AND repairNum ${repairNum.numberType} 0+#{repairNum.value}+0
+        </if>
+
+        <if test="replaceNum != '' and replaceNum!= null and replaceNum.numberType != '' and replaceNum.numberType != null">
+            AND replaceNum ${replaceNum.numberType} 0+#{replaceNum.value}+0
+        </if>
+
+        <if test="repairNum != '' and repairNum!= null and repairNum.sort != '' and repairNum.sort != null">
+            ORDER BY 0+repairNum ${repairNum.sort}
+        </if>
+        <if test="replaceNum != '' and replaceNum!= null and replaceNum.sort != '' and replaceNum.sort != null">
+            ORDER BY 0+replaceNum ${replaceNum.sort}
+        </if>
+        <if test="repairNum.sort == '' and replaceNum.sort == ''">
+            ORDER BY partDrawingNo DESC
+        </if>
+    </select>
+    <select id="selectFaultCause" parameterType ="utry.data.modular.technicalQuality.dto.PieChartQueryDTO" resultType="utry.data.modular.technicalQuality.dto.FaultCauseDTO">
+        SELECT tt.* FROM(SELECT
+        COUNT(faultCauseCode) AS faultCodeNum,
+        faultCause,
+        faultCauseCode,
+        dispatchingTime,
+        systemState,
+        productModel,
+        productCategoryCode,
+        productTypeCode,
+        finishTime,
+        describedDrawingNo,
+        partDrawingNo,
+        repairEligible,
+        dispatchingSource
+        FROM
+        (
+        SELECT
+        t2.serviceType,
+        t2.productModel,
+        t2.dispatchingTime,
+        t2.productTypeCode,
+        t2.productCategoryCode,
+        t2.finishTime,
+        t2.repairEligible,
+        t2.systemState,
+        t2.dispatchingSource,
+        t1.faultCauseCode,
+        t1.faultCause,
+        t1.partDrawingNo,
+        t1.describedDrawingNo,
+        1 AS type
+        FROM
+        t_region_repair_part t1
+        LEFT JOIN t_region_dispatching_detail t2 ON t1.dispatchingOrder = t2.dispatchingOrder
+        UNION ALL
+        SELECT
+        t4.serviceType,
+        t4.productModel,
+        t4.dispatchingTime,
+        t4.productCategoryCode,
+        t4.productTypeCode,
+        t4.finishTime,
+        t4.repairEligible,
+        t4.systemState,
+        t4.dispatchingSource,
+        t3.faultCauseCode,
+        t3.faultCause,
+        t3.describedDrawingNo,
+        t3.faultCauseCode,
+        2 AS type
+        FROM
+        t_region_replace_part t3
+        LEFT JOIN t_region_dispatching_detail t4 ON t3.dispatchingOrder = t4.dispatchingOrder
+        ) t
+        WHERE
+        serviceType IN ("非上门维修", "维修")
+        AND repairEligible IS NOT NULL
+        AND systemState NOT IN (
+        '已作废',
+        '已关闭',
+        '申请作废'
+        )
+        AND dispatchingSource NOT IN (
+        '自接',
+        '营销中心',
+        '前置渠道'
+        )
+        <if test="startTime != '' and startTime != null">
+            AND dispatchingTime &gt;= #{startTime}
+        </if>
+        <if test="endTime != '' and endTime != null">
+            AND dispatchingTime &lt;= #{endTime}
+        </if>
+        <if test="(list != null and list.size > 0) or (modelList != null and modelList.size > 0 ) or (productCategoryList != null and productCategoryList.size > 0)">
+            AND( 1=2
+            <if test="list != null and list.size > 0">
+                OR productTypeCode IN
+                <foreach collection="list" item="productTypeCode" open="(" separator="," close=")">
+                    #{productTypeCode}
+                </foreach>
+            </if>
+            <if test="modelList != null and modelList.size > 0">
+                OR productModel IN
+                <foreach collection="modelList" item="productModel" open="(" separator="," close=")">
+                    #{productModel}
+                </foreach>
+            </if>
+            <if test="productCategoryList != null and productCategoryList.size > 0">
+                OR productCategoryCode IN
+                <foreach collection="productCategoryList" item="productCategoryCode" open="(" separator="," close=")">
+                    #{productCategoryCode}
+                </foreach>
+            </if>
+            )
+        </if>
+        GROUP BY
+        faultCauseCode
+            )tt
+            WHERE 1 = 1
+        <if test="partDrawingNo != '' and partDrawingNo!= null and partDrawingNo.textType != '' and partDrawingNo.textType != null and engineerName.textType == '0'.toString()">
+            AND partDrawingNo = #{partDrawingNo.value}
+        </if>
+        <if test="partDrawingNo != '' and partDrawingNo!= null and partDrawingNo.textType != '' and partDrawingNo.textType != null and engineerName.textType == '1'.toString()">
+            AND partDrawingNo LIKE CONCAT('%',#{partDrawingNo.value},'%')
+        </if>
+        <if test="partDrawingNo != '' and partDrawingNo!= null and partDrawingNo.textType != '' and partDrawingNo.textType != null and engineerName.textType == '2'.toString()">
+            AND partDrawingNo &lt;&gt; #{partDrawingNo.value}
+        </if>
+        <if test="describedDrawingNo != '' and describedDrawingNo!= null and describedDrawingNo.textType != '' and describedDrawingNo.textType != null and describedDrawingNo.textType == '0'.toString()">
+            AND describedDrawingNo = #{describedDrawingNo.value}
+        </if>
+        <if test="describedDrawingNo != '' and describedDrawingNo!= null and describedDrawingNo.textType != '' and describedDrawingNo.textType != null and describedDrawingNo.textType == '1'.toString()">
+            AND describedDrawingNo LIKE CONCAT('%',#{describedDrawingNo.value},'%')
+        </if>
+        <if test="describedDrawingNo != '' and describedDrawingNo!= null and describedDrawingNo.textType != '' and describedDrawingNo.textType != null and describedDrawingNo.textType == '2'.toString()">
+            AND describedDrawingNo &lt;&gt; #{describedDrawingNo.value}
+        </if>
+        <if test="repairNum != '' and repairNum!= null and repairNum.numberType != '' and repairNum.numberType != null">
+            AND repairNum ${repairNum.numberType} 0+#{repairNum.value}+0
+        </if>
+        <if test="replaceNum != '' and replaceNum!= null and replaceNum.numberType != '' and replaceNum.numberType != null">
+            AND replaceNum ${replaceNum.numberType} 0+#{replaceNum.value}+0
+        </if>
+        <if test="repairNum != '' and repairNum!= null and repairNum.sort != '' and repairNum.sort != null">
+            ORDER BY 0+repairNum ${repairNum.sort}
+        </if>
+        <if test="replaceNum != '' and replaceNum!= null and replaceNum.sort != '' and replaceNum.sort != null">
+            ORDER BY 0+replaceNum ${replaceNum.sort}
+        </if>
+        <if test="repairNum.sort == '' and replaceNum.sort == ''">
+            ORDER BY partDrawingNo DESC
+        </if>
+    </select>
+
+    <select id="selectPartByFaultCause" parameterType ="utry.data.modular.technicalQuality.dto.PieChartQueryDTO" resultType="utry.data.modular.technicalQuality.dto.PieChartDTO">
+        SELECT tt.* FROM(SELECT
+        partDrawingNo,
+        describedDrawingNo,
+        sum(type = 1) AS repairNum,
+        sum(type = 2) AS replaceNum,
+        productModel,
+        dispatchingTime,
+        productTypeCode,
+        productCategoryCode,
+        faultCauseCode,
+        finishTime,
+        repairEligible,
+        systemState,
+        dispatchingSource
+        FROM
+        (
+        SELECT
+        t2.serviceType,
+        t2.productModel,
+        t2.dispatchingTime,
+        t2.productTypeCode,
+        t2.productCategoryCode,
+        t2.finishTime,
+        t2.repairEligible,
+        t2.systemState,
+        t2.dispatchingSource,
+        t1.partDrawingNo,
+        t1.describedDrawingNo,
+        t1.faultCauseCode,
+        1 AS type
+        FROM
+        t_region_repair_part t1
+        LEFT JOIN t_region_dispatching_detail t2 ON t1.dispatchingOrder = t2.dispatchingOrder
+        UNION ALL
+        SELECT
+        t4.serviceType,
+        t4.productModel,
+        t4.dispatchingTime,
+        t4.productTypeCode,
+        t4.productCategoryCode,
+        t4.finishTime,
+        t4.repairEligible,
+        t4.systemState,
+        t4.dispatchingSource,
+        t3.partDrawingNo,
+        t3.describedDrawingNo,
+        t3.faultCauseCode,
+        2 AS type
+        FROM
+        t_region_replace_part t3
+        LEFT JOIN t_region_dispatching_detail t4 ON t3.dispatchingOrder = t4.dispatchingOrder
+        ) t
+        WHERE
+        serviceType IN ("非上门维修", "维修")
+        AND repairEligible IS NOT NULL
+        AND systemState NOT IN (
+        '已作废',
+        '已关闭',
+        '申请作废'
+        )
+        AND dispatchingSource NOT IN (
+        '自接',
+        '营销中心',
+        '前置渠道'
+        )
+        <if test="startTime != '' and startTime != null">
+            AND dispatchingTime &gt;= #{startTime}
+        </if>
+        <if test="endTime != '' and endTime != null">
+            AND dispatchingTime &lt;= #{endTime}
+        </if>
+        <if test="(list != null and list.size > 0) or (modelList != null and modelList.size > 0 ) or (productCategoryList != null and productCategoryList.size > 0)">
+            AND( 1=2
+            <if test="list != null and list.size > 0">
+                OR productTypeCode IN
+                <foreach collection="list" item="productTypeCode" open="(" separator="," close=")">
+                    #{productTypeCode}
+                </foreach>
+            </if>
+            <if test="modelList != null and modelList.size > 0">
+                OR productModel IN
+                <foreach collection="modelList" item="productModel" open="(" separator="," close=")">
+                    #{productModel}
+                </foreach>
+            </if>
+            <if test="productCategoryList != null and productCategoryList.size > 0">
+                OR productCategoryCode IN
+                <foreach collection="productCategoryList" item="productCategoryCode" open="(" separator="," close=")">
+                    #{productCategoryCode}
+                </foreach>
+            </if>
+            )
+        </if>
+        <if test="faultCauseCode != '' and faultCauseCode != null">
+            AND faultCauseCode = #{faultCauseCode}
+        </if>
+        GROUP BY
+        partDrawingNo
+        )tt
+        WHERE 1 = 1
+        <if test="partDrawingNo != '' and partDrawingNo!= null and partDrawingNo.textType != '' and partDrawingNo.textType != null and engineerName.textType == '0'.toString()">
+            AND partDrawingNo = #{partDrawingNo.value}
+        </if>
+        <if test="partDrawingNo != '' and partDrawingNo!= null and partDrawingNo.textType != '' and partDrawingNo.textType != null and engineerName.textType == '1'.toString()">
+            AND partDrawingNo LIKE CONCAT('%',#{partDrawingNo.value},'%')
+        </if>
+        <if test="partDrawingNo != '' and partDrawingNo!= null and partDrawingNo.textType != '' and partDrawingNo.textType != null and engineerName.textType == '2'.toString()">
+            AND partDrawingNo &lt;&gt; #{partDrawingNo.value}
+        </if>
+        <if test="describedDrawingNo != '' and describedDrawingNo!= null and describedDrawingNo.textType != '' and describedDrawingNo.textType != null and describedDrawingNo.textType == '0'.toString()">
+            AND describedDrawingNo = #{describedDrawingNo.value}
+        </if>
+        <if test="describedDrawingNo != '' and describedDrawingNo!= null and describedDrawingNo.textType != '' and describedDrawingNo.textType != null and describedDrawingNo.textType == '1'.toString()">
+            AND describedDrawingNo LIKE CONCAT('%',#{describedDrawingNo.value},'%')
+        </if>
+        <if test="describedDrawingNo != '' and describedDrawingNo!= null and describedDrawingNo.textType != '' and describedDrawingNo.textType != null and describedDrawingNo.textType == '2'.toString()">
+            AND describedDrawingNo &lt;&gt; #{describedDrawingNo.value}
+        </if>
+        <if test="repairNum != '' and repairNum!= null and repairNum.numberType != '' and repairNum.numberType != null">
+            AND repairNum ${repairNum.numberType} 0+#{repairNum.value}+0
+        </if>
+        <if test="replaceNum != '' and replaceNum!= null and replaceNum.numberType != '' and replaceNum.numberType != null">
+            AND replaceNum ${replaceNum.numberType} 0+#{replaceNum.value}+0
+        </if>
+        <if test="repairNum != '' and repairNum!= null and repairNum.sort != '' and repairNum.sort != null">
+            ORDER BY 0+repairNum ${repairNum.sort}
+        </if>
+        <if test="replaceNum != '' and replaceNum!= null and replaceNum.sort != '' and replaceNum.sort != null">
+            ORDER BY 0+replaceNum ${replaceNum.sort}
+        </if>
+        <if test="repairNum.sort == '' and replaceNum.sort == ''">
+            ORDER BY partDrawingNo DESC
+        </if>
+    </select>
+
+    <select id="selectThreshold" resultType="java.lang.String">
+        SELECT
+            c.indicatorValue
+        FROM
+            t_target t
+                LEFT JOIN t_indicator_configuration c ON c.targetId  = t.id
+        WHERE t.businessCode = 'category'  AND c.indicatorCode='repairRate'
+          AND ifTarget = '1'
+        ORDER BY t.targetMonth DESC limit 1
+    </select>
+
+    <select id="exportRepairRateByYear" parameterType ="utry.data.modular.technicalQuality.dto.ExportConditionDTO" resultType="utry.data.modular.technicalQuality.dto.ExportRepairRateDTO">
+        SELECT tt.* FROM(SELECT
+        t.productType as productType,
+        CONCAT(CAST(0+CAST(IFNULL(ROUND(t.eligible / t.total*100,2 ),0) AS CHAR)AS CHAR),'%') AS repairRate,
+        t.productTypeCode AS productTypeCode,
+        t.productCategory AS productCategory,
+        t.productCategoryCode AS productCategoryCode,
+        t.eligible AS eligible,
+        t.total AS total
+        FROM
+        (
+        SELECT
+        a.productType,
+        a.productTypeCode,
+        a.productCategory,
+        a.productCategoryCode,
+        COUNT(a.dispatchingOrder) AS total,
+        SUM(
+        a.repairEligible
+        ) AS eligible
+        FROM
+        t_region_dispatching_detail a
+        WHERE a.serviceType IN ("非上门维修","维修") AND a.repairEligible IS NOT NULL AND a.systemState NOT IN ('已作废','已关闭','申请作废')
+        AND a.dispatchingSource NOT IN ('自接','营销中心','前置渠道')
+        <if test="(list != null and list.size > 0) or (modelList != null and modelList.size > 0 ) or (productCategoryList != null and productCategoryList.size > 0)">
+            AND( 1=2
+            <if test="list != null and list.size > 0">
+                OR a.productTypeCode IN
+                <foreach collection="list" item="productTypeCode" open="(" separator="," close=")">
+                    #{productTypeCode}
+                </foreach>
+            </if>
+            <if test="modelList != null and modelList.size > 0">
+                OR a.productModel IN
+                <foreach collection="modelList" item="productModel" open="(" separator="," close=")">
+                    #{productModel}
+                </foreach>
+            </if>
+            <if test="productCategoryList != null and productCategoryList.size > 0">
+                OR a.productCategoryCode IN
+                <foreach collection="productCategoryList" item="productCategoryCode" open="(" separator="," close=")">
+                    #{productCategoryCode}
+                </foreach>
+            </if>
+            )
+        </if>
+        <if test="startTime != '' and startTime != null">
+            AND a.dispatchingTime &gt;= #{startTime}
+        </if>
+        <if test="endTime != '' and endTime != null">
+            AND a.dispatchingTime &lt;= #{endTime}
+        </if>
+        GROUP BY a.productTypeCode
+        ) t
+        ) tt
+        <if test="number > 0">
+            LIMIT #{number}
+        </if>
+    </select>
+
+    <select id="exportRepairRateByMonth" parameterType ="utry.data.modular.technicalQuality.dto.ExportConditionDTO" resultType="utry.data.modular.technicalQuality.dto.ExportRepairRateByMonthDTO">
+        SELECT
+        CONCAT(CAST(0+CAST(IFNULL(ROUND(t.eligible / t.total*100,2 ),0) AS CHAR)AS CHAR),'%') AS repairRate,
+        SUBSTRING_INDEX(t.dispatchingTime, '-',2) AS `time`
+        FROM
+        (
+        SELECT
+        a.dispatchingTime,
+        COUNT(a.dispatchingOrder) AS total,
+        SUM(
+        a.repairEligible
+        ) AS eligible
+        FROM
+        t_region_dispatching_detail a
+        WHERE a.serviceType IN ("非上门维修","维修") AND a.repairEligible IS NOT NULL AND a.systemState NOT IN ('已作废','已关闭','申请作废')
+        AND a.dispatchingSource NOT IN ('自接','营销中心','前置渠道')
+        <if test="(list != null and list.size > 0) or (modelList != null and modelList.size > 0 ) or (productCategoryList != null and productCategoryList.size > 0)">
+            AND( 1=2
+            <if test="list != null and list.size > 0">
+                OR a.productTypeCode IN
+                <foreach collection="list" item="productTypeCode" open="(" separator="," close=")">
+                    #{productTypeCode}
+                </foreach>
+            </if>
+            <if test="modelList != null and modelList.size > 0">
+                OR a.productModel IN
+                <foreach collection="modelList" item="productModel" open="(" separator="," close=")">
+                    #{productModel}
+                </foreach>
+            </if>
+            <if test="productCategoryList != null and productCategoryList.size > 0">
+                OR a.productCategoryCode IN
+                <foreach collection="productCategoryList" item="productCategoryCode" open="(" separator="," close=")">
+                    #{productCategoryCode}
+                </foreach>
+            </if>
+            )
+        </if>
+        <if test="startTime != '' and startTime != null">
+            AND a.dispatchingTime &gt;= #{startTime}
+        </if>
+        <if test="endTime != '' and endTime != null">
+            AND a.dispatchingTime &lt;= #{endTime}
+        </if>
+        <if test="productTypeCode != '' and productTypeCode != null">
+            AND a.productTypeCode = #{productTypeCode}
+        </if>
+        AND a.dispatchingTime IS NOT NULL
+        GROUP BY
+        SUBSTRING_INDEX(a.dispatchingTime, '-',2)
+        ) t
+    </select>
+    <select id="exportServiceList" parameterType ="utry.data.modular.technicalQuality.dto.RepairRateQueryDTO" resultType="utry.data.modular.technicalQuality.dto.RepairRateDTO">
+        SELECT tt.*
+        FROM
+        (
+        SELECT
+        CASE
+        WHEN a.systemState="已上门" AND a.pendingState="挂单" THEN "已挂单"
+        WHEN a.systemState="已上门" AND a.pendingState="解挂" THEN "已解挂"
+        ELSE
+        a.systemState
+        END AS systemState,
+        CASE
+        WHEN a.systemState="已上门" AND a.pendingState="挂单" THEN TIMESTAMPDIFF(SECOND,a.updateTime,NOW())
+        WHEN a.systemState="已上门" AND a.pendingState="解挂" THEN TIMESTAMPDIFF(SECOND,a.updateTime,NOW())
+        WHEN a.systemState="已上门" AND a.pendingState IS NULL THEN TIMESTAMPDIFF(SECOND,a.updateTime,NOW())
+        ELSE
+        NULL
+        END AS time,
+        CASE
+        WHEN a.serviceType= '维修' AND a.visitTime IS NOT NULL THEN 1
+        WHEN a.serviceType= '非上门维修' THEN 1
+        ELSE
+        0
+        END
+        +IFNULL(a.towUp,0) AS visitsNumber,
+        a.dispatchingOrder,
+        a.engineerName,
+        a.storeName,
+        a.productCategory,
+        a.dispatchingTime,
+        a.appointmentTime,
+        a.finishTime,
+        a.accountingArea,
+        a.repairEligible,
+        a.provinces AS area,
+        a.serviceType,
+        TIMESTAMPDIFF(
+        SECOND,
+        a.dispatchingTime,
+        IFNULL(a.TATFinishTime,NOW())
+        ) AS turnoverTime
+        FROM t_region_dispatching_detail a
+        WHERE a.serviceType IN ("非上门维修", "维修")
+        AND a.systemState IN ('已上门','已完成','已提交')
+        AND a.dispatchingSource NOT IN (
+        '自接',
+        '营销中心',
+        '前置渠道'
+        )
+        <if test="(list != null and list.size > 0) or (modelList != null and modelList.size > 0 ) or (productCategoryList != null and productCategoryList.size > 0)">
+            AND( 1=2
+            <if test="list != null and list.size > 0">
+                OR a.productTypeCode IN
+                <foreach collection="list" item="productTypeCode" open="(" separator="," close=")">
+                    #{productTypeCode}
+                </foreach>
+            </if>
+            <if test="modelList != null and modelList.size > 0">
+                OR a.productModel IN
+                <foreach collection="modelList" item="productModel" open="(" separator="," close=")">
+                    #{productModel}
+                </foreach>
+            </if>
+            <if test="productCategoryList != null and productCategoryList.size > 0">
+                OR a.productCategoryCode IN
+                <foreach collection="productCategoryList" item="productCategoryCode" open="(" separator="," close=")">
+                    #{productCategoryCode}
+                </foreach>
+            </if>
+            )
+        </if>
+        <if test="startTime != '' and startTime != null">
+            AND a.dispatchingTime &gt;= #{startTime}
+        </if>
+        <if test="endTime != '' and endTime != null">
+            AND a.dispatchingTime &lt;= #{endTime}
+        </if>
+        )tt
+        WHERE 1 = 1
+        <if test="ifException != '' and ifException!= null and ifException != '-1'.toString()">
+            AND if(tt.serviceType = '维修',tt.visitsNumber &gt; 2,tt.visitsNumber &gt;= 2)
+        </if>
+        <if test="dispatchingOrder != '' and dispatchingOrder!= null and dispatchingOrder.textType != '' and dispatchingOrder.textType != null and dispatchingOrder.textType == '0'.toString()">
+            AND tt.dispatchingOrder = #{dispatchingOrder.value}
+        </if>
+        <if test="dispatchingOrder != '' and dispatchingOrder!= null and dispatchingOrder.textType != '' and dispatchingOrder.textType != null and dispatchingOrder.textType == '1'.toString()">
+            AND tt.dispatchingOrder LIKE CONCAT('%',#{dispatchingOrder.value},'%')
+        </if>
+        <if test="dispatchingOrder != '' and dispatchingOrder!= null and dispatchingOrder.textType != '' and dispatchingOrder.textType != null and dispatchingOrder.textType == '2'.toString()">
+            AND tt.dispatchingOrder &lt;&gt; #{dispatchingOrder.value}
+        </if>
+        <if test="storeName != '' and storeName!= null and storeName.textType != '' and storeName.textType != null and storeName.textType == '0'.toString()">
+            AND tt.storeName = #{storeName.value}
+        </if>
+        <if test="storeName != '' and storeName!= null and storeName.textType != '' and storeName.textType != null and storeName.textType == '1'.toString()">
+            AND tt.storeName LIKE CONCAT('%',#{storeName.value},'%')
+        </if>
+        <if test="storeName != '' and storeName!= null and storeName.textType != '' and storeName.textType != null and storeName.textType == '2'.toString()">
+            AND tt.storeName &lt;&gt; #{storeName.value}
+        </if>
+        <if test="engineerName != '' and engineerName!= null and engineerName.textType != '' and engineerName.textType != null and engineerName.textType == '0'.toString()">
+            AND tt.engineerName = #{engineerName.value}
+        </if>
+        <if test="engineerName != '' and engineerName!= null and engineerName.textType != '' and engineerName.textType != null and engineerName.textType == '1'.toString()">
+            AND tt.engineerName LIKE CONCAT('%',#{engineerName.value},'%')
+        </if>
+        <if test="engineerName != '' and engineerName!= null and engineerName.textType != '' and engineerName.textType != null and engineerName.textType == '2'.toString()">
+            AND tt.engineerName &lt;&gt; #{engineerName.value}
+        </if>
+        <if test="productCategory != '' and productCategory!= null and productCategory.textType != '' and productCategory.textType != null and productCategory.textType == '0'.toString()">
+            AND tt.productCategory = #{productCategory.value}
+        </if>
+        <if test="productCategory != '' and productCategory!= null and productCategory.textType != '' and productCategory.textType != null and productCategory.textType == '1'.toString()">
+            AND tt.productCategory LIKE CONCAT('%',#{productCategory.value},'%')
+        </if>
+        <if test="productCategory != '' and productCategory!= null and productCategory.textType != '' and productCategory.textType != null and productCategory.textType == '2'.toString()">
+            AND tt.productCategory &lt;&gt; #{productCategory.value}
+        </if>
+        <if test="accountingArea != '' and accountingArea!= null and accountingArea.textType != '' and accountingArea.textType != null and accountingArea.textType == '0'.toString()">
+            AND tt.accountingArea = #{accountingArea.value}
+        </if>
+        <if test="accountingArea != '' and accountingArea!= null and accountingArea.textType != '' and accountingArea.textType != null and accountingArea.textType == '1'.toString()">
+            AND tt.accountingArea LIKE CONCAT('%',#{accountingArea.value},'%')
+        </if>
+        <if test="accountingArea != '' and accountingArea!= null and accountingArea.textType != '' and accountingArea.textType != null and accountingArea.textType == '2'.toString()">
+            AND tt.accountingArea &lt;&gt; #{accountingArea.value}
+        </if>
+        <if test="area != '' and area!= null and area.textType != '' and area.textType != null and area.textType == '0'.toString()">
+            AND tt.area = #{area.value}
+        </if>
+        <if test="area != '' and area!= null and area.textType != '' and area.textType != null and area.textType == '1'.toString()">
+            AND tt.area LIKE CONCAT('%',#{area.value},'%')
+        </if>
+        <if test="area != '' and area!= null and area.textType != '' and area.textType != null and area.textType == '2'.toString()">
+            AND tt.area &lt;&gt; #{area.value}
+        </if>
+        <if test="serviceType != '' and serviceType!= null and serviceType.textType != '' and serviceType.textType != null and serviceType.textType == '0'.toString()">
+            AND tt.serviceType = #{serviceType.value}
+        </if>
+        <if test="serviceType != '' and serviceType!= null and serviceType.textType != '' and serviceType.textType != null and serviceType.textType == '1'.toString()">
+            AND tt.serviceType LIKE CONCAT('%',#{serviceType.value},'%')
+        </if>
+        <if test="serviceType != '' and serviceType!= null and serviceType.textType != '' and serviceType.textType != null and serviceType.textType == '2'.toString()">
+            AND tt.serviceType &lt;&gt; #{serviceType.value}
+        </if>
+        <if test="systemState != '' and systemState!= null and systemState.textType != '' and systemState.textType != null and systemState.textType == '0'.toString()">
+            AND tt.systemState = #{systemState.value}
+        </if>
+        <if test="systemState != '' and systemState!= null and systemState.textType != '' and systemState.textType != null and systemState.textType == '1'.toString()">
+            AND tt.systemState LIKE CONCAT('%',#{systemState.value},'%')
+        </if>
+        <if test="systemState != '' and systemState!= null and systemState.textType != '' and systemState.textType != null and systemState.textType == '2'.toString()">
+            AND tt.systemState &lt;&gt; #{systemState.value}
+        </if>
+        <if test="dispatchingTime != null and dispatchingTime.type != '' and dispatchingTime.type != null and dispatchingTime.type=='0'.toString()">
+            AND tt.dispatchingTime <![CDATA[ >= ]]> #{dispatchingTime.startDate} AND tt.dispatchingTime <![CDATA[ <= ]]> #{dispatchingTime.endDate}
+        </if>
+        <if test="dispatchingTime != null and dispatchingTime.type != '' and dispatchingTime.type != null and dispatchingTime.type=='1'.toString()">
+            AND tt.dispatchingTime <![CDATA[ <= ]]> #{dispatchingTime.startDate}
+        </if>
+        <if test="dispatchingTime != null and dispatchingTime.type != '' and dispatchingTime.type != null and dispatchingTime.type=='2'.toString()">
+            AND tt.dispatchingTime <![CDATA[ >= ]]> #{dispatchingTime.startDate}
+        </if>
+        <if test="dispatchingTime != null and dispatchingTime.type != '' and dispatchingTime.type != null and dispatchingTime.type=='3'.toString()">
+            AND tt.dispatchingTime = #{dispatchingTime.startDate}
+        </if>
+        <if test="appointmentTime != null and appointmentTime.type != '' and appointmentTime.type != null and appointmentTime.type=='0'.toString()">
+            AND tt.appointmentTime <![CDATA[ >= ]]> #{appointmentTime.startDate} AND tt.appointmentTime <![CDATA[ <= ]]> #{appointmentTime.endDate}
+        </if>
+        <if test="appointmentTime != null and appointmentTime.type != '' and appointmentTime.type != null and appointmentTime.type=='1'.toString()">
+            AND tt.appointmentTime <![CDATA[ <= ]]> #{appointmentTime.startDate}
+        </if>
+        <if test="appointmentTime != null and appointmentTime.type != '' and appointmentTime.type != null and appointmentTime.type=='2'.toString()">
+            AND tt.appointmentTime <![CDATA[ >= ]]> #{appointmentTime.startDate}
+        </if>
+        <if test="appointmentTime != null and appointmentTime.type != '' and appointmentTime.type != null and appointmentTime.type=='3'.toString()">
+            AND tt.appointmentTime = #{appointmentTime.startDate}
+        </if>
+        <if test="finishTime != '' and finishTime!= null and finishTime.numberType != '' and finishTime.numberType != null">
+            AND tt.finishTime ${finishTime.numberType} #{finishTime.value}+0
+        </if>
+        <if test="turnoverTime != '' and turnoverTime!= null and turnoverTime.numberType != '' and turnoverTime.numberType != null">
+            AND tt.turnoverTime/3600 ${turnoverTime.numberType} #{turnoverTime.value}+0
+        </if>
+        <if test="visitsNumber != '' and visitsNumber!= null and visitsNumber.numberType != '' and visitsNumber.numberType != null">
+            AND tt.visitsNumber ${visitsNumber.numberType} #{visitsNumber.value}+0
+        </if>
+        <if test="dispatchingTime != '' and dispatchingTime!= null and dispatchingTime.sort != '' and dispatchingTime.sort != null">
+            ORDER BY tt.dispatchingTime ${dispatchingTime.sort}
+        </if>
+        <if test="appointmentTime != '' and appointmentTime!= null and appointmentTime.sort != '' and appointmentTime.sort != null">
+            ORDER BY tt.appointmentTime ${appointmentTime.sort}
+        </if>
+        <if test="finishTime != '' and finishTime!= null and finishTime.sort != '' and finishTime.sort != null">
+            ORDER BY tt.finishTime ${finishTime.sort}
+        </if>
+        <if test="turnoverTime != '' and turnoverTime!= null and turnoverTime.sort != '' and turnoverTime.sort != null">
+            ORDER BY tt.turnoverTime ${turnoverTime.sort}
+        </if>
+        <if test="visitsNumber != '' and visitsNumber!= null and visitsNumber.sort != '' and visitsNumber.sort != null">
+            ORDER BY 0+tt.visitsNumber ${visitsNumber.sort}
+        </if>
+        <if test="dispatchingTime.sort == '' and appointmentTime.sort == '' and finishTime.sort == '' and turnoverTime.sort == '' and visitsNumber.sort == ''">
+            ORDER BY tt.dispatchingTime DESC
+        </if>
+    </select>
+
+    <select id="getApprovalDurationAvgTime" parameterType ="utry.data.modular.technicalQuality.dto.CalculateDTO" resultType="java.lang.String">
+        SELECT
+        CONCAT(IFNULL(
+        ROUND((SUM(t.time) / count(*)), 2),
+        0
+        ),'') AS TIME
+        FROM
+        (
+        SELECT
+        TIMESTAMPDIFF(
+        SECOND,
+        submitTime,
+        IF(systemState="已提交",NOW(),auditFinishTime)
+        ) AS `time`,
+        manageNumber,
+        systemState,
+        submitTime,
+        auditFinishTime,
+        productCategoryCode,
+        productTypeCode,
+        documentDate,
+        productModel
+        FROM
+        t_quality_feedback
+        ) t
+        WHERE
+        t.submitTime IS NOT NULL AND t.submitTime != ''
+        <if test="(list != null and list.size > 0) or (modelList != null and modelList.size > 0 ) or (productCategoryList != null and productCategoryList.size > 0)">
+            AND( 1=2
+            <if test="list != null and list.size > 0">
+                OR t.productTypeCode IN
+                <foreach collection="list" item="productTypeCode" open="(" separator="," close=")">
+                    #{productTypeCode}
+                </foreach>
+            </if>
+            <if test="modelList != null and modelList.size > 0">
+                OR t.productModel IN
+                <foreach collection="modelList" item="productModel" open="(" separator="," close=")">
+                    #{productModel}
+                </foreach>
+            </if>
+            <if test="productCategoryList != null and productCategoryList.size > 0">
+                OR t.productCategoryCode IN
+                <foreach collection="productCategoryList" item="productCategoryCode" open="(" separator="," close=")">
+                    #{productCategoryCode}
+                </foreach>
+            </if>
+            )
+        </if>
+        <if test="startTime != '' and startTime != null">
+            AND t.documentDate &gt;= #{startTime}
+        </if>
+        <if test="endTime != '' and endTime != null">
+            AND  t.documentDate &lt;= #{endTime}
+        </if>
+    </select>
+
+    <select id="selectAllUserType" parameterType ="java.lang.String" resultType="java.lang.String">
+        SELECT typeId AS productTypeCode FROM t_user_type GROUP BY typeId
+    </select>
+
+    <select id="selectUserMonthIndicator" resultType="utry.data.modular.baseConfig.dto.IndicatorUserDTO">
+        SELECT
+        c.id,c.indicatorCode,c.indicatorName,c.indicatorValue
+        FROM
+        t_target t
+        LEFT JOIN t_indicator_configuration c ON c.targetId  = t.id
+        WHERE t.businessCode = 'category' AND t.targetMonth = SUBSTRING_INDEX(#{operationTime}, '-',2)
+        AND ifTarget = '0' AND c.indicatorUserId=#{accountId}
+        AND c.indicatorCode= 'repairRate'
+    </select>
+
+    <select id="selectDetailApprovalDurationTime" resultType="utry.data.modular.technicalQuality.dto.ApprovalDurationTimeDTO">
+        SELECT
+            submitTime,
+            auditTime,
+            closeOrderTime,
+            reviewTime,
+            manageNumber
+        FROM
+            t_quality_feedback
+        WHERE
+            manageNumber = #{manageNumber}
+    </select>
+
+    <select id="selectCategoryTemplate" resultType="utry.data.modular.technicalQuality.dto.DistrictTemplateQueryDTO">
+        SELECT
+            productCategoryCode AS code,
+            center AS name
+        FROM
+            t_product_category
+        WHERE
+            systemState = "已启用" AND center IN ('AP上海','WMHZ')
+    </select>
+
+    <select id="selectTypeTemplate" resultType="utry.data.modular.technicalQuality.dto.DistrictTemplateQueryDTO">
+        SELECT
+            t.productTypeCode AS code,
+            c.center AS name
+        FROM
+            t_product_type t
+                LEFT JOIN t_product_category c ON c.productCategoryCode = t.productCategoryCode
+        WHERE
+            t.systemState = "已启用" AND c.center IN ('AP上海','WMHZ') AND
+            c.systemState = "已启用"
+        GROUP BY t.productTypeCode
+    </select>
+</mapper>

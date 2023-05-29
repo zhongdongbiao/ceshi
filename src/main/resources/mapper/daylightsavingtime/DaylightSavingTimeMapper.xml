@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//ibatis.apache.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="utry.data.modular.daylightsavingtime.dao.DaylightSavingTimeMapper">
+    <insert id="saveDaylightSavingTime">
+        insert into t_daylight_saving_time(
+            daylight_saving_time_name,
+            daylight_saving_time_morning,
+            daylight_saving_time_afternoon,
+            is_enable)
+        values (
+                   #{daylightSavingTimeName,jdbcType=VARCHAR},
+                   #{daylightSavingTimeMorning,jdbcType=VARCHAR},
+                   #{daylightSavingTimeAfternoon,jdbcType=VARCHAR},
+                   #{isEnable,jdbcType=VARCHAR}
+               )
+    </insert>
+    <update id="updateDaylightSavingTime">
+            update t_daylight_saving_time
+                set daylight_saving_time_name=#{daylightSavingTimeName,jdbcType=VARCHAR},
+                    daylight_saving_time_morning=#{daylightSavingTimeMorning,jdbcType=VARCHAR},
+                    daylight_saving_time_afternoon=#{daylightSavingTimeAfternoon,jdbcType=VARCHAR},
+                    is_enable=#{isEnable,jdbcType=VARCHAR}
+              where id=#{id}
+    </update>
+    <delete id="deleteDaylightSavingTime">
+        delete from t_daylight_saving_time
+        where id in
+        <foreach collection="ids" index="index" item="id" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </delete>
+
+    <select id="selectDaylightSavingTimeByPage"
+            resultType="utry.data.modular.daylightsavingtime.dto.DaylightSavingTimeDto">
+        select  id,
+                daylight_saving_time_name daylightSavingTimeName,
+                daylight_saving_time_morning daylightSavingTimeMorning,
+                daylight_saving_time_afternoon daylightSavingTimeAfternoon,
+                is_enable isEnable
+        from t_daylight_saving_time
+        <where>
+            <if test="daylightSavingTimeName != null and daylightSavingTimeName!=''">
+               and daylight_saving_time_name like concat(concat('%',#{daylightSavingTimeName,jdbcType=VARCHAR}),'%')
+            </if>
+        </where>
+    </select>
+    <select id="selectDaylightSavingTimeTotalByPage" resultType="java.lang.Integer">
+        select count(0) from t_daylight_saving_time
+        <where>
+            <if test="daylightSavingTimeName != null and daylightSavingTimeName!=''">
+                and daylight_saving_time_name like concat(concat('%',#{daylightSavingTimeName,jdbcType=VARCHAR}),'%')
+            </if>
+        </where>
+    </select>
+    <select id="getDaylightSavingTimeInfo"
+            resultType="utry.data.modular.daylightsavingtime.model.DaylightSavingTime">
+        select  id,
+        daylight_saving_time_name daylightSavingTimeName,
+        daylight_saving_time_morning daylightSavingTimeMorning,
+        daylight_saving_time_afternoon daylightSavingTimeAfternoon,
+        is_enable isEnable
+        from t_daylight_saving_time
+        <where>
+            <if test="isEnable != null and isEnable!=''">
+                and is_enable =#{isEnable}
+            </if>
+        </where>
+
+    </select>
+</mapper>

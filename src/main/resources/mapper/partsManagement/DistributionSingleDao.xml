@@ -1,0 +1,82 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="utry.data.modular.partsManagement.dao.DistributionSingleDao">
+    <!-- 开启二级缓存 -->
+    <cache eviction="LRU" flushInterval="300000" readOnly="true" size="1024"></cache>
+
+    <insert id="insertDistributionSingle">
+        <if test="distributionSubsidiary != null and distributionSubsidiary != '' and distributionSubsidiary.size>0 ">
+            insert into t_distribution_subsidiary (distributionSingleNo,productModel,partCode,partName,partDrawingNo,location,
+            orderDate,orderType,warehouseKeeper,distribution,associatedOrderNumber,applyNumber,distributionNumber)
+            VALUES
+            <foreach collection="distributionSubsidiary" item="model" separator=",">
+                (#{distributionSingleNo},#{model.productModel},#{model.partCode},#{model.partName},
+                #{model.partDrawingNo},#{model.location},#{model.orderDate},#{model.orderType},#{model.warehouseKeeper},#{model.distribution},#{model.associatedOrderNumber},#{model.applyNumber},#{model.distributionNumber})
+            </foreach>
+            ;
+        </if>
+        insert into t_distribution_single (distributionSingleNo,distributionDate,serviceStoreNumber,systemState)
+        values (#{distributionSingleNo},#{distributionDate},#{serviceStoreNumber},#{systemState})
+    </insert>
+
+    <!--批量修改主表数-->
+    <update id="updateOrder">
+        <foreach collection="orderValue" item="item" index="index" open="" close="" separator=";">
+            update t_distribution_single set associatedOrderNumber = #{item.associatedOrderNumber}
+            where distributionSingleNo=#{item.distributionSingleNo}
+        </foreach>
+    </update>
+
+    <!--根据订单号获取配货单数据-->
+    <select id="getDistributionSingleDTO"
+            resultType="utry.data.modular.partsManagement.dto.DistributionSingleDTO">
+        select tds.distributionSingleNo,tds.distributionDate,tds.serviceStoreNumber,tds.systemState from t_distribution_single tds
+        left join t_distribution_subsidiary tdss on tdss.distributionSingleNo=tds.distributionSingleNo where tdss.associatedOrderNumber=#{associatedOrderNumber}
+        group by tds.distributionSingleNo
+    </select>
+
+    <!--根据配货单号获取配货明细-->
+    <select id="getDistributionSubsidiary"
+            resultType="utry.data.modular.partsManagement.model.DistributionSubsidiary">
+        select distributionSingleNo,partName,partDrawingNo,location,substring(orderDate,1,10) as orderDate,orderType,
+        warehouseKeeper,distribution,associatedOrderNumber,partCode,partName,applyNumber,distributionNumber from t_distribution_subsidiary where distributionSingleNo=#{distributionSingleNo} and associatedOrderNumber=#{associatedOrderNumber}
+        group by distributionSingleNo,partDrawingNo,associatedOrderNumber
+    </select>
+
+    <!--根据时间段获取配货单到作业订单的总时长-->
+    <select id="getAllTime" resultType="java.lang.Integer">
+        select IFNULL(sum(TIMESTAMPDIFF(HOUR,documentDate,distributionDate)),0) from (
+        select tod.documentDate,tds.distributionDate from (select distributionDate,distributionSingleNo from t_distribution_single
+        where substring(distributionDate,1,10)  <![CDATA[ >= ]]>  #{startDate} and substring(distributionDate,1,10)  <![CDATA[ <= ]]> #{endDate}
+        and distributionSingleNo  not  in (select distributionSingleNo from t_distribution_list_cancel_detail where IFNULL(goodNumber,0)
+        =cancelDstributionOrderNumber) GROUP BY distributionSingleNo ) tds
+        LEFT JOIN t_distribution_subsidiary tdsd on tdsd.distributionSingleNo=tds.distributionSingleNo
+        LEFT JOIN t_order_detail tod on tod.documentNumber=tdsd.associatedOrderNumber
+        GROUP BY tds.distributionSingleNo) list
+</select>
+
+    <!--根据时间段获取配货单总数量-->
+    <select id="getAllCount" resultType="java.lang.Integer">
+        select count(1) from t_distribution_single
+        where substring(distributionDate,1,10) <![CDATA[ >= ]]> #{startDate}
+        and substring(distributionDate,1,10) <![CDATA[ <= ]]> #{endDate}
+    </select>
+
+    <!--获取实时的配货订单数-->
+    <select id="distributionOrderCount" resultType="java.lang.Integer">
+        select count(1) from (
+        select 1 from t_distribution_subsidiary where  associatedOrderNumber in(select documentNumber from t_part_order where state='0' GROUP BY documentNumber)
+		GROUP BY distributionSingleNo) list
+    </select>
+
+    <!--获取附表中关联的订单号-->
+    <select id="getOrderValue" resultType="java.util.Map">
+        select distributionSingleNo,associatedOrderNumber from t_distribution_subsidiary GROUP BY distributionSingleNo
+    </select>
+    <select id="getOrderDetailFlag" resultType="java.lang.String">
+        select distributionSingleNo from  t_distribution_single where distributionSingleNo=#{singleNo} and serviceStoreNumber=#{serviceStoreNumber}
+    </select>
+
+
+</mapper>

@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//ibatis.apache.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="utry.data.modular.ccBoard.hotLineAgent.dao.HotOrderFollowProcessDao">
+
+    <resultMap id="HotOrderFollowProcessResultMap" type="utry.data.modular.ccBoard.hotLineAgent.model.HotOrderFollowProcess">
+        <id property="hotOrderFollowProcessId" column="hot_order_follow_process_id" jdbcType="BIGINT"/>
+        <result property="hotlineNumber" column="hotline_number" jdbcType="VARCHAR"/>
+        <result property="lastServiceAgentId" column="last_service_agent_id" jdbcType="BIGINT"/>
+        <result property="lastServiceAgentName" column="last_service_agent_name" jdbcType="VARCHAR"/>
+        <result property="lastServiceTime" column="last_service_time"/>
+        <result property="createTime" column="create_time"/>
+        <result property="updateTime" column="update_time"/>
+    </resultMap>
+
+    <!-- 插入热线服务单跟进流程信息 -->
+    <insert id="insert">
+        INSERT INTO t_cc_hot_order_follow_process
+        (
+        hot_order_follow_process_id,
+        hotline_number,
+        last_service_agent_id,
+        last_service_agent_name,
+        last_service_time,
+        create_time,
+        update_time
+        )
+        VALUES
+        (
+        #{hotOrderFollowProcessId},
+        #{hotlineNumber},
+        #{lastServiceAgentId},
+        #{lastServiceAgentName},
+        #{lastServiceTime},
+        #{createTime},
+        #{updateTime}
+        )
+    </insert>
+</mapper>

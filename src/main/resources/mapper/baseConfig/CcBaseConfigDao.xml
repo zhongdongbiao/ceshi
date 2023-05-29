@@ -1,0 +1,284 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="utry.data.modular.baseConfig.dao.CcBaseConfigDao">
+
+    <resultMap id="ccQueueDeptResultMap" type="utry.data.modular.baseConfig.model.CcQueueDept">
+        <result property="queueId" column="queueId"/>
+        <result property="queueName" column="queueName"/>
+        <result property="deptId" column="deptId"/>
+        <result property="deptName" column="deptName"/>
+        <result property="creationTime" column="creationTime"/>
+        <result property="updateTime" column="updateTime"/>
+    </resultMap>
+
+    <insert id="addCoreTarget" parameterType="utry.data.modular.baseConfig.model.CcCoreTarget">
+        INSERT INTO t_cc_core_target (ccCoreTargetId,
+                                      targetName,
+                                      targetMonth,
+                                      connRate,
+                                      creationTime,
+                                      updateTime)
+        VALUES (#{ccCoreTargetId}, #{targetName}, #{targetMonth}, #{connRate}, NOW(), NOW())
+
+    </insert>
+
+    <update id="updateCoreTarget">
+        UPDATE t_cc_core_target
+        <set>
+            updateTime = NOW(),
+            <if test="connRate != '' and connRate != null">
+                connRate = #{connRate}
+            </if>
+        </set>
+        WHERE
+        ccCoreTargetId = #{ccCoreTargetId}
+    </update>
+
+    <delete id="delCoreTarget">
+        DELETE
+        FROM t_cc_core_target
+        WHERE ccCoreTargetId = #{ccCoreTargetId}
+    </delete>
+
+
+    <select id="selectCoreTarget" parameterType="utry.data.modular.baseConfig.model.CcCoreTarget"
+            resultType="utry.data.modular.baseConfig.model.CcCoreTarget">
+        select ccCoreTargetId,
+        targetName,
+        targetMonth,
+        connRate,
+        DATE_FORMAT(creationTime, '%Y-%m-%d %H:%i:%s') as creationTime,
+        DATE_FORMAT(updateTime, '%Y-%m-%d %H:%i:%s')   as updateTime
+        from t_cc_core_target
+        <where>
+            <if test="targetMonth != '' and targetMonth!=null ">
+                and targetMonth = #{targetMonth}
+            </if>
+        </where>
+    </select>
+    <select id="selectBindingCoreTarget" resultType="utry.data.modular.baseConfig.model.CcCoreTarget">
+        select *
+        from t_cc_core_target
+        where targetMonth = #{targetMonth}
+          and ccCoreTargetId != #{ccCoreTargetId}
+    </select>
+    <select id="selectHumanResCoefByPage" resultType="utry.data.modular.baseConfig.model.HumanResCoef">
+        select humanResCoefId,jobNo,manPowerCoef,seats,
+                 DATE_FORMAT(creationTime, '%Y-%m-%d %H:%i:%s') as creationTime,
+                DATE_FORMAT(updateTime, '%Y-%m-%d %H:%i:%s')   as updateTime
+        from t_cc_human_resource_coefficient
+    </select>
+
+    <insert id="batchInsertHumanResCoef">
+        insert into t_cc_human_resource_coefficient (humanResCoefId,jobNo,manPowerCoef,creationTime,updateTime,
+        seats)
+        values
+        <foreach collection="list" item="item" separator=",">
+            (#{item.humanResCoefId},#{item.jobNo},#{item.manPowerCoef},NOW(),NOW(),#{item.seats})
+        </foreach>
+    </insert>
+
+    <update id="editHumanResCoef">
+        UPDATE t_cc_human_resource_coefficient
+        <set>
+            updateTime = NOW(),
+            <if test="manPowerCoef != '' and manPowerCoef != null">
+                manPowerCoef = #{manPowerCoef},
+            </if>
+            <if test="seats != '' and seats != null">
+                seats = #{seats}
+            </if>
+        </set>
+        WHERE
+        humanResCoefId = #{humanResCoefId}
+    </update>
+    <update id="editSeatTimeOut">
+        UPDATE t_cc_seat_status_reminder
+        <set>
+            updateTime = NOW(),
+            <if test="timeout != '' and timeout != null">
+                timeout = #{timeout}
+            </if>
+        </set>
+        WHERE
+        seatStatusId = #{seatStatusId}
+    </update>
+
+
+    <delete id="delHumanResCoef">
+        DELETE
+        FROM t_cc_human_resource_coefficient
+        WHERE humanResCoefId = #{humanResCoefId}
+    </delete>
+
+    <select id="selectAllSeatTimeOut" resultType="utry.data.modular.baseConfig.model.SeatStatusReminder">
+        select t.seatStatusId,
+               t.statusName,
+               t.timeout,
+               DATE_FORMAT(t.creationTime, '%Y-%m-%d %H:%i:%s') as creationTime,
+               DATE_FORMAT(t.updateTime, '%Y-%m-%d %H:%i:%s')   as updateTime
+        from t_cc_seat_status_reminder t
+    </select>
+    <select id="selectQueueBusinessIsBinding" resultType="java.lang.Integer">
+        select count(1)
+        from t_cc_queue_business
+        WHERE queueId = #{queueId}
+    </select>
+
+    <update id="updateQueueBusiness">
+        UPDATE t_cc_queue_business
+        <set>
+            updateTime = NOW(),
+            <if test="businessType != '' and businessType != null">
+                businessType = #{businessType}
+            </if>
+        </set>
+        WHERE
+        queueId = #{queueId}
+    </update>
+    <insert id="replaceIntoSeat">
+        replace
+        into t_cc_seat (id, userName,realName, extension, status, agentFromQueue, agentFromQueueName,departmentId,departmentName, creationTime, updateTime)
+        values (
+        #{id},
+        #{userName},
+        #{realName},
+        #{extension},
+        #{status},
+        #{agentFromQueue},
+        #{agentFromQueueName},
+        #{departmentId},
+        #{departmentName},
+        NOW(),
+        NOW()
+        )
+    </insert>
+
+
+    <insert id="insertQueueBusiness">
+        insert into t_cc_queue_business (queueId, businessType, creationTime, updateTime)
+        values (#{queueId}, #{businessType}, NOW(), NOW())
+    </insert>
+    <insert id="insertQueuedept">
+        replace into t_cc_queue_dept (queueId, queueName, deptId, deptName, creationTime, updateTime)
+        values (#{agentFromQueue}, #{agentFromQueueName}, #{departmentId}, #{departmentName}, NOW(), NOW())
+    </insert>
+
+
+    <select id="selectQueueBusinessByPage" resultType="com.alibaba.fastjson.JSONObject">
+        select t.queueId,
+               t.queueName,
+               t.deptName,
+               t.deptId,
+               tcqb.businessType,
+               DATE_FORMAT(tcqb.creationTime, '%Y-%m-%d %H:%i:%s') as creationTime,
+               DATE_FORMAT(tcqb.updateTime, '%Y-%m-%d %H:%i:%s')   as updateTime
+        from t_cc_queue_dept t
+                 left join t_cc_queue_business tcqb on t.queueId = tcqb.queueId
+    </select>
+
+    <!-- 根据年月获取目标10s率 -->
+    <select id="selectConnRateByTargetMonth" resultType="java.lang.Double">
+        SELECT connRate
+        FROM t_cc_core_target
+        WHERE targetMonth = #{yearMonth}
+    </select>
+
+    <!-- 根据队列id查询队列信息 -->
+    <select id="selectQueueDeptInfoByQueueId" resultMap="ccQueueDeptResultMap">
+        SELECT queueId,queueName,deptId,deptName,creationTime,updateTime
+        FROM t_cc_queue_dept
+        <where>
+            <if test="queueIdList != null and queueIdList.size() > 0">
+                queueId IN
+                <foreach collection="queueIdList" open="(" close=")" item="qId" separator=",">
+                    #{qId}
+                </foreach>
+            </if>
+        </where>
+        ORDER BY queueId
+    </select>
+    <select id="findBindByJobNo" resultType="java.lang.Integer">
+        select count(1)
+        from t_cc_human_resource_coefficient t
+        where t.jobNo = #{jobNo}
+    </select>
+    <select id="selectCoreTargetNotExitSelf" resultType="utry.data.modular.baseConfig.model.CcCoreTarget">
+        select *
+        from t_cc_core_target
+        <where>
+            <if test="targetMonth != '' and targetMonth!=null ">
+                and targetMonth = #{targetMonth}
+            </if>
+            <if test="ccCoreTargetId != '' and ccCoreTargetId!=null ">
+                and ccCoreTargetId != #{ccCoreTargetId}
+            </if>
+        </where>
+    </select>
+
+    <select id="getOverTime" resultType="java.util.HashMap">
+        SELECT
+            (
+                CASE
+
+                    WHEN t.statusName = '空闲' THEN
+                        'freeTimeout'
+                    WHEN t.statusName = '小休-休息' THEN
+                        'restTimeout'
+                    WHEN t.statusName = '小休-如厕' THEN
+                        'toiletTimeout'
+                    WHEN t.statusName = '小休-培训' THEN
+                        'trainTimeout'
+                    WHEN t.statusName = '话后处理' THEN
+                        'afterTimeout'
+                    WHEN t.statusName = '示忙-忙碌' THEN
+                        'busyTimeout' ELSE 'notExit'
+                    END
+                ) AS statusName,
+            t.timeout timeout
+        FROM
+            t_cc_seat_status_reminder t
+        WHERE
+            t.timeout IS NOT NULL
+    </select>
+
+    <!-- 根据队列id获取同级的所有队列id -->
+    <select id="selectSubQueueIdByQueueId" resultMap="ccQueueDeptResultMap">
+        SELECT
+            t1.deptId,
+            t1.deptName,
+            t1.queueId,
+            t1.queueName
+        FROM t_cc_queue_dept t1
+        LEFT JOIN t_cc_queue_business t2 ON t1.queueId = t2.queueId
+        WHERE deptId IN (
+            SELECT deptId
+            FROM t_cc_queue_dept
+            WHERE queueId IN
+            <foreach collection="queueId" open="(" close=")" item="qId" separator=",">
+                #{qId}
+            </foreach>
+        )
+        AND businessType = '2'
+        ORDER BY deptId, t1.queueId
+    </select>
+
+
+    <select id="getAllState" resultType="utry.data.modular.baseConfig.model.CCSeatInfo">
+        select id, userName,realName, extension, status, agentFromQueue, agentFromQueueName,departmentId,departmentName, creationTime, updateTime from t_cc_seat
+    </select>
+
+    <!-- 根据年月查询目标 -->
+    <select id="selectBatchConnRateByTargetMonth" resultType="utry.data.modular.baseConfig.model.CcCoreTarget">
+        SELECT targetMonth,connRate
+        FROM t_cc_core_target
+        WHERE targetMonth IN
+        <foreach collection="yearMonthList" open="(" close=")" item="yearMonth" separator=",">
+            #{yearMonth}
+        </foreach>
+        ORDER BY targetMonth
+    </select>
+
+
+</mapper>

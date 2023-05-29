@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="utry.data.modular.partsManagement.dao.FactoryDataDao">
+    <!-- 开启二级缓存 -->
+    <cache eviction="LRU" flushInterval="300000" readOnly="true" size="1024"></cache>
+
+    <insert id="insertFactoryData">
+        insert into t_factory_data (id,systemState,supplierCode,supplierName,factoryCode,factoryName,factoryShortName,
+         factoryType,provinces) values (REPLACE(UUID(), _utf8'-', _utf8''),#{systemState},#{supplierCode},#{supplierName},#{factoryCode},
+                                        #{factoryName},#{factoryShortName},#{factoryType},#{provinces});
+    </insert>
+
+    <delete id="batchDelete">
+        delete from t_factory_data
+    </delete>
+
+    <insert id="batchFactoryData" parameterType="java.util.List">
+        insert into t_factory_data (id,systemState,supplierCode,supplierName,factoryCode,factoryName,factoryShortName,
+        factoryType,provinces)
+        values
+        <foreach collection="list" item="item" separator=",">
+            (REPLACE(UUID(), _utf8'-', _utf8''),#{item.systemState},#{item.supplierCode},#{item.supplierName},#{item.factoryCode},
+            #{item.factoryName},#{item.factoryShortName},#{item.factoryType},#{item.provinces})
+        </foreach>
+    </insert>
+</mapper>

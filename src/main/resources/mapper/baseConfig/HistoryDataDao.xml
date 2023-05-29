@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="utry.data.modular.baseData.dao.HistoryDataDao">
+
+    <select id="getHistoryDisposable" resultType="utry.data.modular.baseData.dto.HistoriDataDto">
+        select * from test_copy limit 1234
+    </select>
+
+    <insert id="insertHistoryDisposable">
+        replace into test_copy2(
+        `id`,
+        `documentNo`,
+        `documentDate`,
+        `accountingCenterCode`,
+        `warehouseCode`,
+        `warehouseName`,
+        `partDrawingNo`,
+        `describedDrawingNo`,
+        `instructions`,
+        `accountingCenter`,
+        `systemState`
+        )
+        values
+        <foreach collection="list" item="detail" separator=",">
+            (
+            #{detail.id},
+            #{detail.documentNo},
+            #{detail.documentDate},
+            #{detail.accountingCenterCode},
+            #{detail.warehouseCode},
+            #{detail.warehouseName},
+            #{detail.partDrawingNo},
+            #{detail.describedDrawingNo},
+            #{detail.instructions},
+            #{detail.accountingCenter},
+            #{detail.systemState}
+            )
+        </foreach>
+    </insert>
+
+
+    <select id="getHistoryBybatch" resultType="utry.data.modular.baseData.dto.HistoriDataDto">
+        select * from test_copy2 t  where t.id between #{start} and #{end}
+    </select>
+
+</mapper>

@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//ibatis.apache.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="utry.data.modular.ccBoard.common.dao.DosCallCenterAgentMonitorDao">
+
+    <resultMap id="agentMonitorBoResultMap" type="utry.data.modular.ccBoard.common.bo.AgentMonitorBo">
+        <result property="time" column="time"/>
+        <result property="extension" column="extension"/>
+        <result property="realName" column="real_name"/>
+        <result property="agentFromQueue" column="agent_from_queue"/>
+        <result property="currentState" column="current_state"/>
+        <result property="currentStateDuration" column="current_state_duration"/>
+        <result property="incomingCalls" column="incoming_calls"/>
+        <result property="incomingCallConnections" column="incoming_call_connections"/>
+        <result property="incomingCallDuration" column="incoming_call_duration"/>
+        <result property="avgIncomingCallDuration" column="avg_incoming_call_duration"/>
+        <result property="incomingRingDuration" column="incoming_ring_duration"/>
+        <result property="callOutCount" column="call_out_count"/>
+        <result property="callOutConnections" column="call_out_connections"/>
+        <result property="callOutDuration" column="call_out_duration"/>
+        <result property="avgCallOutDuration" column="avg_call_out_duration"/>
+        <result property="avgCallOutRingDuration" column="avg_call_out_ring_duration"/>
+        <result property="totalCalls" column="total_calls"/>
+        <result property="freeDuration" column="free_duration"/>
+        <result property="afterDuration" column="after_duration"/>
+        <result property="toiletDuration" column="toilet_duration"/>
+        <result property="trainDuration" column="train_duration"/>
+        <result property="restDuration" column="rest_duration"/>
+        <result property="eatDuration" column="eat_duration"/>
+        <result property="dutyDuration" column="duty_duration"/>
+        <result property="busyDuration" column="busy_duration"/>
+    </resultMap>
+
+    <!-- 根据队列id和状态查询坐席当前状态 -->
+    <select id="selectAgentCurrentStateByQueueIdAndState" resultMap="agentMonitorBoResultMap">
+        SELECT
+        real_name,
+        extension,
+        current_state,
+        current_state_duration
+        FROM dos_callcenter_agent_monitor
+        <where>
+            `time` = (
+                SELECT MAX(`time`) FROM dos_callcenter_agent_monitor
+            )
+            AND agent_from_queue IN
+            <foreach collection="queueId" open="(" close=")" item="qId" separator=",">
+                #{qId}
+            </foreach>
+            <if test="state != null and state.size() > 0">
+                AND current_state IN
+                <foreach collection="state" open="(" close=")" item="s" separator=",">
+                    #{s}
+                </foreach>
+            </if>
+        </where>
+        ORDER BY extension
+    </select>
+</mapper>

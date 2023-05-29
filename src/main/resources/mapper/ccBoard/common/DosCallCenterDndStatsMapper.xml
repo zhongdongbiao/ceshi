@@ -1,0 +1,165 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//ibatis.apache.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="utry.data.modular.ccBoard.common.dao.DosCallCenterDndStatsDao">
+
+    <resultMap id="timeDurationTableVoResultMap" type="utry.data.modular.ccBoard.hotLineAgent.vo.TimeDurationTableVo">
+        <result property="state" column="state"/>
+        <result property="startDateTime" column="start_date_time"/>
+        <result property="endDateTime" column="end_date_time"/>
+        <result property="duration" column="duration"/>
+        <result property="queueId" column="queue_id"/>
+        <result property="queueName" column="queue_name"/>
+        <result property="agentName" column="agent_name"/>
+        <result property="agentId" column="agent_id"/>
+    </resultMap>
+
+    <resultMap id="dndStatsBoResultMap" type="utry.data.modular.ccBoard.common.bo.DndStatsBo">
+        <result property="queueId" column="queue_id"/>
+        <result property="agentId" column="agent_id"/>
+        <result property="agentName" column="agent_name"/>
+        <result property="startDateTime" column="start_date_time"/>
+        <result property="endDateTime" column="end_date_time"/>
+        <result property="duration" column="duration"/>
+        <result property="operationType" column="operation_type"/>
+    </resultMap>
+
+    <resultMap id="startEndDateTimeDurationBoResultMap" type="utry.data.modular.ccBoard.hotLineAgent.bo.StartEndDateTimeDurationBo">
+        <result property="startDateTime" column="start_date_time"/>
+        <result property="endDateTime" column="end_date_time"/>
+        <result property="duration" column="duration"/>
+    </resultMap>
+
+    <!-- 时段会话状态表格 -->
+    <select id="selectTimeDurationTable" resultMap="timeDurationTableVoResultMap">
+        SELECT
+            operation_type AS state,
+            DATE_FORMAT(start_time, '%Y-%m-%d %H:%i:%s') AS start_date_time,
+            DATE_FORMAT(end_time, '%Y-%m-%d %H:%i:%s') AS end_date_time,
+            CASE WHEN end_time IS NULL AND duration IS NULL THEN TIMESTAMPDIFF(SECOND, start_time, NOW()) ELSE duration END AS duration,
+            queue AS queue_id,
+            real_name AS agent_name,
+            extension AS agent_id
+        FROM dos_callcenter_dnd_stats
+        <where>
+            <if test="agentId != null and agentId != ''">
+                extension = #{agentId}
+            </if>
+            AND start_time BETWEEN #{startDateTime} AND #{endDateTime}
+            <if test="queueId != null and queueId.size() > 0">
+                AND queue IN
+                <foreach collection="queueId" open="(" close=")" item="qId" separator=",">
+                    #{qId}
+                </foreach>
+            </if>
+        </where>
+        ORDER BY extension, start_time DESC
+    </select>
+
+    <!-- 查询除就餐和培训外的的坐席（包括振铃时长、通话时长） -->
+    <select id="selectCheckInSeat" resultMap="dndStatsBoResultMap">
+        SELECT
+            queue AS queue_id,
+            extension AS agent_id,
+            real_name AS agent_name,
+            DATE_FORMAT(start_time, '%Y-%m-%d %H:%i:%s') AS start_date_time,
+            DATE_FORMAT(end_time, '%Y-%m-%d %H:%i:%s') AS end_date_time,
+            duration,
+            operation_type
+        FROM dos_callcenter_dnd_stats
+        WHERE start_time BETWEEN #{startDate} AND CONCAT(#{endDate}, ' 23:59:59')
+        AND queue IN
+        <foreach collection="queueId" open="(" close=")" item="qId" separator=",">
+            #{qId}
+        </foreach>
+        AND operation_type IN (-1,0,1,3,6)
+        UNION ALL
+        SELECT
+            agent_from_queue AS queue_id,
+            destination AS agent_id,
+            destination_real_name AS agent_name,
+            answer_time AS start_date_time,
+            agent_hangup_time AS end_date_time,
+            billable_seconds AS duration,
+            99 AS operation_type
+        FROM dos_callcenter_callrecord
+        WHERE answer_time BETWEEN #{startDate} AND CONCAT(#{endDate}, ' 23:59:59')
+        AND agent_from_queue IN
+        <foreach collection="queueId" open="(" close=")" item="qId" separator=",">
+            #{qId}
+        </foreach>
+        AND call_type = 'in'
+        UNION ALL
+        SELECT
+            agent_from_queue AS queue_id,
+            destination AS agent_id,
+            destination_real_name AS agent_name,
+            ring_start_time AS start_date_time,
+            answer_time AS end_date_time,
+            ring_time AS duration,
+            99 AS operation_type
+        FROM dos_callcenter_callrecord
+        WHERE answer_time BETWEEN #{startDate} AND CONCAT(#{endDate}, ' 23:59:59')
+        AND agent_from_queue IN
+        <foreach collection="queueId" open="(" close=")" item="qId" separator=",">
+            #{qId}
+        </foreach>
+        AND call_type = 'in'
+        ORDER BY agent_id, start_date_time
+    </select>
+
+    <!-- 通话时长、振铃时长、空闲、话后、培训、值日、忙碌开始结束时间、持续时长 -->
+    <select id="selectStartEndDateTimeDuration" resultMap="startEndDateTimeDurationBoResultMap">
+        SELECT
+            start_time AS start_date_time,
+            end_time AS end_date_time,
+            duration
+        FROM dos_callcenter_dnd_stats
+        WHERE start_time BETWEEN #{dto.startDate} AND CONCAT(#{dto.endDate}, ' 23:59:59')
+        AND queue IN
+        <foreach collection="dto.queueId" open="(" close=")" item="qId" separator=",">
+            #{qId}
+        </foreach>
+        AND operation_type IN
+        <foreach collection="statusList" open="(" close=")" item="status" separator=",">
+            #{status}
+        </foreach>
+        UNION ALL
+        SELECT
+            answer_time AS start_date_time,
+            agent_hangup_time AS end_date_time,
+            billable_seconds AS duration
+        FROM dos_callcenter_callrecord
+        WHERE call_time BETWEEN #{dto.startDate} AND CONCAT(#{dto.endDate}, ' 23:59:59')
+        AND agent_from_queue IN
+        <foreach collection="dto.queueId" open="(" close=")" item="qId" separator=",">
+            #{qId}
+        </foreach>
+        AND agent_hangup_time IS NOT NULL
+        UNION ALL
+        SELECT
+            ring_start_time AS start_date_time,
+            answer_time AS end_date_time,
+            ring_time AS duration
+        FROM dos_callcenter_callrecord
+        WHERE call_time BETWEEN #{dto.startDate} AND CONCAT(#{dto.endDate}, ' 23:59:59')
+        AND agent_from_queue IN
+        <foreach collection="dto.queueId" open="(" close=")" item="qId" separator=",">
+            #{qId}
+        </foreach>
+        AND call_type = 'in'
+        AND answer_time IS NOT NULL
+        UNION ALL
+        SELECT
+            call_time AS start_date_time,
+            DATE_ADD(call_time, INTERVAL ring_time SECOND) AS end_date_time,
+            ring_time AS duration
+        FROM dos_callcenter_callrecord
+        WHERE call_time BETWEEN #{dto.startDate} AND CONCAT(#{dto.endDate}, ' 23:59:59')
+        AND agent_from_queue IN
+        <foreach collection="dto.queueId" open="(" close=")" item="qId" separator=",">
+            #{qId}
+        </foreach>
+        AND call_type = 'out'
+        ORDER BY start_date_time
+    </select>
+</mapper>

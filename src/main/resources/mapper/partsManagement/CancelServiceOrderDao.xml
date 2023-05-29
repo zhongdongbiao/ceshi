@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="utry.data.modular.partsManagement.dao.CancelServiceOrderDao">
+    <!-- 开启二级缓存 -->
+    <cache eviction="LRU" flushInterval="300000" readOnly="true" size="1024"></cache>
+
+    <insert id="insertCancelServiceOrder">
+        <if test="detail != null and detail != '' and detail.size>0 ">
+            insert into t_cancel_service_order_detail (receiptNumber,productModel,partCode,partDrawingNo,partDrawingName,documentNumber,sourceLineNumber,
+            orderType,orderTime,applyNumber,distributionNumber,outNumber,cancelNumber,unitPrice,money,costType)
+            VALUES
+            <foreach collection="detail" item="model" separator=",">
+                (#{receiptNumber},#{model.productModel},#{model.partCode},#{model.partDrawingNo},#{model.partDrawingName},#{model.documentNumber},#{model.sourceLineNumber},
+                #{model.orderType},#{model.orderTime},#{model.applyNumber},#{model.distributionNumber},#{model.outNumber},#{model.cancelNumber},#{model.unitPrice},
+                #{model.money},#{model.costType})
+            </foreach>
+            ;
+        </if>
+        insert into t_cancel_service_order (documentNumber,documentDate,storeNumber,storeName,warehouseCode,warehouseName,
+         aggregateAmount,note,accountingCenter,systemState) values (#{receiptNumber},#{documentDate},#{storeNumber},#{storeName},
+         #{warehouseCode},#{warehouseName},#{aggregateAmount},#{note},#{accountingCenter},#{systemState })
+    </insert>
+
+    <!--批量修改服务店备货取消单-->
+    <update id="updateOrder">
+        <foreach collection="cancelServiceOrderValue" item="item" index="index" open="" close="" separator=";">
+            update t_cancel_service_order set associatedOrderNumber = #{item.documentNumber}
+            where documentNumber=#{item.receiptNumber}
+        </foreach>
+    </update>
+
+    <!--获取服务店备货取消单关联订单号-->
+    <select id="getOrderValue" resultType="java.util.Map">
+        select receiptNumber,documentNumber from t_cancel_service_order_detail GROUP BY receiptNumber
+    </select>
+    <select id="getFlag" resultType="java.lang.String">
+        select receiptNumber from t_cancel_service_order_detail where receiptNumber=#{receiptNumber}
+    </select>
+
+
+</mapper>

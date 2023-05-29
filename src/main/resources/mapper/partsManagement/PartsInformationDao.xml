@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="utry.data.modular.partsManagement.dao.PartsInformationDao">
+    <!-- 开启二级缓存 -->
+    <cache eviction="LRU" flushInterval="300000" readOnly="true" size="1024"></cache>
+
+    <insert id="insertPartsInformation">
+        insert into t_parts_information (id,systemState,partCode,partName,centerCode,center)
+        values (REPLACE(UUID(), _utf8'-', _utf8''),#{systemState},#{partCode},#{partName},#{centerCode},#{center});
+    </insert>
+
+    <insert id="batchPartsData" parameterType="java.util.List">
+        insert into t_parts_information (id,systemState,partCode,partName,centerCode,center)
+        values
+        <foreach collection="list" item="item" separator=",">
+            (REPLACE(UUID(), _utf8'-', _utf8''),#{item.systemState},#{item.partCode},#{item.partName},#{item.centerCode},#{item.center})
+        </foreach>
+    </insert>
+
+    <delete id="batchDelete">
+        delete from t_parts_information
+    </delete>
+</mapper>

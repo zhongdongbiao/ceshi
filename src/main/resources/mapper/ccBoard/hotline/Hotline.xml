@@ -1,0 +1,391 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//ibatis.apache.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="utry.data.modular.ccBoard.hotline.dao.HotlineDao">
+
+    <resultMap id="hotlineMap" type="utry.data.modular.ccBoard.hotline.vo.HotlineVo">
+        <id property="hotlineNumber" column="hotlineNumber" jdbcType="VARCHAR"/>
+        <result property="recordFileName" column="recordFileName" jdbcType="VARCHAR"/>
+        <result property="systemState" column="systemState" jdbcType="VARCHAR"/>
+        <result property="isFollow" column="isFollow" jdbcType="VARCHAR"/>
+        <result property="lastFollowTime" column="lastFollowTime" jdbcType="VARCHAR"/>
+        <result property="productCategory" column="productCategory" jdbcType="VARCHAR"/>
+        <result property="productType" column="productType" jdbcType="VARCHAR"/>
+        <result property="serviceType" column="serviceType" jdbcType="VARCHAR"/>
+        <result property="serviceDetails" column="serviceDetails" jdbcType="VARCHAR"/>
+        <result property="callTime" column="callTime" jdbcType="VARCHAR"/>
+        <result property="tenStandard" column="tenStandard" jdbcType="VARCHAR"/>
+        <result property="deptId" column="deptId" jdbcType="VARCHAR"/>
+        <result property="agentId" column="agentId" jdbcType="VARCHAR"/>
+        <result property="customerEvaluation" column="customerEvaluation" jdbcType="VARCHAR"/>
+        <result property="dispatchingOrder" column="dispatchingOrder" jdbcType="VARCHAR"/>
+    </resultMap>
+
+    <resultMap id="evaluateMap" type="utry.data.modular.ccBoard.hotline.vo.Evaluate">
+        <result property="id" column="id" jdbcType="VARCHAR"/>
+        <result property="recordFileName" column="recordFileName" jdbcType="VARCHAR"/>
+        <result property="productCategory" column="productCategory" jdbcType="VARCHAR"/>
+        <result property="serviceType" column="serviceType" jdbcType="VARCHAR"/>
+        <result property="serviceDetails" column="serviceDetails" jdbcType="VARCHAR"/>
+        <result property="comment" column="comment" jdbcType="VARCHAR"/>
+    </resultMap>
+
+    <!--  查询热线服务总量及服务投诉量  -->
+    <select id="selectHotlineData" parameterType="java.util.Map" resultType="java.util.Map">
+        SELECT
+            SUM(IF(hotlineTime &gt;= #{dayStartTime} AND hotlineTime &lt;= #{dayEndTime}, 1, 0)) dayHotlineNumber,
+            SUM(IF(hotlineTime &gt;= #{dayStartTime} AND hotlineTime &lt;= #{dayEndTime} AND
+            serviceType = '投诉', 1, 0)) dayComplaintNumber,
+            SUM(IF(hotlineTime &gt;= #{weekStartTime} AND hotlineTime &lt;= #{weekEndTime}, 1, 0)) weekHotlineNumber,
+            SUM(IF(hotlineTime &gt;= #{monthStartTime} AND hotlineTime &lt;= #{monthEndTime}, 1, 0)) monthHotlineNumber
+        FROM t_complaint_hot_line
+        <where>
+            <if test="deptIds != null and deptIds.size > 0">
+                AND accountingCenter IN
+                <foreach collection="deptIds" open="(" close=")" item="deptId" separator=",">
+                    #{deptId}
+                </foreach>
+            </if>
+            AND accountingCenterCode != 'CS03'
+        </where>
+    </select>
+
+    <select id="hotlineServiceTypeByCategory" parameterType="java.util.Map" resultType="java.util.Map">
+        SELECT productCategoryCODE,
+               productCategory type,
+               <if test="serviceType == null or serviceType == ''">
+                    serviceType label,
+               </if>
+               <if test="serviceType != null and serviceType != ''">
+                   serviceDetails label,
+               </if>
+               COUNT(productCategory) number,
+               ifnull(SUM(IF(systemState = '已受理', 1, 0)),0) number2
+            FROM t_complaint_hot_line
+        <where>
+            <if test="serviceType != null and serviceType != ''">
+                AND serviceType = #{serviceType}
+            </if>
+            <if test="beginDate != null and beginDate != ''">
+                AND hotlineTime &gt;= #{beginDate}
+            </if>
+            <if test="endDate != null and endDate != ''">
+                AND hotlineTime &lt;= #{endDate}
+            </if>
+            <if test="deptIds != null and deptIds.size > 0">
+                AND accountingCenter IN
+                <foreach collection="deptIds" open="(" close=")" item="deptId" separator=",">
+                    #{deptId}
+                </foreach>
+            </if>
+            AND accountingCenterCode != 'CS03'
+        </where>
+        GROUP BY productCategoryCODE
+        <if test="serviceType == null or serviceType == ''">
+            ,serviceType
+        </if>
+        <if test="serviceType != null and serviceType != ''">
+            ,serviceDetails
+        </if>
+    </select>
+
+    <!--  热线服务单维度  -->
+    <select id="hotlineServiceTypeByType" parameterType="java.util.Map" resultType="java.util.Map">
+        SELECT serviceType type,serviceDetails label,COUNT(productCategory) number,
+               ifnull(SUM(IF(systemState = '已受理', 1, 0)),0) number2
+            FROM t_complaint_hot_line
+        <where>
+            <if test="beginDate != null and beginDate != ''">
+                AND hotlineTime &gt;= #{beginDate}
+            </if>
+            <if test="endDate != null and endDate != ''">
+                AND hotlineTime &lt;= #{endDate}
+            </if>
+            <if test="deptIds != null and deptIds.size > 0">
+                AND accountingCenter IN
+                <foreach collection="deptIds" open="(" close=")" item="deptId" separator=",">
+                    #{deptId}
+                </foreach>
+            </if>
+            AND accountingCenterCode != 'CS03'
+        </where>
+        GROUP BY serviceType,serviceDetails
+    </select>
+
+    <!--  已受理工单未跟进  -->
+    <select id="acceptWorkFollow" parameterType="java.util.Map" resultType="java.util.Map">
+        SELECT cast(a.hotlineTime as date) dayDate,
+               SUM(IF(cast(b.last_service_time as date) != #{currentDate}, 1, 0)) number
+        FROM t_complaint_hot_line a
+        LEFT JOIN (
+            SELECT a.hotline_number,MAX(a.last_service_time) last_service_time
+                FROM t_cc_hot_order_follow_process a
+            GROUP BY a.last_service_time
+        ) b ON a.hotlineNumber = b.hotline_number
+        <where>
+            AND a.systemState = '已受理'
+            <if test="beginDate != null and beginDate != ''">
+                AND a.hotlineTime &gt;= #{beginDate}
+            </if>
+            <if test="endDate != null and endDate != ''">
+                AND a.hotlineTime &lt;= #{endDate}
+            </if>
+            <if test="deptIds != null and deptIds.size > 0">
+                AND accountingCenter IN
+                <foreach collection="deptIds" open="(" close=")" item="deptId" separator=",">
+                    #{deptId}
+                </foreach>
+            </if>
+            AND a.accountingCenterCode != 'CS03'
+        </where>
+        GROUP BY cast(hotlineTime as date)
+    </select>
+
+    <!--  客户评价  -->
+    <select id="customerEvaluation" parameterType="java.util.Map" resultType="java.util.Map">
+        SELECT
+            <if test="comment != null and comment != ''">
+                comment,
+                (CASE WHEN comment = '-1' THEN '客户未输入'
+                WHEN comment = '1' THEN '满意'
+                WHEN comment = '2' THEN '基本满意'
+                WHEN comment = '3' THEN '客服人员服务态度不满意'
+                WHEN comment = '4' THEN '解决方案不满意'
+                WHEN comment = '5' THEN '产品品质不满意'
+                ELSE '未转满意度评价' END) name,
+            </if>
+            <if test="comment == null or comment == ''">
+                (IF(comment IS NULL, '未转满意度评价', '转满意度评价')) name,
+            </if>
+            count(1) value FROM dos_callcenter_record
+        <where>
+            <if test="beginDate != null and beginDate != ''">
+                AND first_queue_start_time &gt;= #{beginDate}
+            </if>
+            <if test="endDate != null and endDate != ''">
+                AND first_queue_start_time &lt;= #{endDate}
+            </if>
+            <if test="agentId != null and agentId != ''">
+                AND agent_number =#{agentId}
+            </if>
+            <if test="queueIds != null and queueIds.size > 0">
+                AND agent_from_queue IN
+                <foreach collection="queueIds" open="(" close=")" item="queueId" separator=",">
+                    #{queueId}
+                </foreach>
+            </if>
+            <if test="comment != null and comment != ''">
+                AND comment IS NOT NULL
+            </if>
+        </where>
+        GROUP BY comment
+    </select>
+
+    <!--  投诉分析  -->
+    <select id="complaintsAnalysis" parameterType="java.util.Map" resultType="java.util.Map">
+        SELECT serviceDetails,sum(t.number1) typeNumber,group_concat(concat(subsidiaryLedger,':',number2) separator ',') AS subsidiaryLedger
+        FROM(
+                SELECT serviceDetails,count(serviceDetails) number1,subsidiaryLedger,count(subsidiaryLedger) number2
+                    FROM t_complaint_hot_line
+                <where>
+                    AND serviceType = '投诉'
+                    AND accountingCenterCode != 'CS03'
+                </where>
+                GROUP BY serviceDetails,subsidiaryLedger
+            )t
+        GROUP BY t.serviceDetails
+    </select>
+
+    <!--  话务明细  -->
+    <select id="callDetail" parameterType="java.util.Map" resultMap="hotlineMap">
+        SELECT a.systemState,a.hotlineNumber,a.productCategory,a.productType,a.serviceType,a.serviceDetails,a.dispatchingOrder,
+               c.recordFile recordFileName,IF(DATE_FORMAT(b.last_service_time,'%Y-%m-%d') = #{currentDate}, 1, 0) isFollow,
+               DATE_FORMAT(b.last_service_time,'%Y-%m-%d %H:%i:%s') lastFollowTime
+            FROM t_complaint_resume c
+        LEFT JOIN t_complaint_hot_line a ON c.hotlineNumber = a.hotlineNumber
+        LEFT JOIN (
+            SELECT a.hotline_number,MAX(a.last_service_time) last_service_time
+                FROM t_cc_hot_order_follow_process a
+            GROUP BY a.last_service_time
+        ) b ON a.hotlineNumber = b.hotline_number
+        <where>
+            <if test="serviceDetails != null and serviceDetails != ''">
+                AND a.serviceDetails = #{serviceDetails}
+            </if>
+            <if test="serviceType != null and serviceType != ''">
+                AND a.serviceType = #{serviceType}
+            </if>
+            <if test="productCategoryCODE != null and productCategoryCODE != ''">
+                AND a.productCategoryCODE = #{productCategoryCODE}
+            </if>
+            <if test="recordList != null and recordList.size > 0">
+                AND c.recordFile IN
+                <foreach collection="recordList" open="(" close=")" separator="," item="recordFile">
+                    #{recordFile}
+                </foreach>
+            </if>
+        </where>
+    </select>
+
+    <!--  通过录音文件查询通话记录数据  -->
+    <select id="selectCallRecord" parameterType="java.util.Map" resultMap="hotlineMap">
+        SELECT answer_time callTime,IF(request_agent_wait_time &lt;= 10, 1, 0) tenStandard,
+               agent_from_queue deptId,agent_number agentId,
+            (CASE WHEN comment = '-1' THEN '客户未输入'
+            WHEN comment = '1' THEN '满意'
+            WHEN comment = '2' THEN '基本满意'
+            WHEN comment = '3' THEN '客服人员服务态度不满意'
+            WHEN comment = '4' THEN '解决方案不满意'
+            WHEN comment = '5' THEN '产品品质不满意'
+            ELSE '未转满意度评价' END) customerEvaluation,record_file recordFileName
+        FROM dos_callcenter_record
+        <where>
+            <if test="beginDate != null and beginDate != ''">
+                AND first_queue_start_time &gt;= #{beginDate}
+            </if>
+            <if test="endDate != null and endDate != ''">
+                AND first_queue_start_time &lt;= #{endDate}
+            </if>
+            <if test="customerEvaluation != null and customerEvaluation != ''">
+                AND comment =#{customerEvaluation}
+            </if>
+            <if test="agentId != null and agentId != ''">
+                AND agent_number =#{agentId}
+            </if>
+            <if test="queueIds != null and queueIds.size > 0">
+                AND agent_from_queue IN
+                <foreach collection="queueIds" open="(" close=")" item="queueId" separator=",">
+                    #{queueId}
+                </foreach>
+            </if>
+        </where>
+    </select>
+
+    <!--  热线服务单详情  -->
+    <select id="hotlineServiceDetail" parameterType="java.util.Map" resultType="java.util.Map">
+        SELECT hotlineNumber,recordSource,accountingCenter,customerNo,serviceType,dispatchingOrder,
+               (CASE WHEN provincesCode = 11 or provincesCode = 12 or provincesCode = 31 or provincesCode = 50 THEN concat(provinces,county)
+                ELSE concat(provinces,city) END) region,storeNumber,storeName,storeLevel,
+               productType,productSeries,productModel,machineNumber,callDetail,recordFileName
+        FROM t_complaint_hot_line
+        WHERE hotlineNumber = #{hotlineNumber}
+    </select>
+
+    <!--  查询出所有的服务类型  -->
+    <select id="getServiceType" parameterType="java.util.Map" resultType="java.util.Map">
+        SELECT serviceType FROM t_complaint_hot_line
+        <where>
+            <if test="beginDate != null and beginDate != ''">
+                AND hotlineTime &gt;= #{beginDate}
+            </if>
+            <if test="endDate != null and endDate != ''">
+                AND hotlineTime &lt;= #{endDate}
+            </if>
+            <if test="deptIds != null and deptIds.size > 0">
+                AND accountingCenter IN
+                <foreach collection="deptIds" open="(" close=")" item="deptId" separator=",">
+                    #{deptId}
+                </foreach>
+            </if>
+            AND accountingCenterCode != 'CS03'
+        </where>
+        GROUP BY serviceType
+    </select>
+
+    <!--  查询所有的服务明细  -->
+    <select id="getServiceDetails" parameterType="java.util.Map" resultType="java.util.Map">
+        SELECT serviceDetails FROM t_complaint_hot_line
+        <where>
+            <if test="beginDate != null and beginDate != ''">
+                AND hotlineTime &gt;= #{beginDate}
+            </if>
+            <if test="endDate != null and endDate != ''">
+                AND hotlineTime &lt;= #{endDate}
+            </if>
+            <if test="serviceType != null and serviceType != ''">
+                AND serviceType = #{serviceType}
+            </if>
+            <if test="deptIds != null and deptIds.size > 0">
+                AND accountingCenter IN
+                <foreach collection="deptIds" open="(" close=")" item="deptId" separator=",">
+                    #{deptId}
+                </foreach>
+            </if>
+            AND accountingCenterCode != 'CS03'
+        </where>
+        GROUP BY serviceDetails
+    </select>
+
+    <!--  查询出队列名称  -->
+    <select id="selectQueueName" parameterType="java.util.Map" resultType="java.util.Map">
+        SELECT queueId,queueName FROM t_cc_queue_dept
+        <where>
+            <if test="queueIds != null and queueIds.size > 0">
+                AND queueId IN
+                <foreach collection="queueIds" open="(" close=")" item="queueId" separator=",">
+                    #{queueId}
+                </foreach>
+            </if>
+        </where>
+    </select>
+
+    <!--  根据队列id获取核算中心  -->
+    <select id="getAccountingCenter" parameterType="java.util.Map" resultType="java.lang.String">
+        SELECT DISTINCT deptName FROM t_cc_queue_dept
+        <where>
+            <if test="queueIds != null and queueIds.size > 0">
+                AND queueId IN
+                <foreach collection="queueIds" open="(" close=")" item="queueId" separator=",">
+                    #{queueId}
+                </foreach>
+            </if>
+        </where>
+    </select>
+
+    <!--  查询录音文件信息  -->
+    <select id="selectRecordFile" parameterType="java.util.Map" resultMap="evaluateMap">
+        SELECT id,record_file recordFileName,comment
+            FROM dos_callcenter_record
+        <where>
+            <if test="beginDate != null and beginDate != ''">
+                AND first_queue_start_time &gt;= #{beginDate}
+            </if>
+            <if test="endDate != null and endDate != ''">
+                AND first_queue_start_time &lt;= #{endDate}
+            </if>
+            <if test="customerEvaluation != null and customerEvaluation != ''">
+                AND comment =#{customerEvaluation}
+            </if>
+            <if test="queueIds != null and queueIds.size > 0">
+                AND agent_from_queue IN
+                <foreach collection="queueIds" open="(" close=")" item="queueId" separator=",">
+                    #{queueId}
+                </foreach>
+            </if>
+        </where>
+    </select>
+
+    <!--  查询热线信息  -->
+    <select id="selectHotline" parameterType="java.util.Map" resultMap="evaluateMap">
+        SELECT a.productCategory,a.serviceType,a.serviceDetails,c.recordFile recordFileName
+            FROM t_complaint_resume c
+        LEFT JOIN t_complaint_hot_line a ON c.hotlineNumber = a.hotlineNumber
+        <where>
+            <if test="serviceDetails != null and serviceDetails != ''">
+                AND a.serviceDetails = #{serviceDetails}
+            </if>
+            <if test="serviceType != null and serviceType != ''">
+                AND a.serviceType = #{serviceType}
+            </if>
+            <if test="productCategoryCODE != null and productCategoryCODE != ''">
+                AND a.productCategoryCODE = #{productCategoryCODE}
+            </if>
+            <if test="recordList != null and recordList.size > 0">
+                AND c.recordFile IN
+                <foreach collection="recordList" open="(" close=")" separator="," item="recordFile">
+                    #{recordFile}
+                </foreach>
+            </if>
+        </where>
+    </select>
+
+</mapper>

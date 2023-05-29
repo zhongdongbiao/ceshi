@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="utry.data.modular.partsManagement.dao.DistrictAccountingDao">
+    <!-- 开启二级缓存 -->
+    <cache eviction="LRU" flushInterval="300000" readOnly="true" size="1024"></cache>
+
+    <resultMap id="BaseResultMap" type="utry.data.modular.partsManagement.model.DistrictAccounting" >
+        <id column="id" property="id" />
+        <result column="systemState" jdbcType="VARCHAR" property="systemState"  />
+        <result column="regionalCode" jdbcType="VARCHAR" property="regionalCode"  />
+        <result column="regionalCode" jdbcType="VARCHAR" property="regionalCode"  />
+        <result column="centerCode" jdbcType="VARCHAR" property="centerCode"  />
+        <result column="center" jdbcType="VARCHAR" property="center"  />
+    </resultMap>
+
+
+    <insert id="insertDistrictAccounting">
+        insert into t_district_accounting (id,systemState,regionalCode,regional,centerCode,center,areaCode,area,adminNo,adminName,reduceArea)
+        values (REPLACE(UUID(), _utf8'-', _utf8''),#{systemState},#{regionalCode},#{regional},#{centerCode},#{center},#{areaCode},#{area},#{adminNo},#{adminName},#{reduceArea})
+    </insert>
+
+    <select id="selectDistrictAccounting" parameterType="utry.data.modular.partsManagement.model.DistrictAccounting"
+            resultType="utry.data.modular.partsManagement.model.DistrictAccounting">
+        select t.regionalCode,t.systemState,t.regional from t_district_accounting t
+
+    </select>
+
+    <delete id="delDistrictAccounting">
+        delete from t_district_accounting
+    </delete>
+</mapper>

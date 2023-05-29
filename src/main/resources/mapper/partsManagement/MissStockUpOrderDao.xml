@@ -1,0 +1,90 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="utry.data.modular.partsManagement.dao.MissStockUpOrderDao">
+    <!-- 开启二级缓存 -->
+    <cache eviction="LRU" flushInterval="300000" readOnly="true" size="1024"></cache>
+
+    <insert id="insertMissStockUpOrder">
+        insert into t_miss_stock_up_order (documentNo,productModel,partCode,documentDate,orderType,goodQuantity,associatedOrderNumber,processNumber,
+        serviceStoreNumber,serviceStoreName,goodArrivalTime,partDrawingNo,missDealOrderId,systemState) values (#{documentNo},#{productModel},#{partCode},
+        #{documentDate},#{orderType},#{goodQuantity},#{associatedOrderNumber},#{processNumber},#{serviceStoreNumber},#{serviceStoreName},
+        #{goodarrivalTime},#{partDrawingNo},#{missDealOrderId},#{systemState})
+    </insert>
+
+    <update id="updateMissStockUpOrder">
+        update t_miss_stock_up_order
+        <set>
+            <if test="documentDate != null and documentDate != ''">
+                documentDate=#{documentDate},
+            </if>
+            <if test="orderType != null and orderType != ''">
+                orderType=#{orderType},
+            </if>
+            <if test="goodQuantity != null and goodQuantity != ''">
+                goodQuantity=#{goodQuantity},
+            </if>
+            <if test="associatedOrderNumber != null and associatedOrderNumber != ''">
+                associatedOrderNumber=#{associatedOrderNumber},
+            </if>
+            <if test="serviceStoreNumber != null and serviceStoreNumber != ''">
+                serviceStoreNumber=#{serviceStoreNumber},
+            </if>
+            <if test="serviceStoreName != null and serviceStoreName != ''">
+                serviceStoreName=#{serviceStoreName},
+            </if>
+            <if test="goodarrivalTime != null and goodarrivalTime != ''">
+                goodarrivalTime=#{goodarrivalTime},
+            </if>
+            <if test="partDrawingNo != null and partDrawingNo != ''">
+                partDrawingNo=#{partDrawingNo},
+            </if>
+            <if test="missDealOrderId != null and missDealOrderId != ''">
+                missDealOrderId=#{missDealOrderId},
+            </if>
+            <if test="systemState != null and systemState != ''">
+                systemState=#{systemState},
+            </if>
+            <if test="processNumber != null and processNumber != ''">
+                processNumber=#{processNumber},
+            </if>
+            <if test="productModel != null and productModel != ''">
+                productModel=#{productModel},
+            </if>
+            <if test="partCode != null and partCode != ''">
+                partCode=#{partCode},
+            </if>
+        </set>
+        where documentNo=#{documentNo}
+    </update>
+
+    <!--根据单据数据缺件备货单数据-->
+    <select id="getMissStockUpOrderByOrder"
+            resultType="utry.data.modular.partsManagement.model.MissStockUpOrder">
+        select distinct(associatedOrderNumber),documentNo,documentDate,orderType,goodQuantity,
+        serviceStoreNumber,serviceStoreName,goodArrivalTime,partDrawingNo,missDealOrderId,systemState from t_miss_stock_up_order
+        <where>
+            <if test="associatedOrderNumber != null and associatedOrderNumber != ''">
+                and associatedOrderNumber = #{associatedOrderNumber}
+            </if>
+        </where>
+    </select>
+
+    <!--根据时间段获取缺件备货单数量-->
+    <select id="getMissStockUpOrderCount" resultType="java.lang.Integer">
+        select count(1) from t_miss_stock_up_order where substring(documentDate,1,10) <![CDATA[ >= ]]> #{startDate}
+        and substring(documentDate,1,10) <![CDATA[ <= ]]> #{endDate}
+    </select>
+
+    <!--获取实时的缺件单数-->
+    <select id="realMissOrder" resultType="java.lang.Integer">
+        select count(1) from (
+        select 1 from t_miss_stock_up_order where associatedOrderNumber  in(select documentNumber from t_part_order where state='0' GROUP BY documentNumber) GROUP BY documentNo) list
+    </select>
+
+    <!--根据单据号获取是否重复-->
+    <select id="getFlag" resultType="java.lang.String">
+      select documentNo from t_miss_stock_up_order where documentNo=#{documentNo}
+    </select>
+
+</mapper>

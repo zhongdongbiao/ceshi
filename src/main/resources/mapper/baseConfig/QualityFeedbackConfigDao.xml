@@ -1,0 +1,75 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="utry.data.modular.baseConfig.dao.QualityFeedbackConfigDao">
+
+    <select id="selectAllInformation"
+            resultType="utry.data.modular.baseConfig.dto.QualityFeedbackDTO">
+        SELECT
+        productModel,manualTime,serviceManualTime
+        FROM
+        t_product_information
+    </select>
+
+    <update id="updateTime" parameterType="java.util.List">
+        update t_product_information
+        <trim prefix="set" suffixOverrides=",">
+            <trim prefix="manualTime =case" suffix="end,">
+                <foreach collection="list" item="item" index="index">
+                    <if test="item.manualTime !=null and item.manualTime != ''">
+                        when productModel=#{item.productModel}
+                        then #{item.manualTime}
+                    </if>
+                </foreach>
+            </trim>
+            <trim prefix="serviceManualTime =case" suffix="end,">
+                <foreach collection="list" item="item" index="index">
+                    <if test="item.serviceManualTime!=null and item.serviceManualTime != ''">
+                        when productModel=#{item.productModel}
+                        then #{item.serviceManualTime}
+                    </if>
+                </foreach>
+            </trim>
+        </trim>
+        where productModel in
+        <foreach collection="list" item="item" index="index" separator="," open="(" close=")">
+            #{item.productModel}
+        </foreach>
+    </update>
+
+    <select id="select" parameterType="utry.data.modular.baseConfig.dto.ModelTimeDTO"
+            resultType="utry.data.modular.baseConfig.dto.ProductInformationDTO">
+        SELECT
+            productModel,productCategory,productType,DATE_FORMAT(updateTime, '%Y-%m-%d %H:%i:%s') as updateTime,DATE_FORMAT(listingDate, '%Y-%m-%d') as listingDate,DATE_FORMAT(manualTime, '%Y-%m-%d') as manualTime,DATE_FORMAT(serviceManualTime, '%Y-%m-%d') as serviceManualTime
+        FROM
+            t_product_information
+        WHERE systemState =  "已启用"
+        <if test="time != '' and time != null">
+            AND SUBSTRING_INDEX(listingDate,'-',2) = #{time}
+        </if>
+        <if test="productModel != '' and productModel!= null and productModel.textType != '' and productModel.textType != null and productModel.textType == '0'.toString()">
+            AND productModel = #{productModel.value}
+        </if>
+        <if test="productModel != '' and productModel!= null and productModel.textType != '' and productModel.textType != null and productModel.textType == '1'.toString()">
+            AND productModel LIKE CONCAT('%',#{productModel.value},'%')
+        </if>
+        <if test="productModel != '' and productModel!= null and productModel.textType != '' and productModel.textType != null and productModel.textType == '2'.toString()">
+            AND productModel &lt;&gt; #{productModel.value}
+        </if>
+    </select>
+
+    <update id="update" parameterType="utry.data.modular.baseConfig.dto.QualityFeedbackDTO">
+        UPDATE t_product_information
+        <set>
+            updateTime = NOW(),
+            <if test="manualTime != ''">
+                manualTime=#{manualTime},
+            </if>
+            <if test="serviceManualTime != ''">
+                serviceManualTime=#{serviceManualTime},
+            </if>
+        </set>
+        WHERE
+            productModel = #{productModel}
+    </update>
+</mapper>

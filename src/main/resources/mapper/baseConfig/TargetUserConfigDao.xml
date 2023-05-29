@@ -1,0 +1,198 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="utry.data.modular.baseConfig.dao.TargetUserConfigDao">
+
+    <select id="selectTarget" parameterType="utry.data.modular.baseConfig.dto.TargetUserDTO"
+            resultType="utry.data.modular.baseConfig.dto.TargetUserDTO">
+        SELECT
+        t.id,
+        DATE_FORMAT(
+        t.createTime,
+        '%Y-%m-%d %H:%i:%s'
+        ) AS createTime,
+        DATE_FORMAT(
+        t.updateTime,
+        '%Y-%m-%d %H:%i:%s'
+        ) AS updateTime,
+        t.targetName,
+        t.targetMonth,
+        GROUP_CONCAT(a.RealName SEPARATOR '、') AS userName,
+        GROUP_CONCAT(a.AccountID) AS userId
+        FROM
+        (
+        SELECT
+        t1.*, indicatorUserId
+        FROM
+        t_target t1
+        LEFT JOIN t_indicator_configuration t2 ON t2.targetId = t1.id
+        WHERE 1 = 1
+        <if test="userId != '' and userId != null">
+            AND t2.indicatorUserId = #{userId}
+        </if>
+        GROUP BY
+        t1.id
+        ) t
+        LEFT JOIN (
+        SELECT
+        indicatorUserId,
+        targetId
+        FROM
+        t_indicator_configuration
+        WHERE
+        indicatorUserId IS NOT NULL
+        GROUP BY
+        indicatorUserId,
+        targetId
+        ) c ON c.targetId = t.id
+        LEFT JOIN hrm_db.t_hrm_accountinfo a ON a.AccountID = c.indicatorUserId
+        WHERE
+        t.businessCode = #{businessCode}
+        AND ifTarget = '0'
+        <if test="targetMonth != '' and targetMonth != null">
+            AND t.targetMonth = #{targetMonth}
+        </if>
+        GROUP BY
+        t.id
+        ORDER BY
+        t.targetMonth DESC
+    </select>
+
+    <select id="ifExist" parameterType="utry.data.modular.baseConfig.dto.TargetAddDTO"
+            resultType="java.lang.String">
+        SELECT
+        t.id
+        FROM
+        t_target t
+        LEFT JOIN t_indicator_configuration c ON c.targetId = t.id
+        WHERE c.indicatorUserId IN
+        <foreach collection="users" item="item" index="index" separator="," open="(" close=")">
+            #{item}
+        </foreach>
+             AND t.businessCode = #{businessCode} AND t.ifTarget = '0' AND t.targetMonth = #{targetMonth}
+        <if test="id != '' and id != null">
+            AND c.targetId != #{id}
+        </if>
+        LIMIT 1
+    </select>
+
+    <insert id="addTarget" parameterType="utry.data.modular.baseConfig.dto.TargetAddDTO">
+        INSERT INTO t_target (
+            id,
+            businessCode,
+            createTime,
+            updateTime,
+            targetName,
+            targetMonth,
+            ifTarget
+        )
+        VALUES
+            (#{id},#{businessCode},NOW(),NOW(),#{targetName},#{targetMonth},'0')
+    </insert>
+
+    <insert id="addIndicator" parameterType="utry.data.modular.baseConfig.dto.TargetAddDTO">
+        INSERT INTO t_indicator_configuration (id, indicatorUserId, indicatorCode, indicatorName, indicatorValue, targetId)
+        VALUES
+        <foreach collection="userList" item="item" separator=",">
+            (REPLACE(UUID(), _utf8'-', _utf8''),#{item.accountId},#{item.indicatorCode},#{item.indicatorName},#{item.indicatorValue},#{id})
+        </foreach>
+    </insert>
+
+    <select id="editQuery" parameterType="utry.data.modular.baseConfig.dto.TargetAddDTO"
+            resultType="utry.data.modular.baseConfig.dto.IndicatorUserDTO">
+        SELECT
+            c.id,
+            c.indicatorCode,
+            c.indicatorName,
+            c.indicatorValue,
+            a.accountId
+        FROM
+            t_target t
+                LEFT JOIN t_indicator_configuration c ON c.targetId = t.id
+                LEFT JOIN hrm_db.t_hrm_accountinfo a ON a.AccountID = c.indicatorUserId
+        WHERE
+            t.id = #{id}
+        GROUP BY c.indicatorCode
+    </select>
+    <delete id="deleteAll" parameterType="utry.data.modular.baseConfig.dto.TargetAddDTO">
+        DELETE
+        FROM
+            t_indicator_configuration
+        WHERE
+            targetId = #{id}
+    </delete>
+    <delete id="deleteTarget" parameterType="utry.data.modular.baseConfig.dto.TargetAddDTO">
+        DELETE
+        FROM
+            t_target
+        WHERE
+            id = #{id}
+    </delete>
+    <update id="updateTarget" parameterType="utry.data.modular.baseConfig.dto.TargetAddDTO">
+        UPDATE t_target
+        <set>
+            updateTime = NOW(),
+            <if test="targetName != '' and targetName != null">
+                targetName = #{targetName}
+            </if>
+        </set>
+        WHERE
+            id = #{id}
+    </update>
+    <select id="select"
+            resultType="utry.data.modular.baseConfig.dto.IndicatorUserDTO">
+        SELECT
+            c.id,c.indicatorCode,c.indicatorName,c.indicatorValue,c.indicatorUserId AS accountId,a.RealName as name
+        FROM
+            t_target t
+                LEFT JOIN t_indicator_configuration c ON c.targetId  = t.id
+                LEFT JOIN hrm_db.t_hrm_accountinfo a ON a.AccountID = c.indicatorUserId
+        WHERE t.businessCode = #{businessCode} AND t.targetMonth = #{month} AND ifTarget = '0'
+    </select>
+    <select id="selectUser" resultType="utry.data.modular.baseConfig.dto.HrmAccountInfoDTO">
+        SELECT
+            c.indicatorUserId AS accountId,
+            a.Account AS account,
+            a.RealName AS realName
+        FROM
+            t_target t
+        LEFT JOIN t_indicator_configuration c ON c.targetId  = t.id
+        LEFT JOIN hrm_db.t_hrm_accountinfo a ON a.AccountID = c.indicatorUserId
+        WHERE t.ifTarget = '0' AND t.businessCode = #{businessCode}
+        GROUP BY
+            c.indicatorUserId
+    </select>
+    <select id="selectCategoryUser" resultType="utry.data.modular.baseConfig.dto.HrmAccountInfoDTO">
+        SELECT
+            t.userId AS accountId,
+            a.Account AS account,
+            a.RealName AS realName
+        FROM
+            t_user_type t
+                LEFT JOIN hrm_db.t_hrm_accountinfo a ON a.AccountID = t.userId
+        GROUP BY
+            t.userId
+    </select>
+    <select id="selectPartManagementUser" resultType="utry.data.modular.baseConfig.dto.HrmAccountInfoDTO">
+        SELECT
+            t.userId AS accountId,
+            a.Account AS account,
+            a.RealName AS realName
+        FROM
+            t_user_factory t
+                LEFT JOIN hrm_db.t_hrm_accountinfo a ON a.AccountID = t.userId
+        GROUP BY
+            t.userId
+    </select>
+    <select id="selectDistrictUser" resultType="utry.data.modular.baseConfig.dto.HrmAccountInfoDTO">
+        SELECT
+            t.userId AS accountId,
+            a.Account AS account,
+            a.RealName AS realName
+        FROM
+            t_user_district t
+                LEFT JOIN hrm_db.t_hrm_accountinfo a ON a.AccountID = t.userId
+        GROUP BY
+            t.userId
+    </select>
+</mapper>

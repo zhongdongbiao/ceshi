@@ -1,0 +1,101 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="utry.data.modular.ccBoard.visit.dao.VisitDao">
+    <!--添加回访任务数据-->
+    <insert id="create">
+        insert into t_cc_visit (serviceNumber,systemState,productCategory,taskType,serviceType,storeNumber,storeName,storeLevel,engineerId,
+        doortTime,completeTime,productType,productSeries,productModel,machineNumber,accountingCenter,accountingRegional,dialNumber,accountingArea,createTime,updateTime)
+        values(#{serviceNumber},#{systemState},#{productCategory},#{taskType},#{serviceType}, #{storeNumber},#{storeName},#{storeLevel},#{engineerId},
+        #{doortTime},#{completeTime},#{productType},#{productSeries},#{productModel},#{machineNumber},#{accountingCenter},#{accountingRegional},
+        #{dialNumber},#{accountingArea},#{createTime},#{updateTime})
+    </insert>
+
+    <!--根据服务单号修改回访任务-->
+    <update id="updateVisitTask">
+        update t_cc_visit set systemState=#{systemState},productCategory=#{productCategory},taskType=#{taskType},serviceType=#{serviceType},
+        storeNumber=#{storeNumber},storeName=#{storeName},storeLevel=#{storeLevel},engineerId=#{engineerId},doortTime=#{doortTime},
+        completeTime=#{completeTime},productType=#{productType},productSeries=#{productSeries},productModel=#{productModel},machineNumber=#{machineNumber},
+        accountingCenter=#{accountingCenter},accountingRegional=#{accountingRegional},dialNumber=#{dialNumber},accountingArea=#{accountingArea},createTime=#{createTime},updateTime=#{updateTime}
+        where serviceNumber=#{serviceNumber}
+    </update>
+
+    <!--根据服务单号查询是否有数据-->
+    <select id="getFlag" resultType="utry.data.modular.ccBoard.visit.model.VisitTask">
+        select serviceNumber,systemState,productCategory,taskType,serviceType,storeNumber,storeName,storeLevel,engineerId,doortTime,completeTime,
+        productType,productSeries,productModel,machineNumber,accountingCenter,accountingRegional,dialNumber,accountingArea,createTime,updateTime
+        from t_cc_visit  where serviceNumber=#{serviceNumber}
+    </select>
+
+    <!--获取未完成回访任务的数量-->
+    <select id="getNotCompete" resultType="utry.data.modular.ccBoard.visit.bo.NotComplete">
+        select taskType as type,IFNULL(sum(pending),0) as pending,IFNULL(sum(threeNotComplete),0) as threeNotComplete,IFNULL(sum(pending),0)+IFNULL(sum(threeNotComplete),0) as notCompleteTotal,
+        ROUND((IFNULL(sum(pending),0)+IFNULL(sum(threeNotComplete),0))/IFNULL(sum(total),0)*100,2) as rate
+        from (
+        select count(*) as pending,null as threeNotComplete,null total,taskType  from  t_cc_visit where accountingCenter !='住宅设备BU' and systemState='未完成' and  TIMESTAMPDIFF(DAY,createTime,NOW())<![CDATA[ <= ]]>  3
+        <if test="dateDurationQueueIdDto.startDate != null and dateDurationQueueIdDto.startDate != ''">
+            and substring(createTime,1,10) <![CDATA[ >= ]]> #{dateDurationQueueIdDto.startDate}
+        </if>
+        <if test="dateDurationQueueIdDto.endDate != null and dateDurationQueueIdDto.endDate != ''">
+            and substring(createTime,1,10)  <![CDATA[ <= ]]> #{dateDurationQueueIdDto.endDate}
+        </if>
+        <if test="accountingCenter != null and accountingCenter.size >0 ">
+            and accountingCenter  in
+            <foreach collection="accountingCenter" item="model" open="(" close=")" separator=",">
+                #{model}
+            </foreach>
+        </if>
+        GROUP BY taskType union
+        select null as pending,count(*) as threeNotComplete,null as total,taskType  from  t_cc_visit where accountingCenter !='住宅设备BU' and systemState='未完成' and  TIMESTAMPDIFF(DAY,createTime,NOW())  >  3
+        <if test="dateDurationQueueIdDto.startDate != null and dateDurationQueueIdDto.startDate != ''">
+            and substring(createTime,1,10) <![CDATA[ >= ]]> #{dateDurationQueueIdDto.startDate}
+        </if>
+        <if test="dateDurationQueueIdDto.endDate != null and dateDurationQueueIdDto.endDate != ''">
+            and substring(createTime,1,10)  <![CDATA[ <= ]]> #{dateDurationQueueIdDto.endDate}
+        </if>
+        <if test="accountingCenter != null and accountingCenter.size >0 ">
+            and accountingCenter  in
+            <foreach collection="accountingCenter" item="model" open="(" close=")" separator=",">
+                #{model}
+            </foreach>
+        </if>
+        GROUP BY taskType union select null as pending,null as threeNotComplete,count(*)as total,taskType from t_cc_visit where accountingCenter !='住宅设备BU'
+        <if test="dateDurationQueueIdDto.startDate != null and dateDurationQueueIdDto.startDate != ''">
+            and substring(createTime,1,10) <![CDATA[ >= ]]> #{dateDurationQueueIdDto.startDate}
+        </if>
+        <if test="dateDurationQueueIdDto.endDate != null and dateDurationQueueIdDto.endDate != ''">
+            and substring(createTime,1,10)  <![CDATA[ <= ]]> #{dateDurationQueueIdDto.endDate}
+        </if>
+        <if test="accountingCenter != null and accountingCenter.size >0 ">
+            and accountingCenter  in
+            <foreach collection="accountingCenter" item="model" open="(" close=")" separator=",">
+                #{model}
+            </foreach>
+        </if>
+         GROUP BY taskType) list GROUP BY taskType
+    </select>
+
+    <!--获取回访任务数量-->
+    <select id="getVisitTask" resultType="java.lang.Integer">
+        select count(*) from  t_cc_visit where accountingCenter !='住宅设备BU'
+        <if test="dateDurationQueueIdDto.startDate != null and dateDurationQueueIdDto.startDate != ''">
+            and substring(createTime,1,10) <![CDATA[ >= ]]> #{dateDurationQueueIdDto.startDate}
+        </if>
+        <if test="dateDurationQueueIdDto.endDate != null and dateDurationQueueIdDto.endDate != ''">
+            and substring(createTime,1,10)  <![CDATA[ <= ]]> #{dateDurationQueueIdDto.endDate}
+        </if>
+        <if test="accountingCenter != null and accountingCenter.size >0 ">
+            and accountingCenter  in
+            <foreach collection="accountingCenter" item="model" open="(" close=")" separator=",">
+                #{model}
+            </foreach>
+        </if>
+        <if test="type != null and type != '' and type =='1'.toString()">
+            and systemState='已完成'
+        </if>
+        <if test="type != null and type != '' and type =='0'.toString()">
+            and systemState='未完成'
+        </if>
+    </select>
+
+</mapper>

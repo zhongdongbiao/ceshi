@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="utry.data.modular.partsManagement.dao.CancelPurchaseOrderDao">
+    <!-- 开启二级缓存 -->
+    <cache eviction="LRU" flushInterval="300000" readOnly="true" size="1024"></cache>
+
+    <insert id="insertCancelPurchaseOrder">
+        <if test="purchaseOrderdetail != null and purchaseOrderdetail != '' and purchaseOrderdetail.size>0 ">
+            insert into t_cancel_purchase_order_detail (receiptNumber,purchaseOrderNo,partDrawingNo,partDrawingNumber,describedDrawingNo,
+            placeOrderTime,orderNumber,shippedQuantity,quantityCancelled,remainingOrderQuantity,cancelNumber,lineNote)
+            VALUES
+            <foreach collection="purchaseOrderdetail" item="model" separator=",">
+                (#{receiptNumber},#{model.purchaseOrderNo},#{model.partDrawingNo},#{model.partDrawingNumber},#{model.describedDrawingNo},#{model.placeOrderTime},
+                #{model.orderNumber},#{model.shippedQuantity},#{model.quantityCancelled},#{model.remainingOrderQuantity},#{model.cancelNumber},#{model.lineNote})
+            </foreach>
+            ;
+        </if>
+      insert into t_cancel_purchase_order (receiptNumber,receiptTime,note,accountingCenter,supplierShortName,
+      supplierCode,supplierName,systemState) values (#{receiptNumber},#{receiptTime},#{note},#{accountingCenter},#{supplierShortName},
+      #{supplierCode},#{supplierName},#{systemState})
+    </insert>
+    <select id="getFlag" resultType="java.lang.String">
+        select receiptNumber from t_cancel_purchase_order where receiptNumber=#{receiptNumber}
+    </select>
+
+
+</mapper>

@@ -1,0 +1,148 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="utry.data.modular.baseConfig.dao.UserFactoryDao">
+
+    <select id="selectUser" resultType="utry.data.modular.baseConfig.dto.HrmAccountInfoDTO">
+        SELECT
+            AccountID as accountId,
+            Account as account,
+            RealName as realName
+        FROM
+            hrm_db.t_hrm_accountinfo
+        WHERE deleted = '0'
+    </select>
+
+    <select id="selectFactory" resultType="utry.data.modular.partsManagement.model.FactoryData">
+        SELECT
+            f.id,
+            f.factoryCode,
+            f.`factoryName`,
+            DATE_FORMAT(f.createTime, '%Y-%m-%d %H:%i:%s') as createTime
+        FROM
+            t_factory_data f
+                LEFT JOIN t_user_factory u ON u.factoryId = f.factoryCode
+        WHERE
+            u.id IS NULL
+          AND f.systemState = "已启用"
+    </select>
+
+    <select id="selectAllFactory" resultType="utry.data.modular.partsManagement.model.FactoryData">
+        SELECT
+            factoryCode,
+            factoryName
+        FROM
+            t_factory_data
+        WHERE systemState = "已启用"
+    </select>
+
+
+    <insert id="addConfig" parameterType="utry.data.modular.baseConfig.dto.UserFactoryDTO">
+        INSERT INTO t_user_factory (id, userId, factoryId, createTime,updateTime)
+        VALUES
+        <foreach collection="list" item="factoryId" separator=",">
+            (REPLACE(UUID(), _utf8'-', _utf8''),#{accountId},#{factoryId}, #{createTime}, NOW())
+        </foreach>
+    </insert>
+
+    <select id="selectConfig"
+            resultType="utry.data.modular.baseConfig.dto.HrmAccountInfoDTO">
+        SELECT
+            h.accountId,
+            h.account,
+            h.realName,
+            DATE_FORMAT(t.createTime, '%Y-%m-%d %H:%i:%s') AS createTime,
+            Max(DATE_FORMAT(t.updateTime, '%Y-%m-%d %H:%i:%s')) AS updateTime
+        FROM
+            t_user_factory t
+                LEFT JOIN hrm_db.t_hrm_accountinfo h ON t.userId = h.AccountID
+                LEFT JOIN t_factory_data f ON t.factoryId = f.factoryCode
+        GROUP BY
+            t.userId
+        ORDER BY Max(DATE_FORMAT(t.updateTime, '%Y-%m-%d %H:%i:%s')) DESC
+    </select>
+
+    <delete id="deleteConfig" parameterType="java.lang.String">
+        delete from t_user_factory where userId = #{accountId}
+    </delete>
+
+    <select id="selectUserFactory" resultType="utry.data.modular.partsManagement.model.FactoryData">
+        SELECT
+            f.id,
+            f.factoryCode,
+            f.`factoryName`,
+            DATE_FORMAT(u.createTime, '%Y-%m-%d %H:%i:%s') as createTime,
+            DATE_FORMAT(u.updateTime, '%Y-%m-%d %H:%i:%s') as updateTime
+        FROM
+            t_factory_data f
+                LEFT JOIN t_user_factory u ON u.factoryId = f.factoryCode
+        WHERE
+            u.userId = #{accountId}
+          AND f.systemState = "已启用"
+    </select>
+
+    <select id="ifExist" parameterType="java.util.List" resultType="java.lang.String">
+        SELECT
+            u.id
+        FROM
+            t_user_factory u
+        LEFT JOIN t_factory_data f ON u.factoryId = f.factoryCode
+        WHERE u.factoryId in
+        <foreach collection="list" open="(" close=")" separator="," item="factoryId">
+            #{factoryId}
+        </foreach>
+        LIMIT 1
+    </select>
+
+    <select id="ifEditExist" resultType="java.lang.String">
+        SELECT
+        u.id
+        FROM
+        t_user_factory u
+        LEFT JOIN t_factory_data f ON u.factoryId = f.factoryCode
+        WHERE u.factoryId in
+        <foreach collection="list" open="(" close=")" separator="," item="factoryId">
+            #{factoryId}
+        </foreach>
+        AND u.userId != #{oldAccountId}
+        LIMIT 1
+    </select>
+
+    <select id="selectTargetId" resultType="java.lang.String">
+        SELECT
+        c.targetId
+        FROM
+        t_indicator_configuration c
+        LEFT JOIN t_target t ON t.id = c.targetId
+        WHERE c.indicatorUserId = #{accountId}
+        AND t.businessCode = 'partManagement'
+        GROUP BY c.targetId
+    </select>
+
+    <delete id="deleteUserTargetId" parameterType="java.util.List">
+        delete from t_indicator_configuration where indicatorUserId = #{accountId} and targetId in
+        <foreach collection="list" open="(" close=")" separator="," item="targetId">
+            #{targetId}
+        </foreach>
+    </delete>
+
+    <delete id="deleteTargetId" parameterType="java.util.List">
+        delete from t_target where id IN
+        <foreach collection="list" open="(" close=")" separator="," item="targetId">
+            #{targetId}
+        </foreach>
+    </delete>
+
+    <select id="selectLast" resultType="java.lang.String">
+        SELECT
+            c.targetId
+        FROM
+            t_indicator_configuration c
+                LEFT JOIN t_target t ON t.id = c.targetId
+        WHERE c.indicatorUserId != #{accountId} AND c.targetId IN
+        <foreach collection="list" open="(" close=")" separator="," item="targetId">
+            #{targetId}
+        </foreach>
+        GROUP BY c.targetId
+    </select>
+</mapper>

@@ -1,0 +1,437 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="utry.data.modular.partsManagement.dao.ReceiptDao">
+    <!-- 开启二级缓存 -->
+    <cache eviction="LRU" flushInterval="300000" readOnly="true" size="1024"></cache>
+
+    <insert id="insertReceipt">
+        <if test="detail != null and detail != '' and detail.size>0 ">
+            insert into t_receipt_detail (documentNumber,associatedOrderNumber,productModel,partCode,applyNumber,partDrawingNo,goodNumber,notReceive,abnormalNumber)
+            VALUES
+            <foreach collection="detail" item="model" separator=",">
+                (#{documentNumber},
+                #{model.associatedOrderNumber},#{model.productModel},#{model.partCode},#{model.applyNumber},#{model.partDrawingNo},#{model.goodNumber},#{model.notReceive},#{model.abnormalNumber})
+            </foreach>
+            ;
+        </if>
+        insert into t_receipt (documentNumber,systemState,deliveryTime,receivingType,packingListNo,appropriateInvestTime,
+        goodTime,logisticsSingleNumber) values (#{documentNumber},#{systemState},#{deliveryTime},#{receivingType},#{packingListNo},#{appropriateInvestTime},
+        #{goodTime},#{logisticsSingleNumber})
+    </insert>
+
+    <!--收货单详情数据修改-->
+    <update id="updateReceipt">
+        update t_receipt
+        <set>
+            <if test="systemState != null and systemState != ''">
+                systemState=#{systemState},
+            </if>
+            <if test="receivingType != null and receivingType != ''">
+                receivingType=#{receivingType},
+            </if>
+            <if test="packingListNo != null and packingListNo != ''">
+                packingListNo=#{packingListNo},
+            </if>
+            <if test="appropriateInvestTime != null and appropriateInvestTime != ''">
+                appropriateInvestTime=#{appropriateInvestTime},
+            </if>
+            <if test="goodTime != null and goodTime != ''">
+                goodTime=#{goodTime},
+            </if>
+        </set>
+        where documentNumber=#{documentNumber}
+    </update>
+    <!--批量修改主表数-->
+    <update id="updateOrder">
+        <foreach collection="orderValue" item="item" index="index" open="" close="" separator=";">
+            update t_receipt set associatedOrderNumber = #{item.associatedOrderNumber}
+            where documentNumber=#{item.documentNumber}
+        </foreach>
+    </update>
+
+    <!--收货单详情数据删除-->
+    <delete id="deleteReceipt">
+        DELETE from t_receipt where documentNumber =#{documentNumber};
+        DELETE from t_receipt_detail where documentNumber =#{documentNumber};
+    </delete>
+
+    <!--根据时间段获取收货订单数-->
+    <select id="getCountByDate" resultType="java.lang.Integer">
+      select count(1) from (select 1 from t_receipt tr
+      LEFT JOIN t_receipt_detail trd on tr.documentNumber=trd.documentNumber
+      LEFT JOIN t_inventory_warning tiw on trd.partDrawingNo=tiw.partDrawingNo
+        LEFT JOIN t_factory_data tfd on tfd.factoryName=tiw.factoryName
+      LEFT JOIN t_user_factory tuf on tuf.factoryId=tfd.factoryCode
+      where 1=1 and substring(tiw.inventoryDate,1,10)=#{inventoryDate}
+        and tr.documentNumber  not in (select documentNumber  from t_receipt
+        where appropriateInvestTime is null and goodTime is null
+        and substring(deliveryTime ,1,10) <![CDATA[ >= ]]> DATE_SUB(DATE_FORMAT(NOW(),'%Y-%m-%d'),INTERVAL 1 DAY)
+        and substring(deliveryTime ,1,10) <![CDATA[ <= ]]> DATE_FORMAT(NOW(),'%Y-%m-%d'))
+        <if test="startDate != null and startDate != ''">
+            and substring(tr.deliveryTime,1,10) <![CDATA[ >= ]]> #{startDate}
+        </if>
+        <if test="endDate != null and endDate != ''">
+            and substring(tr.deliveryTime,1,10) <![CDATA[ <= ]]> #{endDate}
+        </if>
+        <if test="userId != null and userId != ''">
+            and tuf.userId=#{userId}
+        </if>
+        GROUP BY tr.documentNumber,trd.associatedOrderNumber,trd.partDrawingNo) list
+    </select>
+
+    <!--根据时间段获取符合NDS2的收货订单数-->
+    <select id="getCountByNDS2" resultType="java.lang.Integer">
+      select count(1) from (select 1 from t_receipt tr
+      LEFT JOIN t_receipt_detail trd on tr.documentNumber=trd.documentNumber
+      LEFT JOIN t_inventory_warning tiw on trd.partDrawingNo=tiw.partDrawingNo
+        LEFT JOIN t_factory_data tfd on tfd.factoryName=tiw.factoryName
+      LEFT JOIN t_user_factory tuf on tuf.factoryId=tfd.factoryCode
+      where 1=1 and substring(tiw.inventoryDate,1,10)=#{inventoryDate}
+        <if test="startDate != null and startDate != ''">
+          and substring(tr.deliveryTime,1,10) <![CDATA[ >= ]]> #{startDate}
+        </if>
+        <if test="endDate != null and endDate != ''">
+            and substring(tr.deliveryTime,1,10) <![CDATA[ <= ]]> #{endDate}
+        </if>
+        <if test="userId != null and userId != ''">
+            and tuf.userId=#{userId}
+        </if>
+        and (tr.appropriateInvestTime is not null or tr.goodTime is not null)
+        and TimeStampDiff(DAY,tr.deliveryTime,IF(IF(tr.appropriateInvestTime is null or tr.appropriateInvestTime='','3022-12-12 00:00:00',tr.appropriateInvestTime)>
+        IF(tr.goodTime is null or tr.goodTime='','3022-12-12 00:00:00',tr.goodTime), substring(tr.goodTime,1,10), substring(tr.appropriateInvestTime,1,10))) <![CDATA[ <= ]]>  2
+        GROUP BY tr.documentNumber,trd.associatedOrderNumber,trd.partDrawingNo) list
+    </select>
+
+    <!--根据单据数据获取收货单详情数据-->
+    <select id="getReceiptDetailByOrder" resultType="utry.data.modular.partsManagement.model.ReceiptDetail">
+        select distinct(trd.documentNumber),trd.associatedOrderNumber,trd.applyNumber,
+        trd.partDrawingNo from t_receipt_detail trd
+        left join (select count(1) total,documentNumber from t_order_detail GROUP BY
+        documentNumber) tod on tod.documentNumber=trd.associatedOrderNumber
+        LEFT JOIN (select count(1) now,documentNumber from t_receipt_detail GROUP BY
+        documentNumber) trdt on trdt.documentNumber=trd.associatedOrderNumber
+        where trd.associatedOrderNumber=#{associatedOrderNumber} and trdt.now=tod.total
+    </select>
+
+    <!--根据服务店收货单详情数据查询收货单数据-->
+    <select id="getReceiptByReceiptDetail" resultType="utry.data.modular.partsManagement.model.Receipt">
+        select distinct(documentNumber),systemState,systemState,receivingType,packingListNo,appropriateInvestTime,
+        goodTime,logisticsSingleNumber from t_receipt tr,left join ()where documentNumber=#{documentNumber} and (select count(1) from )
+    </select>
+
+    <select id="getReceiptDetailCountByOrderNumer" resultType="java.lang.Integer">
+        select count(1) from t_receipt_detail GROUP BY
+        documentNumber having documentNumber=#{documentNumber}
+    </select>
+
+    <!--根据省份查询货品在途时间-->
+    <select id="getGoodTimeBySort" resultType="java.util.Map">
+        select IFNULL(ROUND(AVG(TimeStampDiff(DAY,substring(tr.deliveryTime,1,10),substring(tr.appropriateInvestTime,1,10))), 1 ),0) GoodTime,provinces
+        from t_receipt tr
+        LEFT JOIN t_receipt_detail trd on tr.documentNumber=trd.documentNumber
+        LEFT JOIN t_order_detail tod on trd.associatedOrderNumber=tod.documentNumber
+        LEFT JOIN t_region_service_store trss on trss.storeNumber =tod.storeNumber
+        where 1=1
+        and tr.documentNumber  not in (select documentNumber  from t_receipt
+        where appropriateInvestTime is null and goodTime is null
+        and substring(deliveryTime ,1,10) <![CDATA[ >= ]]> DATE_SUB(DATE_FORMAT(NOW(),'%Y-%m-%d'),INTERVAL 1 DAY)
+        and substring(deliveryTime ,1,10) <![CDATA[ <= ]]> DATE_FORMAT(NOW(),'%Y-%m-%d'))
+        <if test="startDate != null and startDate != ''">
+            and substring(tr.deliveryTime,1,10) <![CDATA[ >= ]]> #{startDate}
+        </if>
+        <if test="endDate != null and endDate != ''">
+            and substring(tr.deliveryTime,1,10) <![CDATA[ <= ]]> #{endDate}
+        </if>
+        GROUP BY trss.provinces HAVING provinces is not null
+        <if test="sort != null and sort != '' and sort=='0'.toString()">
+            order by GoodTime asc
+        </if>
+        <if test="sort != null and sort != '' and sort=='1'.toString()">
+            order by GoodTime desc
+        </if>
+    </select>
+
+    <!--根据来源单号获取收货单DTO-->
+    <select id="getReceiptDTO" resultType="utry.data.modular.partsManagement.dto.ReceiptDTO">
+        select tr.documentNumber,tr.systemState,tr.deliveryTime,tr.receivingType,tr.packingListNo,tr.appropriateInvestTime,tr.goodTime,
+        tr.logisticsSingleNumber from t_receipt tr left join t_receipt_detail trd on tr.documentNumber=trd.documentNumber
+        where trd.associatedOrderNumber=#{associatedOrderNumber} group by tr.documentNumber order by tr.deliveryTime
+    </select>
+
+    <!--根据收货单号获取收货单详情-->
+    <select id="getReceiptDetail" resultType="utry.data.modular.partsManagement.model.ReceiptDetail">
+        select documentNumber,associatedOrderNumber,applyNumber,partDrawingNo from t_receipt_detail where documentNumber=#{documentNumber}
+    </select>
+
+    <!--获取服务店收货单列表-->
+    <select id="getReceiptList" resultType="utry.data.modular.partsManagement.vo.ReceiptVo">
+        select  DISTINCT(tod.documentNumber) as documentNumber,tr.documentNumber as receiptNumber,substring(tod.orderSubmitTime,1,10) orderDate,
+        substring(tr.deliveryTime,1,10) as loadingDate,tr.deliveryTime,
+        TIMESTAMPDIFF(DAY,substring(tod.orderSubmitTime,1,10),substring(tr.deliveryTime,1,10)) as shipmentTime,tr.appropriateInvestTime,TIMESTAMPDIFF(DAY,substring(tr.deliveryTime,1,10),substring(tr.appropriateInvestTime,1,10)) as logisticsTime,
+        tr.systemState logisticsStatus,trd.applyNumber demand,IFNULL(total.totalLine,0) as notOffer,tod.exceptCompletionTime,
+        CASE WHEN  TIMESTAMPDIFF(DAY,substring(tod.orderSubmitTime,1,10),substring(tr.deliveryTime,1,10))>1 THEN TIMESTAMPDIFF(DAY,substring(tod.orderSubmitTime,1,10),substring(tr.deliveryTime,1,10))-1 ELSE '0' END as overTime,
+        CASE WHEN  TIMESTAMPDIFF(DAY,substring(tr.deliveryTime,1,10),substring(tr.appropriateInvestTime,1,10))>2 THEN TIMESTAMPDIFF(DAY,substring(tr.deliveryTime,1,10),substring(tr.appropriateInvestTime,1,10))-2 ELSE '0' END as logisticsTimeOut from t_receipt tr
+        LEFT JOIN t_receipt_detail trd on tr.documentNumber=trd.documentNumber
+        LEFT JOIN t_order_detail tod on trd.associatedOrderNumber=tod.documentNumber
+        LEFT JOIN t_part_order tpo on tpo.documentNumber=tod.documentNumber
+        LEFT JOIN (select count(1) as totalLine,documentNumber from t_part_order where state='0'  GROUP BY documentNumber,partDrawingNo) total on total.documentNumber=trd.associatedOrderNumber
+        where tr.systemState ='待收货'
+        <if test="startDate != null and startDate != ''">
+            and substring(tr.deliveryTime,1,10) <![CDATA[ >= ]]> #{startDate}
+        </if>
+        <if test="endDate != null and endDate != ''">
+            and substring(tr.deliveryTime,1,10) <![CDATA[ <= ]]> #{endDate}
+        </if>
+        <if test="documentNumber != null and documentNumber.type != '' and documentNumber.type != null and documentNumber.type=='0'.toString()">
+            and tod.documentNumber = #{documentNumber.value}
+        </if>
+        <if test="documentNumber != null and documentNumber.type != '' and documentNumber.type != null and documentNumber.type=='1'.toString()">
+            and tod.documentNumber like concat('%',#{documentNumber.value},'%')
+        </if>
+        <if test="documentNumber != null and documentNumber.type != '' and documentNumber.type != null and documentNumber.type=='2'.toString()">
+            and tod.documentNumber != #{documentNumber.value}
+        </if>
+
+        <if test="receiptNumber != null and receiptNumber.type != '' and documentNumber.type != null and receiptNumber.type=='0'.toString()">
+            and tr.documentNumber = #{receiptNumber.value}
+        </if>
+        <if test="receiptNumber != null and receiptNumber.type != '' and documentNumber.type != null and receiptNumber.type=='1'.toString()">
+            and tr.documentNumber like concat('%',#{receiptNumber.value},'%')
+        </if>
+        <if test="receiptNumber != null and receiptNumber.type != '' and documentNumber.type != null and receiptNumber.type=='2'.toString()">
+            and tr.documentNumber != #{receiptNumber.value}
+        </if>
+
+        <if test="orderDate != null and orderDate.type != '' and orderDate.type != null and orderDate.type=='0'.toString()">
+            and substring(tod.orderSubmitTime,1,10) <![CDATA[ >= ]]> #{orderDate.startDate} and substring(tod.orderSubmitTime,1,10) <![CDATA[ <= ]]> #{orderDate.endDate}
+        </if>
+        <if test="orderDate != null and orderDate.type != '' and orderDate.type != null and orderDate.type != null and orderDate.type=='1'.toString()">
+            and substring(tod.orderSubmitTime,1,10) <![CDATA[ < ]]> #{orderDate.startDate}
+        </if>
+        <if test="orderDate != null and orderDate.type != '' and orderDate.type != null and orderDate.type != null and orderDate.type=='2'.toString()">
+            and substring(tod.orderSubmitTime,1,10) <![CDATA[ > ]]> #{orderDate.startDate}
+        </if>
+        <if test="orderDate != null and orderDate.type != '' and orderDate.type != null and orderDate.type=='3'.toString()">
+            and substring(tod.orderSubmitTime,1,10) = #{orderDate.startDate}
+        </if>
+
+        <if test="loadingDate != null and loadingDate.type != '' and loadingDate.type != null and loadingDate.type=='0'.toString()">
+            and substring(tr.deliveryTime,1,10) <![CDATA[ >= ]]> #{loadingDate.startDate} and substring(tr.deliveryTime,1,10) <![CDATA[ <= ]]> #{loadingDate.endDate}
+        </if>
+        <if test="loadingDate != null and loadingDate.type != '' and loadingDate.type != null and loadingDate.type=='1'.toString()">
+            and substring(tr.deliveryTime,1,10) <![CDATA[ < ]]> #{loadingDate.startDate}
+        </if>
+        <if test="loadingDate != null and loadingDate.type != '' and loadingDate.type != null and loadingDate.type=='2'.toString()">
+            and substring(tr.deliveryTime,1,10) <![CDATA[ > ]]> #{loadingDate.startDate}
+        </if>
+        <if test="loadingDate != null and loadingDate.type != '' and loadingDate.type != null and loadingDate.type=='3'.toString()">
+            and substring(tr.deliveryTime,1,10) = #{loadingDate.startDate}
+        </if>
+
+        <if test="deliveryTime != null and deliveryTime.type != '' and deliveryTime.type != null and deliveryTime.type=='0'.toString()">
+            and tr.deliveryTime <![CDATA[ >= ]]> #{deliveryTime.startDate} and tr.deliveryTime <![CDATA[ <= ]]> #{deliveryTime.endDate}
+        </if>
+        <if test="deliveryTime != null and deliveryTime.type != '' and deliveryTime.type != null and deliveryTime.type=='1'.toString()">
+            and tr.deliveryTime <![CDATA[ < ]]> #{deliveryTime.startDate}
+        </if>
+        <if test="deliveryTime != null and deliveryTime.type != '' and deliveryTime.type != null and deliveryTime.type=='2'.toString()">
+            and tr.deliveryTime <![CDATA[ > ]]> #{deliveryTime.startDate}
+        </if>
+        <if test="deliveryTime != null and deliveryTime.type != '' and deliveryTime.type != null and deliveryTime.type=='3'.toString()">
+            and tr.deliveryTime = #{deliveryTime.startDate}
+        </if>
+
+        <if test="shipmentTime != null and shipmentTime.type != '' and shipmentTime.type != null">
+            and TIMESTAMPDIFF(DAY,substring(tod.orderSubmitTime,1,10),substring(tr.deliveryTime,1,10)) ${shipmentTime.type} #{shipmentTime.value}+0
+        </if>
+
+
+        <if test="appropriateInvestTime != null and appropriateInvestTime.type != '' and appropriateInvestTime.type != null and appropriateInvestTime.type=='0'.toString()">
+            and tr.appropriateInvestTime <![CDATA[ >= ]]> #{appropriateInvestTime.startDate} and tr.appropriateInvestTime <![CDATA[ <= ]]> #{appropriateInvestTime.endDate}
+        </if>
+        <if test="appropriateInvestTime != null and appropriateInvestTime.type != '' and appropriateInvestTime.type != null and appropriateInvestTime.type=='1'.toString()">
+            and tr.appropriateInvestTime <![CDATA[ < ]]> #{appropriateInvestTime.startDate}
+        </if>
+        <if test="appropriateInvestTime != null and appropriateInvestTime.type != '' and appropriateInvestTime.type != null and appropriateInvestTime.type=='2'.toString()">
+            and tr.appropriateInvestTime <![CDATA[ > ]]> #{appropriateInvestTime.startDate}
+        </if>
+        <if test="appropriateInvestTime != null and appropriateInvestTime.type != '' and appropriateInvestTime.type != null and appropriateInvestTime.type=='3'.toString()">
+            and tr.appropriateInvestTime = #{appropriateInvestTime.startDate}
+        </if>
+
+        <if test="logisticsTime != null and logisticsTime.type != '' and logisticsTime.type != null">
+            and TIMESTAMPDIFF(DAY,substring(tr.deliveryTime,1,10),substring(tr.appropriateInvestTime,1,10)) ${logisticsTime.type} #{logisticsTime.value} +0
+        </if>
+
+        <if test="logisticsStatus != null and logisticsStatus.type != '' and logisticsStatus.type != null and logisticsStatus.type=='0'.toString()">
+            and tr.systemState = #{logisticsStatus.value}
+        </if>
+        <if test="logisticsStatus != null and logisticsStatus.type != '' and logisticsStatus.type != null and logisticsStatus.type=='1'.toString()">
+            and tr.systemState like concat('%',#{logisticsStatus.value},'%')
+        </if>
+        <if test="logisticsStatus != null and logisticsStatus.type != '' and logisticsStatus.type != null and logisticsStatus.type=='2'.toString()">
+            and tr.systemState != #{logisticsStatus.value}
+        </if>
+
+        <if test="demand != null and demand.type != '' and demand.type != null">
+            and trd.applyNumber ${demand.type} #{demand.value}+0
+        </if>
+
+        <if test="notOffer != null and notOffer.type != '' and demand.type != null">
+            and total.totalLine ${notOffer.type} #{notOffer.value}+0
+        </if>
+        GROUP BY tod.documentNumber,tr.documentNumber
+        <if test="orderDate != null and orderDate.sort != null and orderDate.sort != ''">
+            order by orderDate ${orderDate.sort}
+        </if>
+        <if test="loadingDate != null and loadingDate.sort != null and loadingDate.sort != ''">
+            order by loadingDate ${loadingDate.sort}
+        </if>
+        <if test="deliveryTime != null and deliveryTime.sort != null and deliveryTime.sort != ''">
+            order by deliveryTime ${deliveryTime.sort}
+        </if>
+        <if test="shipmentTime != null and shipmentTime.sort != null and shipmentTime.sort != ''">
+            order by shipmentTime ${shipmentTime.sort}
+        </if>
+        <if test="appropriateInvestTime != null and appropriateInvestTime.sort != null and appropriateInvestTime.sort != ''">
+            order by appropriateInvestTime ${appropriateInvestTime.sort}
+        </if>
+        <if test="logisticsTime != null and logisticsTime.sort != null and logisticsTime.sort != ''">
+            order by logisticsTime ${logisticsTime.sort}
+        </if>
+        <if test="demand != null and demand.sort != null and  demand.sort != ''">
+            order by demand ${demand.sort}
+        </if>
+        <if test="notOffer != null and notOffer.sort != null and notOffer.sort != ''">
+            order by notOffer ${notOffer.sort}
+        </if>
+        <if test="orderDate.sort == '' and loadingDate.sort == '' and deliveryTime.sort == '' and shipmentTime.sort == ''
+            and appropriateInvestTime.sort == '' and logisticsTime.sort == '' and demand.sort == ''
+            and notOffer.sort == ''">
+            order by tod.documentNumber desc
+        </if>
+
+    </select>
+
+    <!--根据时间段获取收货订单数-->
+    <select id="getReceiptListCountByDate" resultType="java.lang.Integer">
+        select count(1) from t_receipt where appropriateInvestTime is null or appropriateInvestTime =''  and  substring(deliveryTime,1,10) <![CDATA[ >= ]]> #{startDate}
+        and substring(deliveryTime,1,10) <![CDATA[ <= ]]> #{endDate}
+    </select>
+
+    <!--根据时间段获取妥投订单数-->
+    <select id="getVoteCountByDate" resultType="java.lang.Integer">
+        select count(1) from t_receipt where appropriateInvestTime is not null and appropriateInvestTime !='' and systemState ='待收货'
+        and substring(deliveryTime,1,10) <![CDATA[ >= ]]> #{startDate}
+        and substring(deliveryTime,1,10) <![CDATA[ <= ]]> #{endDate}
+    </select>
+
+    <!--获取超时的妥投订单数-->
+    <select id="getTimeOutReceipt" resultType="java.lang.Integer">
+        SELECT count(1) from t_receipt where systemState='待收货' and  appropriateInvestTime is not null and appropriateInvestTime !='' and TimeStampDiff(DAY,substring(deliveryTime,1,10),IF(appropriateInvestTime is null and goodTime is null,curdate(),IF(IF(appropriateInvestTime is null or appropriateInvestTime='','3022-12-12',appropriateInvestTime)>
+        IF(goodTime is null or goodTime='','3022-12-12',goodTime), substring(goodTime,1,10), substring(appropriateInvestTime,1,10))))  >   2
+    </select>
+
+    <!--装箱单到收货单的总时长-->
+    <select id="getAllTime" resultType="java.lang.Integer">
+        select IFNULL(sum(TIMESTAMPDIFF(HOUR,loadingDate,deliveryTime)) ,0) from(
+        select tpl.loadingDate,tr.deliveryTime from t_receipt tr
+        LEFT JOIN t_receipt_detail trd on trd.documentNumber=tr.documentNumber
+        LEFT JOIN t_packing_list_detail tpld on tpld.associatedOrderNumber=trd.associatedOrderNumber and tpld.partDrawingNo=trd.partDrawingNo
+        LEFT JOIN t_packing_list tpl on tpl.packingListNo=tpld.packingListNo
+        where substring(tr.deliveryTime,1,10) <![CDATA[ >= ]]> #{startDate}
+        and substring(tr.deliveryTime,1,10) <![CDATA[ <= ]]> #{endDate} GROUP BY tr.documentNumber)list
+    </select>
+
+    <!--收货单到妥投订单的总时长-->
+    <select id="getAllVoteTime" resultType="java.lang.Integer">
+        select IFNULL(sum(TIMESTAMPDIFF(HOUR,deliveryTime,appropriateInvestTime)) ,0) from(
+        select deliveryTime,appropriateInvestTime from t_receipt
+        where appropriateInvestTime is not null and appropriateInvestTime !='' and systemState ='待收货'
+        and substring(deliveryTime,1,10) <![CDATA[ >= ]]> #{startDate}
+        and substring(deliveryTime,1,10) <![CDATA[ <= ]]> #{endDate} GROUP BY documentNumber) list
+    </select>
+
+    <!--获取实时的收货单数量-->
+    <select id="realReceiptOrder" resultType="java.lang.Integer">
+        select count(1) from (
+        select 1 from t_receipt_detail trd where
+				documentNumber in(select documentNumber from t_receipt where systemState='待收货' and (appropriateInvestTime='' or appropriateInvestTime is null) )
+        GROUP BY documentNumber)list
+    </select>
+
+    <!--获取实时的妥投单数量-->
+    <select id="realVoteNumber" resultType="java.lang.Integer">
+        select count(1) from (
+        select 1 from t_receipt_detail
+		where documentNumber in(select documentNumber from t_receipt where systemState='待收货' and appropriateInvestTime is not null and appropriateInvestTime!='')
+        GROUP BY documentNumber)list
+    </select>
+
+    <!--根据收货单号获取收货单-->
+    <select id="getReceiptFlag" resultType="java.lang.String">
+      select documentNumber from t_receipt where documentNumber=#{documentNumber}
+    </select>
+
+    <!--获取附表中关联的订单号-->
+    <select id="getOrderValue" resultType="java.util.Map">
+      select documentNumber,associatedOrderNumber from t_receipt_detail GROUP BY documentNumber
+    </select>
+
+<!--    获取担当的符合nds3的服务点收货订单行数-->
+    <select id="getCountByNDS3" resultType="java.lang.Integer">
+        select count(1) from (select 1 from t_receipt tr
+        LEFT JOIN t_receipt_detail trd on tr.documentNumber=trd.documentNumber
+        where 1=1
+        <if test="startDate != null and startDate != ''">
+            and substring(tr.deliveryTime,1,10) <![CDATA[ >= ]]> #{startDate}
+        </if>
+        <if test="endDate != null and endDate != ''">
+            and substring(tr.deliveryTime,1,10) <![CDATA[ <= ]]> #{endDate}
+        </if>
+        and (tr.appropriateInvestTime is not null or tr.goodTime is not null)
+        and TimeStampDiff(DAY,tr.deliveryTime,IF(IF(tr.appropriateInvestTime is null or tr.appropriateInvestTime='','3022-12-12 00:00:00',tr.appropriateInvestTime)>
+        IF(tr.goodTime is null or tr.goodTime='','3022-12-12 00:00:00',tr.goodTime), substring(tr.goodTime,1,10), substring(tr.appropriateInvestTime,1,10))) <![CDATA[ <= ]]>  3
+        GROUP BY tr.documentNumber,trd.associatedOrderNumber,trd.partDrawingNo) list
+    </select>
+    <select id="getCountByScreenDate" resultType="java.lang.Integer">
+        select count(1) from (select 1 from t_receipt tr
+        LEFT JOIN t_receipt_detail trd on tr.documentNumber=trd.documentNumber
+        where 1=1
+        and tr.documentNumber  not in (select documentNumber  from t_receipt
+        where appropriateInvestTime is null and goodTime is null
+        and substring(deliveryTime ,1,10) <![CDATA[ >= ]]> DATE_SUB(DATE_FORMAT(NOW(),'%Y-%m-%d'),INTERVAL 1 DAY)
+        and substring(deliveryTime ,1,10) <![CDATA[ <= ]]> DATE_FORMAT(NOW(),'%Y-%m-%d'))
+        <if test="startDate != null and startDate != ''">
+            and substring(tr.deliveryTime,1,10) <![CDATA[ >= ]]> #{startDate}
+        </if>
+        <if test="endDate != null and endDate != ''">
+            and substring(tr.deliveryTime,1,10) <![CDATA[ <= ]]> #{endDate}
+        </if>
+
+        GROUP BY tr.documentNumber,trd.associatedOrderNumber,trd.partDrawingNo) list
+    </select>
+    <select id="getCountByNds2ScreenDate" resultType="java.lang.Integer">
+        select count(1) from (select 1 from t_receipt tr
+        LEFT JOIN t_receipt_detail trd on tr.documentNumber=trd.documentNumber
+        where 1=1
+        <if test="startDate != null and startDate != ''">
+            and substring(tr.deliveryTime,1,10) <![CDATA[ >= ]]> #{startDate}
+        </if>
+        <if test="endDate != null and endDate != ''">
+            and substring(tr.deliveryTime,1,10) <![CDATA[ <= ]]> #{endDate}
+        </if>
+        and (tr.appropriateInvestTime is not null or tr.goodTime is not null)
+        and TimeStampDiff(DAY,tr.deliveryTime,IF(IF(tr.appropriateInvestTime is null or tr.appropriateInvestTime='','3022-12-12 00:00:00',tr.appropriateInvestTime)>
+        IF(tr.goodTime is null or tr.goodTime='','3022-12-12 00:00:00',tr.goodTime), substring(tr.goodTime,1,10), substring(tr.appropriateInvestTime,1,10))) <![CDATA[ <= ]]>  2
+        GROUP BY tr.documentNumber,trd.associatedOrderNumber,trd.partDrawingNo) list
+    </select>
+    <select id="getVoteTimeOutLine" resultType="java.lang.Integer">
+        SELECT count(1) from t_receipt tr LEFT JOIN t_receipt_detail trd on tr.documentNumber=trd.documentNumber
+        where systemState='待收货' and  appropriateInvestTime is not null and appropriateInvestTime !='' and TimeStampDiff(DAY,substring(deliveryTime,1,10),IF(appropriateInvestTime is null and goodTime is null,curdate(),IF(IF(appropriateInvestTime is null or appropriateInvestTime='','3022-12-12',appropriateInvestTime)>
+        IF(goodTime is null or goodTime='','3022-12-12',goodTime), substring(goodTime,1,10), substring(appropriateInvestTime,1,10))))  >   2
+    </select>
+
+
+</mapper>
