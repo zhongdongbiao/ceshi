@@ -98,6 +98,7 @@ public class CoreIndexController extends CommonController {
         System.out.println("123");
         System.out.println("123");
         System.out.println("123");
+        System.out.println("456");
         return RetResponse.makeOKRsp(hrmAccountInfoDTOS);
     }
 
