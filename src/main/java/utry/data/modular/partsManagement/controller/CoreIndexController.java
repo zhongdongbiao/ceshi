@@ -95,6 +95,7 @@ public class CoreIndexController extends CommonController {
     @PostMapping("/getAllBear")
     public RetResult getAllBear() {
         List<HrmAccountInfoDTO> hrmAccountInfoDTOS = userFactoryDao.selectConfig();
+        System.out.println("123");
         return RetResponse.makeOKRsp(hrmAccountInfoDTOS);
     }
 
